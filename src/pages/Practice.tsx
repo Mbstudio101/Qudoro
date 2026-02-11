@@ -16,6 +16,7 @@ const Practice = () => {
   const [showResults, setShowResults] = useState(false);
   const [score, setScore] = useState(0);
   const [incorrectQuestionIds, setIncorrectQuestionIds] = useState<string[]>([]);
+  const [startTime, setStartTime] = useState(Date.now());
   const sessionSaved = useRef(false);
   
   const currentSet = sets.find((s) => s.id === setId);
@@ -44,15 +45,17 @@ const Practice = () => {
   useEffect(() => {
     if (showResults && currentSet && !sessionSaved.current) {
       sessionSaved.current = true;
+      const duration = (Date.now() - startTime) / 1000; // duration in seconds
       addSession({
         setId: currentSet.id,
-        date: Date.now(),
+        date: startTime, // use start time as session date
         score: score,
         totalQuestions: setQuestions.length,
-        incorrectQuestionIds: incorrectQuestionIds
+        incorrectQuestionIds: incorrectQuestionIds,
+        duration: duration
       });
     }
-  }, [showResults, currentSet, score, setQuestions.length, incorrectQuestionIds, addSession]);
+  }, [showResults, currentSet, score, setQuestions.length, incorrectQuestionIds, addSession, startTime]);
 
   if (!currentSet || !currentQuestion) {
     return (

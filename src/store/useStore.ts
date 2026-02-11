@@ -31,6 +31,7 @@ export interface StudySession {
   score: number;
   totalQuestions: number;
   incorrectQuestionIds: string[];
+  duration?: number; // seconds
 }
 
 export interface Achievement {
@@ -50,6 +51,8 @@ export interface UserStats {
   lastStudyDate: number;
   xp: number;
   level: number;
+  perfectedSetIds: string[];
+  importedSetsCount: number;
 }
 
 export interface UserProfile {
@@ -106,6 +109,16 @@ export const AVAILABLE_ACHIEVEMENTS = [
   { id: 'early_bird', title: 'Early Bird', description: 'Complete a session before 8 AM', icon: 'sun', xp: 100 },
   { id: 'weekend_warrior', title: 'Weekend Warrior', description: 'Study on a weekend', icon: 'calendar', xp: 150 },
   
+  // Custom Badges
+  { id: 'bookworm', title: 'Bookworm', description: 'Complete 50 full study sessions', icon: 'book_open', xp: 500 },
+  { id: 'mentorship', title: 'Mentorship', description: 'Score 100% on 5 different sets', icon: 'crown', xp: 1000 },
+  { id: 'massed_practitioner', title: 'Massed Practitioner', description: 'Complete a single session lasting over 2 hours', icon: 'layers', xp: 800 },
+  { id: 'all_nighter', title: 'All-nighter Puller', description: 'Study through the night (1 AM - 5 AM)', icon: 'moon', xp: 600 },
+  { id: 'leave_no_trace', title: 'Leave No Trace', description: 'Import 20+ sets from external sources', icon: 'download', xp: 300 },
+  { id: 'hasty', title: 'Hasty', description: 'Complete an exam quickly (<15s/question) with >80% accuracy', icon: 'zap', xp: 700 },
+  { id: 'happy_camper', title: 'Happy Camper', description: 'Wake up bright and early (5 AM - 8 AM) to complete an exam', icon: 'sun', xp: 400 },
+  { id: 'daredevil', title: 'Daredevil', description: 'Complete a marathon session ending between 3 AM - 6 AM', icon: 'skull', xp: 1500 },
+
   // Long-term Goals
   { id: 'legend', title: 'Legend', description: 'Reach Level 10', icon: 'star', xp: 2000 },
   { id: 'marathon', title: 'Marathoner', description: 'Answer 1000 questions', icon: 'award', xp: 2500 },
@@ -150,7 +163,9 @@ export const useStore = create<AppState>()(
           streakDays: 0,
           lastStudyDate: 0,
           xp: 0,
-          level: 1
+          level: 1,
+          perfectedSetIds: [],
+          importedSetsCount: 0
         },
         achievements: []
       } as UserProfile,
@@ -262,10 +277,16 @@ export const useStore = create<AppState>()(
         get().checkAchievements();
       },
       importData: (data) =>
-        set((state) => ({
-          questions: [...state.questions, ...data.questions],
-          sets: [...state.sets, ...data.sets],
-        })),
+        set((state) => {
+          const newStats = { ...state.userProfile.stats };
+          newStats.importedSetsCount = (newStats.importedSetsCount || 0) + data.sets.length;
+          
+          return {
+            questions: [...state.questions, ...data.questions],
+            sets: [...state.sets, ...data.sets],
+            userProfile: { ...state.userProfile, stats: newStats }
+          };
+        }),
       resetData: () =>
         set({
           questions: [],
@@ -283,7 +304,9 @@ export const useStore = create<AppState>()(
               streakDays: 0,
               lastStudyDate: 0,
               xp: 0,
-              level: 1
+              level: 1,
+              perfectedSetIds: [],
+              importedSetsCount: 0
             },
             achievements: [] 
           },
@@ -372,10 +395,62 @@ export const useStore = create<AppState>()(
             const lastSession = state.sessions[state.sessions.length - 1];
             if (lastSession) {
                 const date = new Date(lastSession.date);
-                if (date.getHours() >= 22) unlock('night_owl');
-                if (date.getHours() < 8) unlock('early_bird');
+                const hour = date.getHours();
+                
+                // Existing
+                if (hour >= 22) unlock('night_owl');
+                if (hour < 8) unlock('early_bird');
                 if (date.getDay() === 0 || date.getDay() === 6) unlock('weekend_warrior');
+
+                // Custom Badges Logic
+                
+                // All-nighter: 1 AM - 5 AM
+                if (hour >= 1 && hour <= 5) unlock('all_nighter');
+
+                // Happy Camper: 5 AM - 8 AM
+                if (hour >= 5 && hour < 8) unlock('happy_camper');
+
+                // Massed Practitioner: > 2 hours (120 mins)
+                // Note: duration is stored in seconds in addSession call in React components, 
+                // but StudySession interface doesn't explicitly have duration field in this file yet (it was Omit<StudySession, 'id'>).
+                // However, we passed 'duration' in Flashcards.tsx. Let's assume we can access it if we added it to interface,
+                // but since we only have 'totalStudyTime' in stats, we might need to rely on that or add duration to interface.
+                // Let's check StudySession interface again. It has date, score, totalQuestions. 
+                // It does NOT have duration. We should add it to interface to be safe.
+                
+                // Mentorship: 100% score on 5 different sets
+                if (lastSession.score === lastSession.totalQuestions && lastSession.totalQuestions > 0) {
+                     if (!stats.perfectedSetIds.includes(lastSession.setId)) {
+                         stats.perfectedSetIds.push(lastSession.setId);
+                         updated = true;
+                     }
+                }
+                if (stats.perfectedSetIds.length >= 5) unlock('mentorship');
+
+                // Hasty: <15s/question AND >80% accuracy
+                if (lastSession.duration && lastSession.totalQuestions > 0) {
+                    const avgTime = lastSession.duration / lastSession.totalQuestions;
+                    const accuracy = lastSession.score / lastSession.totalQuestions;
+                    if (avgTime < 15 && accuracy > 0.8) unlock('hasty');
+                }
+
+                // Massed Practitioner: > 2 hours (7200 seconds)
+                if (lastSession.duration && lastSession.duration > 7200) unlock('massed_practitioner');
+
+                // Daredevil: > 4 hours (14400s) AND ending between 3 AM - 6 AM
+                if (lastSession.duration && lastSession.duration > 14400) {
+                     // date is Start time. End time = date + duration*1000
+                     const endTime = new Date(lastSession.date + (lastSession.duration * 1000));
+                     const endHour = endTime.getHours();
+                     if (endHour >= 3 && endHour <= 6) unlock('daredevil');
+                }
             }
+            
+            // Bookworm: 50 sessions
+            if (state.sessions.length >= 50) unlock('bookworm');
+
+            // Leave No Trace: 20+ imported sets
+            if (stats.importedSetsCount >= 20) unlock('leave_no_trace');
 
             if (stats.level >= 10) unlock('legend');
             if (stats.totalQuestionsAnswered >= 1000) unlock('marathon');

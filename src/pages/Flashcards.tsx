@@ -13,6 +13,7 @@ const Flashcards = () => {
   const [selectedSetId, setSelectedSetId] = useState<string | null>(null);
   const [correctCount, setCorrectCount] = useState(0);
   const [incorrectIds, setIncorrectIds] = useState<string[]>([]);
+  const [startTime, setStartTime] = useState(Date.now());
 
   // Calculate due questions for all sets initially to show counts
   const getDueQuestionsForSet = (setId: string | 'all') => {
@@ -39,6 +40,7 @@ const Flashcards = () => {
     setSessionComplete(false);
     setCorrectCount(0);
     setIncorrectIds([]);
+    setStartTime(Date.now());
   };
 
   const currentQuestion = dueQuestions[currentIndex];
@@ -63,13 +65,15 @@ const Flashcards = () => {
     } else {
       const finalCorrectCount = (rating === 'good' || rating === 'easy') ? correctCount + 1 : correctCount;
       const finalIncorrectIds = (rating === 'again' || rating === 'hard') ? [...incorrectIds, currentQuestion.id] : incorrectIds;
-      
+      const duration = (Date.now() - startTime) / 1000;
+
       addSession({
         setId: selectedSetId || 'all',
-        date: Date.now(),
+        date: startTime, // Use start time as session date
         score: finalCorrectCount,
         totalQuestions: dueQuestions.length,
-        incorrectQuestionIds: finalIncorrectIds
+        incorrectQuestionIds: finalIncorrectIds,
+        duration: duration
       });
       setSessionComplete(true);
     }

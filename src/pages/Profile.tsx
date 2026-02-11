@@ -1,7 +1,7 @@
 import React, { useRef, useState, useMemo } from 'react';
 import { useStore, AVAILABLE_ACHIEVEMENTS } from '../store/useStore';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Trophy, Flame, Award, User, Clock, Star, Brain, Layers, BookOpen, HelpCircle, Folder, X, GraduationCap, Palette, Shuffle, AlertTriangle, Zap, Pen, Shield, Moon, Sun, Calendar } from 'lucide-react';
+import { Trophy, Flame, Award, User, Clock, Star, Brain, Layers, BookOpen, HelpCircle, Folder, X, GraduationCap, Palette, Shuffle, AlertTriangle, Zap, Pen, Shield, Moon, Sun, Calendar, Download, Skull, CheckSquare } from 'lucide-react';
 
 // Debug component to help identify image loading issues
 const ImageWithDebug = ({ src, alt, className, ...props }: React.ImgHTMLAttributes<HTMLImageElement>) => {
@@ -464,6 +464,10 @@ const ACHIEVEMENT_ICONS: Record<string, any> = {
   calendar: Calendar,
   star: Star,
   award: Award,
+  book_open: BookOpen,
+  download: Download,
+  skull: Skull,
+  check_square: CheckSquare,
 };
 
 const Profile = () => {
