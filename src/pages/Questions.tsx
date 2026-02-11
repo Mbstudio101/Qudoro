@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useStore, Question } from '../store/useStore';
-import { Plus, Trash2, Edit2, Search, CheckSquare, Square, Save, Check, ChevronDown, ChevronRight, Folder, List } from 'lucide-react';
+import { Plus, Trash2, Edit2, Search, Save, Check, ChevronDown, ChevronRight, Folder, List, CheckSquare, Square } from 'lucide-react';
+
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
@@ -8,7 +9,11 @@ import Textarea from '../components/ui/Textarea';
 import { motion } from 'framer-motion';
 
 const Questions = () => {
-  const { questions, sets, addQuestion, deleteQuestion, updateQuestion, addQuestionToSet, addSet } = useStore();
+  const { questions: allQuestions, sets: allSets, addQuestion, deleteQuestion, updateQuestion, addQuestionToSet, addSet, activeProfileId } = useStore();
+
+  const questions = useMemo(() => allQuestions.filter(q => !q.profileId || q.profileId === activeProfileId), [allQuestions, activeProfileId]);
+  const sets = useMemo(() => allSets.filter(s => !s.profileId || s.profileId === activeProfileId), [allSets, activeProfileId]);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSetModalOpen, setIsSetModalOpen] = useState(false);
   const [isSetBuilderMode, setIsSetBuilderMode] = useState(false);
@@ -429,7 +434,6 @@ const Questions = () => {
                                                 />
                                             </div>
                                         )}
-                                        {/* Tags removed as per previous request, keeping logic clean */}
                                     </div>
                                     <div className="text-sm text-muted-foreground line-clamp-3 mb-4">
                                         <span className="font-medium text-foreground">Answer: </span>

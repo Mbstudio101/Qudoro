@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { HashRouter, Routes, Route } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useStore } from './store/useStore';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
@@ -11,11 +11,31 @@ import Practice from './pages/Practice';
 import Profile from './pages/Profile';
 import Calendar from './pages/Calendar';
 import Notes from './pages/Notes';
+import Login from './pages/Auth/Login';
+import Signup from './pages/Auth/Signup';
+import ProfileSelect from './pages/Auth/ProfileSelect';
+
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const { isAuthenticated, activeProfileId } = useStore();
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!activeProfileId) return <Navigate to="/profiles" replace />;
+  return <>{children}</>;
+};
 
 const AnimatedRoutes = () => {
+  const { isAuthenticated } = useStore();
+
   return (
     <Routes>
-      <Route path="/" element={<Layout />}>
+      <Route path="/login" element={<Login />} />
+      <Route path="/signup" element={<Signup />} />
+      <Route path="/profiles" element={isAuthenticated ? <ProfileSelect /> : <Navigate to="/login" />} />
+
+      <Route path="/" element={
+        <ProtectedRoute>
+          <Layout />
+        </ProtectedRoute>
+      }>
         <Route index element={<Dashboard />} />
         <Route path="calendar" element={<Calendar />} />
         <Route path="notes" element={<Notes />} />

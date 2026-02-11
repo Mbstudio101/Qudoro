@@ -1,6 +1,5 @@
-import fs from 'fs';
 import path from 'path';
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import started from 'electron-squirrel-startup';
 import Store from 'electron-store';
 import { UpdateService } from './services/UpdateService';
@@ -130,7 +129,6 @@ ipcMain.handle('fetch-url', async (event, url) => {
         // And if we have some quizlet data markers
         // We log the title for debugging
         const title = await win.webContents.executeJavaScript('document.title');
-        console.log('Current page title:', title);
 
         if (!content.includes('<title>Just a moment...</title>') && 
            (content.includes('SetPageTerms-term') || 

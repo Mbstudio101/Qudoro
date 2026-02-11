@@ -11,6 +11,7 @@ import {
   Layers,
   TrendingUp,
   Zap,
+  Plus,
 } from 'lucide-react';
 import Button from '../components/ui/Button';
 import { useNavigate } from 'react-router-dom';
@@ -28,7 +29,11 @@ import {
 import Input from '../components/ui/Input';
 
 const Dashboard = () => {
-  const { questions, sets, userProfile, setUserProfile, updateLastVisit } = useStore();
+  const { questions: allQuestions, sets: allSets, userProfile, setUserProfile, updateLastVisit, activeProfileId } = useStore();
+  
+  const questions = useMemo(() => allQuestions.filter(q => !q.profileId || q.profileId === activeProfileId), [allQuestions, activeProfileId]);
+  const sets = useMemo(() => allSets.filter(s => !s.profileId || s.profileId === activeProfileId), [allSets, activeProfileId]);
+
   const navigate = useNavigate();
   const [greeting, setGreeting] = useState('');
   const [isEditingName, setIsEditingName] = useState(false);
@@ -47,19 +52,15 @@ const Dashboard = () => {
     const hour = new Date().getHours();
     let timeGreeting = 'Welcome';
     
-    if (hour >= 5 && hour < 12) {
+    if (hour < 12) {
       timeGreeting = 'Good morning';
     } else if (hour >= 12 && hour < 18) {
       timeGreeting = 'Good afternoon';
-    } else if (hour >= 18 || hour < 5) {
+    } else {
       timeGreeting = 'Good evening';
     }
 
-    if (!lastVisit) {
-      setGreeting(`Welcome, ${userProfile.name}!`);
-    } else {
-      setGreeting(`${timeGreeting}, ${userProfile.name}!`);
-    }
+    setGreeting(`${timeGreeting}, ${userProfile.name}!`);
   }, [userProfile.lastVisit, userProfile.name, updateLastVisit]); // Run when profile changes
 
   // Calculate Stats
@@ -215,7 +216,7 @@ const Dashboard = () => {
                 <Zap className="mr-2 h-4 w-4" /> Start Review
             </Button>
             <Button variant="outline" onClick={() => navigate('/questions')}>
-                <PlusIcon /> Add New
+                <Plus className="mr-2 h-4 w-4" /> Add New
             </Button>
         </div>
       </div>
@@ -395,9 +396,5 @@ const StatCard = ({ title, value, icon, trend, highlight }: { title: string, val
         {trend && <div className="text-xs text-muted-foreground mt-1">{trend}</div>}
     </motion.div>
 );
-
-const PlusIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 h-4 w-4"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
-)
 
 export default Dashboard;

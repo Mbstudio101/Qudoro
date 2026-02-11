@@ -1,38 +1,9 @@
 import React, { useRef, useState, useMemo } from 'react';
 import { useStore, AVAILABLE_ACHIEVEMENTS } from '../store/useStore';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Trophy, Flame, Award, User, Clock, Star, Layers, BookOpen, HelpCircle, X, GraduationCap, Palette, Shuffle, AlertTriangle, Zap, Pen, Shield, Moon, Sun, Calendar, Download, Skull, CheckSquare, Crown } from 'lucide-react';
+import { Trophy, Flame, Award, User, Clock, Star, Layers, BookOpen, HelpCircle, X, GraduationCap, Palette, Shuffle, Zap, Pen, Shield, Moon, Sun, Calendar, Download, Skull, CheckSquare, Crown, LucideIcon } from 'lucide-react';
 import { GameBadge } from '../components/ui/GameBadge';
-
-// Debug component to help identify image loading issues
-const ImageWithDebug = ({ src, alt, className, ...props }: React.ImgHTMLAttributes<HTMLImageElement>) => {
-    const [error, setError] = useState<boolean>(false);
-
-    if (error) {
-        return (
-            <div className={`flex flex-col items-center justify-center bg-destructive/10 text-destructive p-2 text-[10px] overflow-hidden border border-destructive/50 ${className}`} title={src}>
-                <AlertTriangle size={16} className="mb-1" />
-                <div className="font-bold">Image Failed</div>
-                <div className="w-full bg-white/50 p-1 rounded select-all cursor-text text-black font-mono text-[8px] break-all h-20 overflow-y-auto">
-                    {src}
-                </div>
-            </div>
-        );
-    }
-
-    return (
-        <img
-            src={src}
-            alt={alt}
-            className={className}
-            onError={() => {
-                console.error(`[ImageDebug] Failed to load: ${src}`);
-                setError(true);
-            }}
-            {...props}
-        />
-    );
-};
+import { getAvatarUrl } from '../utils/avatar';
 
 // Options for custom avatar builder
 const AVATAR_OPTIONS = {
@@ -143,36 +114,6 @@ const AVATAR_CATEGORIES: {
   }
 ];
 
-const getAvatarUrl = (avatarString: string) => {
-  if (!avatarString) return '';
-  
-  let url = '';
-  // Check for new format with options (style:seed|options)
-  if (avatarString.includes('|')) {
-      const [base, optionsStr] = avatarString.split('|');
-      let style = 'adventurer';
-      let seed = base;
-      
-      if (base.includes(':')) {
-          [style, seed] = base.split(':');
-      }
-      
-      // Ensure parameters are properly encoded
-      const params = new URLSearchParams(optionsStr);
-      url = `https://api.dicebear.com/7.x/${style}/svg?seed=${encodeURIComponent(seed)}&${params.toString()}`;
-  } else if (avatarString.includes(':')) {
-    const [style, seed] = avatarString.split(':');
-    url = `https://api.dicebear.com/7.x/${style}/svg?seed=${encodeURIComponent(seed)}`;
-  } else {
-    // Legacy support for adventurer style
-    url = `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(avatarString)}`;
-  }
-  
-  // Debug log
-  // console.log(`[AvatarURL] Generated:`, url);
-  return url;
-};
-
 interface AvatarBuilderOptions {
     style: string;
     seed: string;
@@ -222,7 +163,7 @@ const CustomAvatarBuilder = ({ initialAvatar, onSave }: { initialAvatar?: string
         // Only support avataaars editing for now
         if (style !== 'avataaars') return defaultOptions;
 
-        const parsedOptions: any = { ...defaultOptions, style, seed };
+        const parsedOptions: AvatarBuilderOptions = { ...defaultOptions, style, seed };
         
         if (paramsString) {
             const searchParams = new URLSearchParams(paramsString);
@@ -295,7 +236,7 @@ const CustomAvatarBuilder = ({ initialAvatar, onSave }: { initialAvatar?: string
     params.append('mouth[]', 'smile');
     params.append('eyebrows[]', 'defaultNatural');
 
-    const url = `https://api.dicebear.com/7.x/${options.style}/svg?${params.toString()}`;
+    const url = `https://api.dicebear.com/9.x/${options.style}/svg?${params.toString()}`;
     // console.log('[AvatarBuilder] Preview URL:', url);
     return url;
   }, [options]);
@@ -342,7 +283,7 @@ const CustomAvatarBuilder = ({ initialAvatar, onSave }: { initialAvatar?: string
   return (
     <div className="flex flex-col md:flex-row h-full gap-6 p-4">
         <div className="flex-1 flex flex-col items-center justify-center bg-secondary/10 rounded-xl p-8 relative">
-            <ImageWithDebug src={previewUrl} alt="Preview" className="w-64 h-64 rounded-full bg-white shadow-lg" />
+            <img src={previewUrl} alt="Preview" className="w-64 h-64 rounded-full bg-white shadow-lg" />
             <button 
                 type="button"
                 onClick={randomize}
@@ -451,7 +392,7 @@ const CustomAvatarBuilder = ({ initialAvatar, onSave }: { initialAvatar?: string
   );
 };
 
-const ACHIEVEMENT_ICONS: Record<string, any> = {
+const ACHIEVEMENT_ICONS: Record<string, LucideIcon> = {
   flag: Trophy,
   zap: Zap,
   pen: Pen,
@@ -543,7 +484,7 @@ const Profile = () => {
               <div className="h-32 w-32 rounded-full bg-linear-to-tr from-primary to-purple-500 p-1 shadow-lg group-hover:scale-105 transition-transform duration-300">
                 <div className="h-full w-full rounded-full bg-card flex items-center justify-center overflow-hidden relative">
                     {userProfile.avatar ? (
-                      <ImageWithDebug 
+                      <img 
                         src={getAvatarUrl(userProfile.avatar)}
                         alt="Avatar"
                         className="h-full w-full object-cover"
@@ -757,7 +698,7 @@ const Profile = () => {
                             }}
                             className="group relative aspect-square rounded-xl bg-secondary/20 hover:bg-secondary/40 transition-all border border-transparent hover:border-primary/50 overflow-hidden"
                           >
-                            <ImageWithDebug 
+                            <img 
                               src={getAvatarUrl(avatarValue)}
                               alt={seedName}
                               className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500"

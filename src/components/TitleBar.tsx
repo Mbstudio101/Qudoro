@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { X, Minus, Square, Heart } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useStore } from '../store/useStore';
 
 const getThanksgiving = (year: number) => {
   const nov1 = new Date(year, 10, 1);
@@ -49,6 +50,11 @@ const getHolidayMessage = () => {
 
 const TitleBar = () => {
   const { text, isToday } = useMemo(() => getHolidayMessage(), []);
+  const { accounts, currentAccountId } = useStore();
+  
+  const currentAccount = accounts.find(a => a.id === currentAccountId);
+  // Only show ticker if user is from USA or if we want to default to showing it (let's default to hide if not USA/Unknown)
+  const shouldShowTicker = currentAccount?.country === 'USA' || (!currentAccount && false); 
 
   return (
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -56,7 +62,7 @@ const TitleBar = () => {
       
       {/* Holiday Ticker */}
       <div className="flex-1 overflow-hidden flex items-center h-full max-w-[500px] mask-linear-fade">
-         {text && (
+         {text && shouldShowTicker && (
              <motion.div 
                 initial={{ x: "100%" }}
                 animate={{ x: "-100%" }}
@@ -87,7 +93,7 @@ const TitleBar = () => {
         <div className="h-4 w-px bg-border mx-1"></div>
 
         <button
-          onClick={() => window.electron.minimize()}
+          onClick={() => window.electron?.minimize()}
           className="h-full px-5 hover:bg-secondary flex items-center justify-center transition-colors text-muted-foreground hover:text-foreground"
         >
           <Minus size={18} />

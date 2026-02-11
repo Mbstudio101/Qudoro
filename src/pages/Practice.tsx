@@ -1,14 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useStore, Question } from '../store/useStore';
-import { ArrowLeft, CheckCircle2, XCircle, AlertCircle, BookOpen, Target, Brain, ArrowRight } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, XCircle, BookOpen, Target, Brain, ArrowRight } from 'lucide-react';
+
 import Button from '../components/ui/Button';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const Practice = () => {
   const { setId } = useParams<{ setId: string }>();
   const navigate = useNavigate();
-  const { sets, questions, addSession, userProfile } = useStore();
+  const { sets: allSets, questions, addSession, userProfile, activeProfileId } = useStore();
+  
+  const sets = React.useMemo(() => allSets.filter(s => !s.profileId || s.profileId === activeProfileId), [allSets, activeProfileId]);
   
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);

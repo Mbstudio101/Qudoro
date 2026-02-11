@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useStore, ExamSet } from '../store/useStore';
 import { Trash2, Edit2, Play, Layers } from 'lucide-react';
 import Button from '../components/ui/Button';
@@ -9,7 +9,10 @@ import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 
 const ExamSets = () => {
-  const { sets, deleteSet, updateSet } = useStore();
+  const { sets: allSets, deleteSet, updateSet, activeProfileId } = useStore();
+  
+  const sets = useMemo(() => allSets.filter(s => !s.profileId || s.profileId === activeProfileId), [allSets, activeProfileId]);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSet, setEditingSet] = useState<ExamSet | null>(null);
 

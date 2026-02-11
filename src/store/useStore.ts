@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 export interface Question {
   id: string;
+  profileId?: string;
   content: string;
   rationale: string;
   answer: string[];
@@ -18,14 +19,36 @@ export interface Question {
 
 export interface ExamSet {
   id: string;
+  profileId?: string;
   title: string;
   description: string;
   questionIds: string[];
   createdAt: number;
 }
 
+export interface Profile {
+  id: string;
+  name: string;
+  avatar?: string;
+  studyField?: string;
+  lastVisit: number | null;
+  theme: 'light' | 'dark' | 'system';
+  stats: UserStats;
+  achievements: Achievement[];
+}
+
+export interface Account {
+  id: string;
+  name: string;
+  email: string;
+  password: string;
+  country: string;
+  profiles: Profile[];
+}
+
 export interface StudySession {
   id: string;
+  profileId?: string;
   setId: string;
   date: number;
   score: number;
@@ -36,6 +59,7 @@ export interface StudySession {
 
 export interface CalendarEvent {
   id: string;
+  profileId?: string;
   title: string;
   date: number; // timestamp
   type: 'assignment' | 'exam' | 'quiz' | 'study' | 'other';
@@ -46,6 +70,7 @@ export interface CalendarEvent {
 
 export interface Note {
   id: string;
+  profileId?: string;
   title: string;
   content: string;
   createdAt: number;
@@ -73,32 +98,38 @@ export interface UserStats {
   importedSetsCount: number;
 }
 
-export interface UserProfile {
-  name: string;
-  avatar?: string;
-  studyField?: string;
-  lastVisit: number | null;
-  theme: 'light' | 'dark' | 'system';
-  stats: UserStats;
-  achievements: Achievement[];
-}
+// Legacy support: We keep UserProfile as an alias for Profile for now, 
+// but in the store "userProfile" will represent the ACTIVE profile.
+export type UserProfile = Profile;
 
 interface AppState {
+  // Auth State
+  accounts: Account[];
+  isAuthenticated: boolean;
+  currentAccountId: string | null;
+  activeProfileId: string | null;
+
+  // Actions
+  signup: (data: { name: string; email: string; password: string; field: string; country: string }) => void;
+  login: (email: string, password: string) => boolean;
+  logout: () => void;
+  createProfile: (name: string, studyField: string) => void;
+  selectProfile: (profileId: string) => void;
+
   questions: Question[];
   sets: ExamSet[];
   sessions: StudySession[];
   calendarEvents: CalendarEvent[];
   notes: Note[];
-  userProfile: UserProfile;
+  userProfile: UserProfile; // The Active Profile
   addQuestion: (q: Omit<Question, 'id' | 'createdAt' | 'box' | 'nextReviewDate' | 'lastReviewed'>) => string;
   updateQuestion: (id: string, q: Partial<Question>) => void;
   deleteQuestion: (id: string) => void;
   reviewQuestion: (id: string, performance: 'again' | 'hard' | 'good' | 'easy') => void;
-  addSet: (s: Omit<ExamSet, 'id' | 'createdAt'>) => void;
+  addSet: (s: Omit<ExamSet, 'id' | 'createdAt'>) => string;
   updateSet: (id: string, s: Partial<ExamSet>) => void;
   deleteSet: (id: string) => void;
   addQuestionToSet: (setId: string, questionId: string) => void;
-  removeQuestionFromSet: (setId: string, questionId: string) => void;
   addSession: (session: Omit<StudySession, 'id'>) => void;
   // Calendar Actions
   addCalendarEvent: (event: Omit<CalendarEvent, 'id'>) => void;
@@ -106,7 +137,7 @@ interface AppState {
   deleteCalendarEvent: (id: string) => void;
   toggleEventCompletion: (id: string) => void;
   // Note Actions
-  addNote: (note: Omit<Note, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  addNote: (note: Omit<Note, 'id' | 'createdAt' | 'updatedAt'>) => string;
   updateNote: (id: string, note: Partial<Note>) => void;
   deleteNote: (id: string) => void;
   importData: (data: { questions: Question[]; sets: ExamSet[] }) => void;
@@ -177,38 +208,132 @@ const storage: StateStorage = {
   },
 };
 
+const initialStats: UserStats = {
+  totalQuestionsAnswered: 0,
+  totalCorrectAnswers: 0,
+  totalStudyTime: 0,
+  totalSetsCompleted: 0,
+  streakDays: 0,
+  lastStudyDate: 0,
+  xp: 0,
+  level: 1,
+  perfectedSetIds: [],
+  importedSetsCount: 0
+};
+
 export const useStore = create<AppState>()(
   persist(
     (set, get) => ({
+      accounts: [] as Account[],
+      isAuthenticated: false,
+      currentAccountId: null as string | null,
+      activeProfileId: null as string | null,
+      
       questions: [] as Question[],
       sets: [] as ExamSet[],
       sessions: [] as StudySession[],
       calendarEvents: [] as CalendarEvent[],
       notes: [] as Note[],
       userProfile: { 
+        id: 'guest',
         name: 'Student', 
         lastVisit: null, 
         theme: 'system',
-        stats: {
-          totalQuestionsAnswered: 0,
-          totalCorrectAnswers: 0,
-          totalStudyTime: 0,
-          totalSetsCompleted: 0,
-          streakDays: 0,
-          lastStudyDate: 0,
-          xp: 0,
-          level: 1,
-          perfectedSetIds: [],
-          importedSetsCount: 0
-        },
+        stats: { ...initialStats },
         achievements: []
       } as UserProfile,
+
+      signup: (data) => {
+        const newAccount: Account = {
+            id: uuidv4(),
+            name: data.name,
+            email: data.email,
+            password: data.password, 
+            country: data.country,
+            profiles: []
+        };
+        
+        const initialProfile: Profile = {
+            id: uuidv4(),
+            name: data.name,
+            studyField: data.field,
+            theme: 'system',
+            lastVisit: Date.now(),
+            stats: { ...initialStats },
+            achievements: []
+        };
+        newAccount.profiles.push(initialProfile);
+        
+        set((state) => ({
+            accounts: [...state.accounts, newAccount],
+            isAuthenticated: true,
+            currentAccountId: newAccount.id,
+            activeProfileId: initialProfile.id,
+            userProfile: initialProfile
+        }));
+      },
+
+      login: (email, password) => {
+        const state = get();
+        const account = state.accounts.find(a => a.email === email && a.password === password);
+        if (account) {
+            set({ 
+                isAuthenticated: true, 
+                currentAccountId: account.id,
+                activeProfileId: null, // Reset active profile to force selection
+            });
+            return true;
+        }
+        return false;
+      },
+
+      logout: () => set({ 
+          isAuthenticated: false, 
+          currentAccountId: null, 
+          activeProfileId: null 
+      }),
+
+      createProfile: (name, studyField) => {
+        const newProfile: Profile = {
+            id: uuidv4(),
+            name,
+            studyField,
+            theme: 'system',
+            lastVisit: Date.now(),
+            stats: { ...initialStats },
+            achievements: []
+        };
+
+        set((state) => ({
+            accounts: state.accounts.map(a => 
+                a.id === state.currentAccountId 
+                ? { ...a, profiles: [...a.profiles, newProfile] }
+                : a
+            )
+        }));
+      },
+
+      selectProfile: (profileId) => {
+        const state = get();
+        const account = state.accounts.find(a => a.id === state.currentAccountId);
+        if (!account) return;
+        
+        const profile = account.profiles.find(p => p.id === profileId);
+        if (profile) {
+            set({
+                activeProfileId: profileId,
+                userProfile: profile
+            });
+        }
+      },
+
       addQuestion: (q) => {
         const id = uuidv4();
+        const profileId = get().activeProfileId || '';
         set((state) => ({
           questions: [
             ...state.questions,
-            { ...q, id, createdAt: Date.now(), box: 0, nextReviewDate: Date.now() },
+            { ...q, id, profileId, createdAt: Date.now(), box: 0, nextReviewDate: Date.now() },
           ],
         }));
         get().checkAchievements();
@@ -256,20 +381,31 @@ export const useStore = create<AppState>()(
           newStats.xp += xpGain;
           newStats.level = calculateLevel(newStats.xp);
 
+          const updatedProfile = { ...state.userProfile, stats: newStats };
+          const updatedAccounts = state.accounts.map(a => 
+             a.id === state.currentAccountId 
+             ? { ...a, profiles: a.profiles.map(p => p.id === state.activeProfileId ? updatedProfile : p) }
+             : a
+          );
+
           return {
             questions: state.questions.map((q) =>
               q.id === id ? { ...q, box, nextReviewDate, lastReviewed: Date.now() } : q
             ),
-            userProfile: { ...state.userProfile, stats: newStats }
+            userProfile: updatedProfile,
+            accounts: updatedAccounts
           };
         });
         get().checkAchievements();
       },
       addSet: (s) => {
+        const id = uuidv4();
+        const profileId = get().activeProfileId || '';
         set((state) => ({
-          sets: [...state.sets, { ...s, id: uuidv4(), createdAt: Date.now() }],
+          sets: [...state.sets, { ...s, id, profileId, createdAt: Date.now() }],
         }));
         get().checkAchievements();
+        return id;
       },
       updateSet: (id, s) =>
         set((state) => ({
@@ -284,14 +420,6 @@ export const useStore = create<AppState>()(
           sets: state.sets.map((s) =>
             s.id === setId && !s.questionIds.includes(questionId)
               ? { ...s, questionIds: [...s.questionIds, questionId] }
-              : s
-          ),
-        })),
-      removeQuestionFromSet: (setId, questionId) =>
-        set((state) => ({
-          sets: state.sets.map((s) =>
-            s.id === setId
-              ? { ...s, questionIds: s.questionIds.filter((id) => id !== questionId) }
               : s
           ),
         })),
@@ -312,18 +440,30 @@ export const useStore = create<AppState>()(
 
             newStats.xp += session.score * 5;
             newStats.level = calculateLevel(newStats.xp);
+            
+            const profileId = state.activeProfileId || '';
+
+            const updatedProfile = { ...state.userProfile, stats: newStats };
+            const updatedAccounts = state.accounts.map(a => 
+                a.id === state.currentAccountId 
+                ? { ...a, profiles: a.profiles.map(p => p.id === state.activeProfileId ? updatedProfile : p) }
+                : a
+            );
 
             return {
-                sessions: [...state.sessions, { ...session, id: uuidv4() }],
-                userProfile: { ...state.userProfile, stats: newStats }
+                sessions: [...state.sessions, { ...session, id: uuidv4(), profileId }],
+                userProfile: updatedProfile,
+                accounts: updatedAccounts
             };
         });
         get().checkAchievements();
       },
-      addCalendarEvent: (event) =>
+      addCalendarEvent: (event) => {
+        const profileId = get().activeProfileId || '';
         set((state) => ({
-          calendarEvents: [...state.calendarEvents, { ...event, id: uuidv4() }],
-        })),
+          calendarEvents: [...state.calendarEvents, { ...event, id: uuidv4(), profileId }],
+        }));
+      },
       updateCalendarEvent: (id, event) =>
         set((state) => ({
           calendarEvents: state.calendarEvents.map((e) =>
@@ -340,10 +480,14 @@ export const useStore = create<AppState>()(
             e.id === id ? { ...e, completed: !e.completed } : e
           ),
         })),
-      addNote: (note) =>
+      addNote: (note) => {
+        const id = uuidv4();
+        const profileId = get().activeProfileId || '';
         set((state) => ({
-          notes: [...state.notes, { ...note, id: uuidv4(), createdAt: Date.now(), updatedAt: Date.now() }],
-        })),
+          notes: [...state.notes, { ...note, id, profileId, createdAt: Date.now(), updatedAt: Date.now() }],
+        }));
+        return id;
+      },
       updateNote: (id, note) =>
         set((state) => ({
           notes: state.notes.map((n) => (n.id === id ? { ...n, ...note, updatedAt: Date.now() } : n)),
@@ -357,10 +501,18 @@ export const useStore = create<AppState>()(
           const newStats = { ...state.userProfile.stats };
           newStats.importedSetsCount = (newStats.importedSetsCount || 0) + data.sets.length;
           
+          const updatedProfile = { ...state.userProfile, stats: newStats };
+          const updatedAccounts = state.accounts.map(a => 
+              a.id === state.currentAccountId 
+              ? { ...a, profiles: a.profiles.map(p => p.id === state.activeProfileId ? updatedProfile : p) }
+              : a
+          );
+
           return {
             questions: [...state.questions, ...data.questions],
             sets: [...state.sets, ...data.sets],
-            userProfile: { ...state.userProfile, stats: newStats }
+            userProfile: updatedProfile,
+            accounts: updatedAccounts
           };
         }),
       resetData: () =>
@@ -368,29 +520,34 @@ export const useStore = create<AppState>()(
           questions: [],
           sets: [],
           sessions: [],
+          calendarEvents: [],
+          notes: [],
+          accounts: [],
+          isAuthenticated: false,
+          currentAccountId: null,
+          activeProfileId: null,
           userProfile: { 
+            id: 'guest',
             name: 'Student', 
             lastVisit: null, 
             theme: 'system',
-            stats: {
-              totalQuestionsAnswered: 0,
-              totalCorrectAnswers: 0,
-              totalStudyTime: 0,
-              totalSetsCompleted: 0,
-              streakDays: 0,
-              lastStudyDate: 0,
-              xp: 0,
-              level: 1,
-              perfectedSetIds: [],
-              importedSetsCount: 0
-            },
+            stats: { ...initialStats },
             achievements: [] 
           },
         }),
       setUserProfile: (profile) =>
-        set((state) => ({
-          userProfile: { ...state.userProfile, ...profile },
-        })),
+        set((state) => {
+          const updatedProfile = { ...state.userProfile, ...profile };
+          const updatedAccounts = state.accounts.map(a => 
+            a.id === state.currentAccountId 
+            ? { ...a, profiles: a.profiles.map(p => p.id === state.activeProfileId ? updatedProfile : p) }
+            : a
+          );
+          return {
+            userProfile: updatedProfile,
+            accounts: updatedAccounts
+          };
+        }),
       updateLastVisit: () =>
         set((state) => {
             const now = Date.now();
@@ -432,30 +589,47 @@ export const useStore = create<AppState>()(
                 }
             }
 
+            const updatedProfile = {
+                ...state.userProfile,
+                lastVisit: now,
+                stats: {
+                    ...currentStats,
+                    lastStudyDate: now,
+                    streakDays: streak
+                }
+            };
+            
+            const updatedAccounts = state.accounts.map(a => 
+                a.id === state.currentAccountId 
+                ? { ...a, profiles: a.profiles.map(p => p.id === state.activeProfileId ? updatedProfile : p) }
+                : a
+            );
+
             return {
-                userProfile: {
-                    ...state.userProfile,
-                    lastVisit: now,
-                    stats: {
-                        ...currentStats,
-                        lastStudyDate: now,
-                        streakDays: streak
-                    }
-                },
+                userProfile: updatedProfile,
+                accounts: updatedAccounts
             };
         }),
       addXp: (amount) => 
         set((state) => {
             const newXp = (state.userProfile.stats?.xp || 0) + amount;
-            return {
-                userProfile: {
-                    ...state.userProfile,
-                    stats: {
-                        ...state.userProfile.stats,
-                        xp: newXp,
-                        level: calculateLevel(newXp)
-                    }
+            const updatedProfile = {
+                ...state.userProfile,
+                stats: {
+                    ...state.userProfile.stats,
+                    xp: newXp,
+                    level: calculateLevel(newXp)
                 }
+            };
+            const updatedAccounts = state.accounts.map(a => 
+                a.id === state.currentAccountId 
+                ? { ...a, profiles: a.profiles.map(p => p.id === state.activeProfileId ? updatedProfile : p) }
+                : a
+            );
+
+            return {
+                userProfile: updatedProfile,
+                accounts: updatedAccounts
             };
         }),
       checkAchievements: () => 
@@ -507,12 +681,7 @@ export const useStore = create<AppState>()(
                 if (hour >= 5 && hour < 8) unlock('happy_camper');
 
                 // Massed Practitioner: > 2 hours (120 mins)
-                // Note: duration is stored in seconds in addSession call in React components, 
-                // but StudySession interface doesn't explicitly have duration field in this file yet (it was Omit<StudySession, 'id'>).
-                // However, we passed 'duration' in Flashcards.tsx. Let's assume we can access it if we added it to interface,
-                // but since we only have 'totalStudyTime' in stats, we might need to rely on that or add duration to interface.
-                // Let's check StudySession interface again. It has date, score, totalQuestions. 
-                // It does NOT have duration. We should add it to interface to be safe.
+                if (lastSession.duration && lastSession.duration >= 7200) unlock('massed_practitioner');
                 
                 // Mentorship: 100% score on 5 different sets
                 if (lastSession.score === lastSession.totalQuestions && lastSession.totalQuestions > 0) {
@@ -553,15 +722,24 @@ export const useStore = create<AppState>()(
 
             if (!updated) return state;
 
-            return {
-                userProfile: {
-                    ...state.userProfile,
-                    achievements: newAchievements,
-                    stats: {
-                        ...stats,
-                        level: calculateLevel(stats.xp)
-                    }
+            const updatedProfile = {
+                ...state.userProfile,
+                achievements: newAchievements,
+                stats: {
+                    ...stats,
+                    level: calculateLevel(stats.xp)
                 }
+            };
+
+            const updatedAccounts = state.accounts.map(a => 
+                a.id === state.currentAccountId 
+                ? { ...a, profiles: a.profiles.map(p => p.id === state.activeProfileId ? updatedProfile : p) }
+                : a
+            );
+
+            return {
+                userProfile: updatedProfile,
+                accounts: updatedAccounts
             };
         })
     }),

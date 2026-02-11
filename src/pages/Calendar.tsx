@@ -1,7 +1,6 @@
 
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, Clock, CheckCircle, Circle, Trash2, X } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, Clock, CheckCircle, Circle, Trash2 } from 'lucide-react';
 import { useStore, CalendarEvent } from '../store/useStore';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
@@ -11,8 +10,10 @@ const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 const Calendar = () => {
-  const { calendarEvents, addCalendarEvent, updateCalendarEvent, deleteCalendarEvent, toggleEventCompletion } = useStore();
+  const { calendarEvents: allEvents, addCalendarEvent, deleteCalendarEvent, toggleEventCompletion, activeProfileId } = useStore();
   
+  const calendarEvents = useMemo(() => allEvents.filter(e => !e.profileId || e.profileId === activeProfileId), [allEvents, activeProfileId]);
+
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -261,7 +262,7 @@ const Calendar = () => {
                     <label className="text-sm font-medium mb-1 block">Type</label>
                     <select 
                         value={eventType}
-                        onChange={(e) => setEventType(e.target.value as any)}
+                        onChange={(e) => setEventType(e.target.value as CalendarEvent['type'])}
                         className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
                     >
                         <option value="study">Study Session</option>

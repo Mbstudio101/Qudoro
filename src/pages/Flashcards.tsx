@@ -1,11 +1,15 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useStore, Question } from '../store/useStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RotateCw, CheckCircle, AlertCircle, Layers, Play } from 'lucide-react';
 import Button from '../components/ui/Button';
 
 const Flashcards = () => {
-  const { questions, sets, reviewQuestion, addSession } = useStore();
+  const { questions: allQuestions, sets: allSets, reviewQuestion, addSession, activeProfileId } = useStore();
+  
+  const questions = useMemo(() => allQuestions.filter(q => !q.profileId || q.profileId === activeProfileId), [allQuestions, activeProfileId]);
+  const sets = useMemo(() => allSets.filter(s => !s.profileId || s.profileId === activeProfileId), [allSets, activeProfileId]);
+
   const [dueQuestions, setDueQuestions] = useState<Question[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
@@ -257,8 +261,6 @@ const Flashcards = () => {
                 <p className="text-xl font-bold mb-4">
                   {Array.isArray(currentQuestion.answer) ? currentQuestion.answer.join(', ') : currentQuestion.answer}
                 </p>
-                
-                {/* Options rendering removed as requested */}
 
                 {currentQuestion.rationale && (
                   <div className="pt-4 border-t border-border/50 w-full mt-4">

@@ -1,29 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { BookOpen, Layers, Settings, Brain, LayoutDashboard, User, ChevronLeft, ChevronRight, Calendar, FileText } from 'lucide-react';
+import { BookOpen, Layers, Settings, Brain, LayoutDashboard, User, ChevronLeft, ChevronRight, Calendar, FileText, Users } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Logo } from './ui/Logo';
 import { useStore } from '../store/useStore';
-
-const getAvatarUrl = (avatarString?: string) => {
-  if (!avatarString) return '';
-  
-  // Check for new format with options (style:seed|options)
-  if (avatarString.includes('|')) {
-      const [base, options] = avatarString.split('|');
-      if (base.includes(':')) {
-          const [style, seed] = base.split(':');
-          return `https://api.dicebear.com/7.x/${style}/svg?seed=${encodeURIComponent(seed)}&${options}`;
-      }
-      return `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(base)}&${options}`;
-  }
-
-  if (avatarString.includes(':')) {
-    const [style, seed] = avatarString.split(':');
-    return `https://api.dicebear.com/7.x/${style}/svg?seed=${encodeURIComponent(seed)}`;
-  }
-  return `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(avatarString)}`;
-};
+import { getAvatarUrl } from '../utils/avatar';
 
 const Sidebar = () => {
   const { userProfile } = useStore();
@@ -91,6 +72,21 @@ const Sidebar = () => {
       </nav>
 
       <div className="space-y-2 pt-4 mt-4 border-t border-border/40">
+        <NavLink
+            to="/profiles"
+            title={isCollapsed ? 'Switch Profile' : ''}
+            className={({ isActive }) =>
+              `flex items-center ${isCollapsed ? 'justify-center px-2' : 'gap-3 px-4'} py-3 rounded-xl transition-all duration-300 ${
+                isActive
+                  ? 'bg-primary/10 text-primary font-semibold shadow-sm'
+                  : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground hover:translate-x-1'
+              }`
+            }
+        >
+            <Users size={20} className="shrink-0" />
+            {!isCollapsed && <span className="font-medium whitespace-nowrap overflow-hidden">Switch Profile</span>}
+        </NavLink>
+
         <NavLink
             to="/profile"
             title={isCollapsed ? 'Profile' : ''}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useStore, Question } from '../store/useStore';
 import { Plus, Trash2, Search, FileText, Brain } from 'lucide-react';
 import Button from '../components/ui/Button';
@@ -6,7 +6,11 @@ import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
 
 const Notes = () => {
-  const { notes, addNote, updateNote, deleteNote, addQuestion, sets, addQuestionToSet, addSet } = useStore();
+  const { notes: allNotes, addNote, updateNote, deleteNote, addQuestion, sets: allSets, addQuestionToSet, addSet, activeProfileId } = useStore();
+  
+  const notes = useMemo(() => allNotes.filter(n => !n.profileId || n.profileId === activeProfileId), [allNotes, activeProfileId]);
+  const sets = useMemo(() => allSets.filter(s => !s.profileId || s.profileId === activeProfileId), [allSets, activeProfileId]);
+
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -14,8 +18,8 @@ const Notes = () => {
   const [showFlashcardModal, setShowFlashcardModal] = useState(false);
   const [flashcardContent, setFlashcardContent] = useState({ question: '', answer: '' });
   const [targetSetId, setTargetSetId] = useState<string>('');
-  const [newSetTitle] = useState('');
-  const [isCreatingNewSet] = useState(false);
+  const [newSetTitle, setNewSetTitle] = useState('');
+  const [isCreatingNewSet, setIsCreatingNewSet] = useState(false);
 
   const selectedNote = notes.find(n => n.id === selectedNoteId);
 
@@ -31,16 +35,8 @@ const Notes = () => {
       title: 'Untitled Note',
       content: '',
     };
-    addNote(newNote);
-    // Select the newly created note (we need the ID, but addNote doesn't return it in current store impl, 
-    // wait, I can modify store or just find the newest one)
-    // Actually, let's just find the most recently created note.
-    setTimeout(() => {
-        // This is a bit hacky, ideally addNote should return the ID.
-        // But since we just added it, it should be the last one in the list if we didn't sort, 
-        // or we can search by createdAt.
-        // For now, let's just let the user click it or implement a better way later.
-    }, 100);
+    const newId = addNote(newNote);
+    setSelectedNoteId(newId);
   };
 
   const handleDeleteNote = (id: string, e?: React.MouseEvent) => {
@@ -87,10 +83,10 @@ const Notes = () => {
         const newSet = {
             title: newSetTitle,
             description: 'Created from Notes',
-            questionIds: [] as string[]
+            questionIds: [questionId]
         };
         addSet(newSet);
-        alert('Flashcard created! (Note: New set creation via this modal is currently limited. Please organize manually.)');
+        alert('Flashcard created and added to new set!');
     } else if (finalSetId) {
         addQuestionToSet(finalSetId, questionId);
         alert('Flashcard created and added to set!');
@@ -238,12 +234,29 @@ const Notes = () => {
                     value={targetSetId}
                     onChange={(e) => setTargetSetId(e.target.value)}
                     className="w-full p-2 rounded-lg border bg-background"
+                    disabled={isCreatingNewSet}
                 >
                     <option value="">Select a set...</option>
                     {sets.map(set => (
                         <option key={set.id} value={set.id}>{set.title}</option>
                     ))}
                 </select>
+                <div className="flex items-center gap-2 mt-2">
+                    <input 
+                        type="checkbox" 
+                        id="create-new-set"
+                        checked={isCreatingNewSet} 
+                        onChange={(e) => setIsCreatingNewSet(e.target.checked)}
+                    />
+                    <label htmlFor="create-new-set" className="text-sm">Create new set</label>
+                </div>
+                {isCreatingNewSet && (
+                    <Input
+                        placeholder="New Set Title"
+                        value={newSetTitle}
+                        onChange={(e) => setNewSetTitle(e.target.value)}
+                    />
+                )}
             </div>
 
             <div className="flex justify-end gap-2 pt-4">
