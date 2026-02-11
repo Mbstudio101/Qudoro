@@ -414,10 +414,8 @@ const ACHIEVEMENT_ICONS: Record<string, LucideIcon> = {
 };
 
 import { COUNTRIES } from '../utils/holidays';
-import { useNavigate } from 'react-router-dom';
 
 const Profile = () => {
-  const navigate = useNavigate();
   const { userProfile, setUserProfile } = useStore();
   
   const [isEditing, setIsEditing] = useState(false);

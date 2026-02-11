@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
 import { calculateSM2 } from '../utils/sm2';
+import { BlackboardCourse, BlackboardAssignment, BlackboardGrade, BlackboardToken } from '../types/blackboard';
 
 
 export interface Question {
@@ -42,6 +43,17 @@ export interface Profile {
   theme: 'light' | 'dark' | 'system';
   stats: UserStats;
   achievements: Achievement[];
+  blackboard?: {
+    isConnected: boolean;
+    token?: BlackboardToken;
+    schoolUrl?: string;
+    clientId?: string;
+    clientSecret?: string;
+    courses: BlackboardCourse[];
+    assignments: BlackboardAssignment[];
+    grades: BlackboardGrade[];
+    lastSync?: number;
+  };
 }
 
 export interface Account {
@@ -153,9 +165,14 @@ interface AppState {
   updateLastVisit: () => void;
   checkAchievements: () => void;
   addXp: (amount: number) => void;
+  // Blackboard
+  connectBlackboard: (token: BlackboardToken, schoolUrl?: string) => void;
+  disconnectBlackboard: () => void;
+  updateBlackboardData: (data: { courses: BlackboardCourse[], assignments: BlackboardAssignment[], grades: BlackboardGrade[] }) => void;
+  setBlackboardConfig: (config: { clientId: string; clientSecret: string }) => void;
 }
 
-const INTERVALS = [0, 1, 3, 7, 14, 30, 60];
+// const INTERVALS = [0, 1, 3, 7, 14, 30, 60];
 
 // Achievement Definitions
 export const AVAILABLE_ACHIEVEMENTS = [
@@ -799,7 +816,103 @@ export const useStore = create<AppState>()(
                 userProfile: updatedProfile,
                 accounts: updatedAccounts
             };
-        })
+        }),
+      
+      connectBlackboard: (token, schoolUrl) => set((state) => {
+        const updatedProfile = {
+            ...state.userProfile,
+            blackboard: {
+                clientId: state.userProfile.blackboard?.clientId,
+                clientSecret: state.userProfile.blackboard?.clientSecret,
+                isConnected: true,
+                token,
+                schoolUrl: schoolUrl || state.userProfile.blackboard?.schoolUrl,
+                courses: [] as BlackboardCourse[],
+                assignments: [] as BlackboardAssignment[],
+                grades: [] as BlackboardGrade[],
+                lastSync: Date.now()
+            }
+        };
+        const updatedAccounts = state.accounts.map(acc => {
+            if (acc.id === state.currentAccountId) {
+                return {
+                    ...acc,
+                    profiles: acc.profiles.map(p => p.id === state.activeProfileId ? updatedProfile : p)
+                };
+            }
+            return acc;
+        });
+
+        return { userProfile: updatedProfile, accounts: updatedAccounts };
+      }),
+      
+      disconnectBlackboard: () => set((state) => {
+        const updatedProfile = { ...state.userProfile };
+        delete updatedProfile.blackboard;
+        
+         const updatedAccounts = state.accounts.map(acc => {
+            if (acc.id === state.currentAccountId) {
+                return {
+                    ...acc,
+                    profiles: acc.profiles.map(p => p.id === state.activeProfileId ? updatedProfile : p)
+                };
+            }
+            return acc;
+        });
+
+        return { userProfile: updatedProfile, accounts: updatedAccounts };
+      }),
+
+      updateBlackboardData: (data) => set((state) => {
+         if (!state.userProfile.blackboard) return state;
+
+         const updatedProfile = {
+             ...state.userProfile,
+             blackboard: {
+                 ...state.userProfile.blackboard,
+                 ...data,
+                 lastSync: Date.now()
+             }
+         };
+         
+         const updatedAccounts = state.accounts.map(acc => {
+            if (acc.id === state.currentAccountId) {
+                return {
+                    ...acc,
+                    profiles: acc.profiles.map(p => p.id === state.activeProfileId ? updatedProfile : p)
+                };
+            }
+            return acc;
+        });
+
+        return { userProfile: updatedProfile, accounts: updatedAccounts };
+      }),
+
+      setBlackboardConfig: (config) => set((state) => {
+        const updatedProfile = {
+            ...state.userProfile,
+            blackboard: {
+                ...state.userProfile.blackboard,
+                ...config,
+                courses: state.userProfile.blackboard?.courses || [],
+                assignments: state.userProfile.blackboard?.assignments || [],
+                grades: state.userProfile.blackboard?.grades || [],
+                isConnected: state.userProfile.blackboard?.isConnected || false
+            }
+        };
+
+        const updatedAccounts = state.accounts.map(acc => {
+            if (acc.id === state.currentAccountId) {
+                return {
+                    ...acc,
+                    profiles: acc.profiles.map(p => p.id === state.activeProfileId ? updatedProfile : p)
+                };
+            }
+            return acc;
+        });
+
+        return { userProfile: updatedProfile, accounts: updatedAccounts };
+      }),
     }),
     {
       name: 'qudoro-storage',

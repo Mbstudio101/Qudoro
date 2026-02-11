@@ -31,6 +31,11 @@ declare global {
         set: (key: string, value: any) => void;
       };
       fetchUrl: (url: string) => Promise<{ success: boolean; data?: string; error?: string }>;
+      openExternal: (url: string) => Promise<void>;
+      auth: {
+        startServer: () => Promise<{ success: boolean; port: number; error?: string }>;
+        waitForCode: () => Promise<string>;
+      };
       parsePdf: (buffer: number[]) => Promise<{ success: boolean; text?: string; error?: string }>;
       updater: {
         checkForUpdates: () => Promise<UpdateInfo | null>;

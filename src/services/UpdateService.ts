@@ -72,7 +72,7 @@ export class UpdateService {
     });
   }
 
-  private send(channel: string, ...args: any[]) {
+  private send(channel: string, ...args: unknown[]) {
     if (this.mainWindow && !this.mainWindow.isDestroyed()) {
       this.mainWindow.webContents.send(channel, ...args);
     }

@@ -1,15 +1,25 @@
 import path from 'path';
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import started from 'electron-squirrel-startup';
 import Store from 'electron-store';
 import { UpdateService } from './services/UpdateService';
+import http from 'http';
+import url from 'url';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const store = new Store() as any;
 
+// OAuth Server State
+let authServer: http.Server | null = null;
+
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
   app.quit();
+}
+
+// Set App Name for Menu Bar (macOS)
+if (process.platform === 'darwin') {
+    app.setName('Qudoro');
 }
 
 const createWindow = () => {
@@ -18,6 +28,7 @@ const createWindow = () => {
     width: 1200,
     height: 800,
     icon: path.join(__dirname, '../../public/icon.png'), // For Windows/Linux
+    title: 'Qudoro',
     frame: false, // Frameless
     titleBarStyle: 'hidden', 
     trafficLightPosition: { x: -100, y: -100 }, // Hide macOS controls
@@ -66,6 +77,79 @@ ipcMain.on('maximize-window', (event) => {
 ipcMain.on('close-window', (event) => {
   const win = BrowserWindow.fromWebContents(event.sender);
   win?.close();
+});
+
+ipcMain.handle('open-external-url', async (event, url) => {
+    await shell.openExternal(url);
+});
+
+ipcMain.handle('start-auth-server', async () => {
+  return new Promise<{ success: boolean; port: number; error?: string }>((resolve) => {
+    if (authServer) {
+      authServer.close();
+      authServer = null;
+    }
+
+    const server = http.createServer();
+    // Use port 54321
+    server.listen(54321, '127.0.0.1', () => {
+      resolve({ success: true, port: 54321 });
+    });
+
+    server.on('error', (err) => {
+        resolve({ success: false, port: 0, error: err.message });
+    });
+
+    authServer = server;
+  });
+});
+
+ipcMain.handle('wait-for-auth-code', async () => {
+    if (!authServer) throw new Error('Auth server not started');
+    
+    return new Promise<string>((resolve, reject) => {
+        // Set a timeout of 5 minutes
+        const timeout = setTimeout(() => {
+            if (authServer) {
+                authServer.close();
+                authServer = null;
+            }
+            reject(new Error('Auth timed out'));
+        }, 300000);
+
+        authServer?.on('request', (req, res) => {
+            const parsedUrl = url.parse(req.url || '', true);
+            
+            if (parsedUrl.pathname === '/callback') {
+                const code = parsedUrl.query.code as string;
+                
+                if (code) {
+                    res.writeHead(200, { 'Content-Type': 'text/html' });
+                    res.end('<h1>Login Successful</h1><p>You can close this window and return to Qudoro.</p><script>window.close()</script>');
+                    
+                    if (authServer) {
+                        authServer.close();
+                        authServer = null;
+                    }
+                    clearTimeout(timeout);
+                    resolve(code);
+                    
+                    // Focus the app
+                    const wins = BrowserWindow.getAllWindows();
+                    if (wins.length > 0) {
+                        if (wins[0].isMinimized()) wins[0].restore();
+                        wins[0].focus();
+                    }
+                } else {
+                    res.writeHead(400);
+                    res.end('No code returned');
+                }
+            } else {
+                res.writeHead(404);
+                res.end('Not Found');
+            }
+        });
+    });
 });
 
 // Store IPC
@@ -170,7 +254,14 @@ ipcMain.handle('fetch-url', async (event, url) => {
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.on('ready', createWindow);
+app.on('ready', () => {
+    // Set Dock Icon for macOS (especially useful in dev)
+    if (process.platform === 'darwin') {
+        const iconPath = path.join(__dirname, '../../public/icon.png');
+        app.dock.setIcon(iconPath);
+    }
+    createWindow();
+});
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits

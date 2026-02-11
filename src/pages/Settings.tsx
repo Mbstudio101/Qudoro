@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { RefreshCw, Download, Check, AlertCircle, Package, User, Save, Upload, Trash2, Database, MessageSquare, Moon, Sun, Laptop, Shield, FileText, Lock, Users, ExternalLink, Mail } from 'lucide-react';
+import { RefreshCw, Download, Check, AlertCircle, Package, User, Save, Upload, Trash2, Database, MessageSquare, Moon, Sun, Laptop, Shield, FileText, Lock, Users, ExternalLink, Mail, GraduationCap } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
 import { useStore } from '../store/useStore';
+import School from './School';
 
 const Settings = () => {
   const { userProfile, setUserProfile, questions, sets, importData, resetData } = useStore();
@@ -154,7 +155,7 @@ const Settings = () => {
 
         {/* Tab Navigation */}
         <div className="flex space-x-1 bg-secondary/20 p-1 rounded-lg w-full max-w-md">
-            {['general', 'data', 'about'].map((tab) => (
+            {['general', 'school', 'data', 'about'].map((tab) => (
                 <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
@@ -262,6 +263,32 @@ const Settings = () => {
                         {isSaved ? 'Saved' : 'Save Changes'}
                     </Button>
                 </form>
+            </div>
+        </motion.div>
+      )}
+
+      {/* School Tab */}
+      {activeTab === 'school' && (
+        <motion.div 
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="space-y-6"
+        >
+            <div className="bg-card border rounded-xl p-6 space-y-6">
+                <div className="flex items-center gap-4">
+                    <div className="p-3 bg-primary/10 rounded-full text-primary">
+                        <GraduationCap className="h-6 w-6" />
+                    </div>
+                    <div>
+                        <h2 className="text-xl font-semibold">School Integration</h2>
+                        <p className="text-sm text-muted-foreground">Connect your Blackboard account to access courses and grades.</p>
+                    </div>
+                </div>
+                
+                {/* Embed the School component directly */}
+                <div className="border rounded-xl overflow-hidden bg-background min-h-[500px]">
+                    <School />
+                </div>
             </div>
         </motion.div>
       )}

@@ -35,5 +35,10 @@ contextBridge.exposeInMainWorld('electron', {
         ipcRenderer.removeAllListeners('update-error');
         ipcRenderer.removeAllListeners('update-status');
     }
+  },
+  openExternal: (url: string) => ipcRenderer.invoke('open-external-url', url),
+  auth: {
+      startServer: () => ipcRenderer.invoke('start-auth-server'),
+      waitForCode: () => ipcRenderer.invoke('wait-for-auth-code')
   }
 });

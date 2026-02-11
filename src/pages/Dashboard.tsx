@@ -27,7 +27,7 @@ import {
 import Input from '../components/ui/Input';
 
 import { getHolidayForToday } from '../utils/holidays';
-import { QUOTES, getQuotesByField } from '../utils/quotes';
+import { getQuotesByField } from '../utils/quotes';
 
 const Dashboard = () => {
   const { questions: allQuestions, sets: allSets, userProfile, setUserProfile, updateLastVisit, activeProfileId } = useStore();

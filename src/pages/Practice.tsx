@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useStore, Question } from '../store/useStore';
 import { ArrowLeft, CheckCircle2, XCircle, BookOpen, Target, Brain, ArrowRight, AlertCircle } from 'lucide-react';
@@ -11,7 +11,7 @@ const Practice = () => {
   const navigate = useNavigate();
   const { sets: allSets, questions, addSession, userProfile, activeProfileId } = useStore();
   
-  const sets = React.useMemo(() => allSets.filter(s => !s.profileId || s.profileId === activeProfileId), [allSets, activeProfileId]);
+  const sets = useMemo(() => allSets.filter(s => !s.profileId || s.profileId === activeProfileId), [allSets, activeProfileId]);
   
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
@@ -155,8 +155,8 @@ const Practice = () => {
         <div className="flex flex-col h-full overflow-y-auto pb-10">
             <div className="max-w-4xl mx-auto w-full space-y-8 animate-in fade-in zoom-in duration-300 p-4">
                 <div className="text-center space-y-2">
-                    <h2 className="text-3xl font-bold">Session Complete!</h2>
-                    <p className="text-muted-foreground">Here is your comprehensive performance analysis.</p>
+                    <h2 className={`text-3xl font-bold ${feedback.color}`}>{feedback.title}</h2>
+                    <p className="text-muted-foreground">{feedback.message}</p>
                 </div>
                 
                 {/* Score Overview */}

@@ -454,11 +454,11 @@ export const COUNTRIES: CountryData[] = [
     name: 'Haiti',
     flag: '🇭🇹',
     holidays: [
-      { name: 'Independence Day', date: '01-01', emoji: '🎉' },
-      { name: 'Happy Haitian Flag Day to all my Zoes!', date: '05-18', emoji: '🇭🇹' },
-      { name: 'Emancipation Day', date: '08-23', emoji: '✊' },
-      { name: 'Dessalines Day', date: '10-17', emoji: '🕊' },
-      { name: 'Battle of Vertières', date: '11-18', emoji: '⚔️' }
+      { name: '♥️🇭🇹 🇭🇹 Independence Day ♥️🇭🇹 🇭🇹', date: '01-01', emoji: '🎉' },
+      { name: '♥️🇭🇹 🇭🇹 Happy Haitian Flag Day To All My Zoes!♥️🇭🇹 🇭🇹', date: '05-18', emoji: '🇭🇹' },
+      { name: 'Emancipation Day', date: '08-23', emoji: '✊⛓️‍💥🇭🇹' },
+      { name: 'Dessalines Day', date: '10-17', emoji: '🕊🇭🇹' },
+      { name: 'Battle of Vertières', date: '11-18', emoji: '⚔️🇭🇹' }
     ]
   },
   {

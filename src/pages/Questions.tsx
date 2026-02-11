@@ -17,7 +17,17 @@ const Questions = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSetModalOpen, setIsSetModalOpen] = useState(false);
   const [isSetBuilderMode, setIsSetBuilderMode] = useState(false);
-  const [draftQuestions, setDraftQuestions] = useState<any[]>([]); // Using any for simplicity in draft shape, but ideally typed
+  
+  // Type for draft questions in Set Builder Mode
+  type DraftQuestion = {
+      content: string;
+      rationale: string;
+      answer: string[];
+      options: string[];
+      tags: string[];
+  };
+  
+  const [draftQuestions, setDraftQuestions] = useState<DraftQuestion[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [selectedSetId, setSelectedSetId] = useState<string>('');
