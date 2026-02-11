@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useStore, Question } from '../store/useStore';
-import { ArrowLeft, CheckCircle2, XCircle, BookOpen, Target, Brain, ArrowRight } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, XCircle, BookOpen, Target, Brain, ArrowRight, AlertCircle } from 'lucide-react';
 
 import Button from '../components/ui/Button';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -129,6 +129,17 @@ const Practice = () => {
     const percentage = Math.round((score / setQuestions.length) * 100);
     const incorrectQuestions = questions.filter(q => incorrectQuestionIds.includes(q.id));
     
+    const getFeedback = (pct: number) => {
+        if (pct === 100) return { title: "Outstanding!", message: "Perfect score! You've completely mastered this material.", color: "text-green-500" };
+        if (pct >= 90) return { title: "Excellent Work!", message: "You're doing amazing! Just a few minor details to polish.", color: "text-emerald-500" };
+        if (pct >= 80) return { title: "Great Job!", message: "Solid performance. You're well on your way to mastery.", color: "text-blue-500" };
+        if (pct >= 70) return { title: "Good Effort", message: "You're getting there! Review your mistakes to strengthen your understanding.", color: "text-indigo-500" };
+        if (pct >= 60) return { title: "Keep Going", message: "You passed, but there's room for improvement. Don't give up!", color: "text-yellow-500" };
+        return { title: "Don't Give Up!", message: "Learning takes time. Review the material and try again—you've got this!", color: "text-orange-500" };
+    };
+
+    const feedback = getFeedback(percentage);
+
     // Analyze tags for focus areas
     const missedTags = incorrectQuestions.flatMap(q => q.tags || []);
     const tagCounts = missedTags.reduce((acc, tag) => {

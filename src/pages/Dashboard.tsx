@@ -5,13 +5,11 @@ import {
   Activity,
   Award,
   BookOpen,
-  Calendar,
   CheckCircle2,
   Clock,
   Layers,
   TrendingUp,
   Zap,
-  Plus,
 } from 'lucide-react';
 import Button from '../components/ui/Button';
 import { useNavigate } from 'react-router-dom';
@@ -28,6 +26,9 @@ import {
 } from 'recharts';
 import Input from '../components/ui/Input';
 
+import { getHolidayForToday } from '../utils/holidays';
+import { QUOTES, getQuotesByField } from '../utils/quotes';
+
 const Dashboard = () => {
   const { questions: allQuestions, sets: allSets, userProfile, setUserProfile, updateLastVisit, activeProfileId } = useStore();
   
@@ -36,11 +37,21 @@ const Dashboard = () => {
 
   const navigate = useNavigate();
   const [greeting, setGreeting] = useState('');
+  const [dailyQuote, setDailyQuote] = useState(() => {
+    const relevantQuotes = getQuotesByField(userProfile.studyField);
+    return relevantQuotes[Math.floor(Math.random() * relevantQuotes.length)];
+  });
+  const [todaysHoliday, setTodaysHoliday] = useState<{name: string, emoji: string, country: string} | null>(null);
+  
   const [isEditingName, setIsEditingName] = useState(false);
   const [newName, setNewName] = useState(userProfile.name);
 
   // Update last visit on mount and determine greeting
   useEffect(() => {
+    // Refresh quote when profile changes
+    const relevantQuotes = getQuotesByField(userProfile.studyField);
+    setDailyQuote(relevantQuotes[Math.floor(Math.random() * relevantQuotes.length)]);
+    
     const lastVisit = userProfile.lastVisit;
     const now = Date.now();
     
@@ -61,7 +72,19 @@ const Dashboard = () => {
     }
 
     setGreeting(`${timeGreeting}, ${userProfile.name}!`);
-  }, [userProfile.lastVisit, userProfile.name, updateLastVisit]); // Run when profile changes
+
+    // Check for holidays
+    const holidayData = getHolidayForToday(userProfile.originCountry);
+    if (holidayData) {
+        setTodaysHoliday({
+            name: holidayData.holiday.name,
+            emoji: holidayData.holiday.emoji,
+            country: holidayData.countryName
+        });
+    } else {
+        setTodaysHoliday(null);
+    }
+  }, [userProfile.lastVisit, userProfile.name, userProfile.originCountry, userProfile.studyField, updateLastVisit]); // Run when profile changes
 
   // Calculate Stats
   const stats = useMemo(() => {
@@ -183,42 +206,64 @@ const Dashboard = () => {
   return (
     <div className="space-y-8 pb-20">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            {isEditingName ? (
-              <form onSubmit={handleNameSave} className="flex items-center gap-2">
-                <Input 
-                  value={newName} 
-                  onChange={(e) => setNewName(e.target.value)} 
-                  className="h-9 w-48"
-                  autoFocus
-                />
-                <Button size="sm" type="submit">Save</Button>
-              </form>
-            ) : (
-              <h1 
-                className="text-4xl font-bold tracking-tight bg-linear-to-r from-primary to-purple-600 bg-clip-text text-transparent cursor-pointer hover:opacity-80 transition-opacity"
-                onClick={() => setIsEditingName(true)}
-                title="Click to edit name"
-              >
-                {greeting}
-              </h1>
-            )}
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              {isEditingName ? (
+                <form onSubmit={handleNameSave} className="flex items-center gap-2">
+                  <Input 
+                    value={newName} 
+                    onChange={(e) => setNewName(e.target.value)} 
+                    className="h-9 w-48"
+                    autoFocus
+                  />
+                  <Button size="sm" type="submit">Save</Button>
+                </form>
+              ) : (
+                <h1 
+                  className="text-4xl font-bold tracking-tight bg-linear-to-r from-primary to-purple-600 bg-clip-text text-transparent cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={() => setIsEditingName(true)}
+                  title="Click to edit name"
+                >
+                  {greeting}
+                </h1>
+              )}
+            </div>
+            <p className="text-muted-foreground mt-1 flex items-center gap-2 italic">
+              "{dailyQuote.text}" <span className="text-xs not-italic text-primary/80">— {dailyQuote.author}</span>
+            </p>
           </div>
-          <p className="text-muted-foreground mt-1 flex items-center gap-2">
-            <Calendar className="h-4 w-4" />
-            {new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-          </p>
+          <div className="flex items-center gap-3">
+              <div className="hidden md:flex items-center gap-2 px-3 py-2 bg-orange-500/10 border border-orange-500/20 rounded-lg text-orange-600 font-semibold">
+                  <Zap className="h-4 w-4 fill-orange-500" />
+                  <span>{userProfile.stats.streakDays || 0} Day Streak</span>
+              </div>
+              <Button onClick={() => navigate('/flashcards')} className="shadow-lg shadow-primary/20">
+                  <Zap className="mr-2 h-4 w-4" /> Start Review
+              </Button>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-            <Button onClick={() => navigate('/flashcards')} className="shadow-lg shadow-primary/20">
-                <Zap className="mr-2 h-4 w-4" /> Start Review
-            </Button>
-            <Button variant="outline" onClick={() => navigate('/questions')}>
-                <Plus className="mr-2 h-4 w-4" /> Add New
-            </Button>
-        </div>
+
+        {/* Holiday Ticker */}
+        {todaysHoliday && (
+            <motion.div 
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-linear-to-r from-primary/20 via-primary/10 to-transparent border border-primary/20 p-3 rounded-xl flex items-center gap-3 overflow-hidden relative"
+            >
+                <div className="absolute top-0 left-0 w-1 h-full bg-primary animate-pulse" />
+                <div className="text-2xl animate-bounce">{todaysHoliday.emoji}</div>
+                <div className="flex-1">
+                    <p className="font-bold text-primary">
+                        Happy {todaysHoliday.name}!
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                        Celebrating in {todaysHoliday.country} today.
+                    </p>
+                </div>
+            </motion.div>
+        )}
       </div>
 
       {/* Stats Grid */}

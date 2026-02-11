@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useStore } from './store/useStore';
+import { useNotificationScheduler } from './hooks/useNotificationScheduler';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import Questions from './pages/Questions';
@@ -52,6 +53,9 @@ const AnimatedRoutes = () => {
 
 const App = () => {
   const { userProfile } = useStore();
+  
+  // Initialize notification scheduler
+  useNotificationScheduler();
 
   useEffect(() => {
     const applyTheme = () => {

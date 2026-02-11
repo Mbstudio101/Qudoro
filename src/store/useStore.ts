@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
+import { calculateSM2 } from '../utils/sm2';
+
 
 export interface Question {
   id: string;
@@ -15,6 +17,10 @@ export interface Question {
   box: number;
   nextReviewDate: number;
   lastReviewed?: number;
+  // SM-2 Algorithm Fields
+  easeFactor?: number;
+  repetitions?: number;
+  interval?: number;
 }
 
 export interface ExamSet {
@@ -31,6 +37,7 @@ export interface Profile {
   name: string;
   avatar?: string;
   studyField?: string;
+  originCountry?: string; // e.g., "HT", "JM", "US"
   lastVisit: number | null;
   theme: 'light' | 'dark' | 'system';
   stats: UserStats;
@@ -122,7 +129,7 @@ interface AppState {
   calendarEvents: CalendarEvent[];
   notes: Note[];
   userProfile: UserProfile; // The Active Profile
-  addQuestion: (q: Omit<Question, 'id' | 'createdAt' | 'box' | 'nextReviewDate' | 'lastReviewed'>) => string;
+  addQuestion: (q: Omit<Question, 'id' | 'createdAt' | 'box' | 'nextReviewDate' | 'lastReviewed' | 'easeFactor' | 'repetitions' | 'interval'>) => string;
   updateQuestion: (id: string, q: Partial<Question>) => void;
   deleteQuestion: (id: string) => void;
   reviewQuestion: (id: string, performance: 'again' | 'hard' | 'good' | 'easy') => void;
@@ -333,7 +340,17 @@ export const useStore = create<AppState>()(
         set((state) => ({
           questions: [
             ...state.questions,
-            { ...q, id, profileId, createdAt: Date.now(), box: 0, nextReviewDate: Date.now() },
+            { 
+              ...q, 
+              id, 
+              profileId, 
+              createdAt: Date.now(), 
+              box: 0, 
+              nextReviewDate: Date.now(),
+              easeFactor: 2.5,
+              repetitions: 0,
+              interval: 0
+            },
           ],
         }));
         get().checkAchievements();
@@ -358,14 +375,20 @@ export const useStore = create<AppState>()(
           const question = state.questions.find((q) => q.id === id);
           if (!question) return state;
 
-          let box = question.box || 0;
-          if (performance === 'again') box = 0;
-          else if (performance === 'hard') box = Math.max(0, box - 1);
-          else if (performance === 'good') box = Math.min(INTERVALS.length - 1, box + 1);
-          else if (performance === 'easy') box = Math.min(INTERVALS.length - 1, box + 2);
+          // --- SM-2 Algorithm Implementation ---
+          
+          const currentSM2State = {
+            easeFactor: question.easeFactor || 2.5,
+            repetitions: question.repetitions || 0,
+            interval: question.interval || 0
+          };
 
-          const intervalDays = INTERVALS[box];
-          const nextReviewDate = Date.now() + intervalDays * 24 * 60 * 60 * 1000;
+          const { easeFactor, repetitions, interval } = calculateSM2(currentSM2State, performance);
+
+          const nextReviewDate = Date.now() + interval * 24 * 60 * 60 * 1000;
+          
+          // Legacy 'box' support
+          const box = Math.min(6, repetitions);
 
           // Stats Update
           const newStats = { ...state.userProfile.stats };
@@ -390,7 +413,15 @@ export const useStore = create<AppState>()(
 
           return {
             questions: state.questions.map((q) =>
-              q.id === id ? { ...q, box, nextReviewDate, lastReviewed: Date.now() } : q
+              q.id === id ? { 
+                ...q, 
+                box, 
+                nextReviewDate, 
+                lastReviewed: Date.now(),
+                easeFactor,
+                repetitions,
+                interval
+              } : q
             ),
             userProfile: updatedProfile,
             accounts: updatedAccounts
@@ -441,6 +472,33 @@ export const useStore = create<AppState>()(
             newStats.xp += session.score * 5;
             newStats.level = calculateLevel(newStats.xp);
             
+            // Streak Logic
+            const now = new Date();
+            const lastDate = new Date(newStats.lastStudyDate || 0);
+            
+            // Normalize to midnight for accurate day comparison
+            const todayMidnight = new Date(now);
+            todayMidnight.setHours(0,0,0,0);
+            
+            const lastMidnight = new Date(lastDate);
+            lastMidnight.setHours(0,0,0,0);
+            
+            const diffTime = todayMidnight.getTime() - lastMidnight.getTime();
+            const diffDays = diffTime / (1000 * 60 * 60 * 24);
+
+            if (diffDays === 1) {
+                // Consecutive day
+                newStats.streakDays = (newStats.streakDays || 0) + 1;
+            } else if (diffDays > 1) {
+                // Missed a day
+                newStats.streakDays = 1;
+            } else if (diffDays === 0 && !newStats.streakDays) {
+                // First study of the day for a new user/reset
+                newStats.streakDays = 1;
+            }
+            
+            newStats.lastStudyDate = Date.now();
+
             const profileId = state.activeProfileId || '';
 
             const updatedProfile = { ...state.userProfile, stats: newStats };

@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useStore, Question } from '../store/useStore';
+import { calculateSM2 } from '../utils/sm2';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RotateCw, CheckCircle, AlertCircle, Layers, Play } from 'lucide-react';
 import Button from '../components/ui/Button';
@@ -48,6 +49,17 @@ const Flashcards = () => {
   };
 
   const currentQuestion = dueQuestions[currentIndex];
+
+  const getIntervalLabel = (rating: 'again' | 'hard' | 'good' | 'easy') => {
+    if (!currentQuestion) return '-';
+    const { interval } = calculateSM2({
+        easeFactor: currentQuestion.easeFactor || 2.5,
+        repetitions: currentQuestion.repetitions || 0,
+        interval: currentQuestion.interval || 0
+    }, rating);
+    
+    return interval === 1 ? '1 day' : `${interval} days`;
+  };
 
   const handleRate = (rating: 'again' | 'hard' | 'good' | 'easy') => {
     if (!currentQuestion) return;
@@ -305,7 +317,7 @@ const Flashcards = () => {
                 >
                   Again
                 </Button>
-                <span className="text-[10px] text-center text-muted-foreground">1 min</span>
+                <span className="text-[10px] text-center text-muted-foreground">{getIntervalLabel('again')}</span>
               </div>
               <div className="flex flex-col gap-1">
                 <Button 
@@ -315,7 +327,7 @@ const Flashcards = () => {
                 >
                   Hard
                 </Button>
-                <span className="text-[10px] text-center text-muted-foreground">2 days</span>
+                <span className="text-[10px] text-center text-muted-foreground">{getIntervalLabel('hard')}</span>
               </div>
               <div className="flex flex-col gap-1">
                 <Button 
@@ -325,7 +337,7 @@ const Flashcards = () => {
                 >
                   Good
                 </Button>
-                <span className="text-[10px] text-center text-muted-foreground">4 days</span>
+                <span className="text-[10px] text-center text-muted-foreground">{getIntervalLabel('good')}</span>
               </div>
               <div className="flex flex-col gap-1">
                 <Button 
@@ -335,7 +347,7 @@ const Flashcards = () => {
                 >
                   Easy
                 </Button>
-                <span className="text-[10px] text-center text-muted-foreground">7 days</span>
+                <span className="text-[10px] text-center text-muted-foreground">{getIntervalLabel('easy')}</span>
               </div>
             </motion.div>
           )}

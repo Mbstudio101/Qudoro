@@ -413,8 +413,30 @@ const ACHIEVEMENT_ICONS: Record<string, LucideIcon> = {
   layers: Layers,
 };
 
+import { COUNTRIES } from '../utils/holidays';
+import { useNavigate } from 'react-router-dom';
+
 const Profile = () => {
+  const navigate = useNavigate();
   const { userProfile, setUserProfile } = useStore();
+  
+  const [isEditing, setIsEditing] = useState(false);
+  const [formData, setFormData] = useState({
+    name: userProfile.name,
+    studyField: userProfile.studyField || '',
+    originCountry: userProfile.originCountry || 'Global'
+  });
+
+  const handleSaveProfile = () => {
+    setUserProfile({
+      ...userProfile,
+      name: formData.name,
+      studyField: formData.studyField,
+      originCountry: formData.originCountry
+    });
+    setIsEditing(false);
+  };
+
   const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState('fun');
   
@@ -505,8 +527,73 @@ const Profile = () => {
           </div>
           
           <div className="text-center md:text-left space-y-4 flex-1">
-            <div>
-                <h2 className="text-4xl font-bold tracking-tight mb-2">{userProfile.name}</h2>
+            {isEditing ? (
+              <div className="space-y-4 max-w-md mx-auto md:mx-0 bg-background/50 backdrop-blur-sm p-6 rounded-2xl border border-border/50">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Name</label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border bg-background"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Study Field / Career</label>
+                  <input
+                    type="text"
+                    value={formData.studyField}
+                    onChange={(e) => setFormData({ ...formData, studyField: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border bg-background"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Origin Country</label>
+                  <select
+                    value={formData.originCountry}
+                    onChange={(e) => setFormData({ ...formData, originCountry: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border bg-background"
+                  >
+                    <option value="">Select Country</option>
+                    {COUNTRIES.filter(c => c.code === 'Global').map(c => (
+                        <option key={c.code} value={c.code}>{c.flag} {c.name}</option>
+                    ))}
+                    <option disabled>──────────</option>
+                    {COUNTRIES.filter(c => c.code !== 'Global').map((c) => (
+                      <option key={c.code} value={c.code}>
+                        {c.flag} {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <button
+                    onClick={handleSaveProfile}
+                    className="flex-1 bg-primary text-primary-foreground py-2 rounded-lg text-sm font-medium"
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={() => setIsEditing(false)}
+                    className="flex-1 bg-secondary text-secondary-foreground py-2 rounded-lg text-sm font-medium"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div className="flex items-center justify-center md:justify-start gap-3 mb-2">
+                  <h2 className="text-4xl font-bold tracking-tight">{userProfile.name}</h2>
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-muted-foreground"
+                    title="Edit Profile"
+                  >
+                    <Pen size={16} />
+                  </button>
+                </div>
+                
                 <div className="flex items-center gap-3 justify-center md:justify-start flex-wrap">
                     <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border border-yellow-500/20 text-sm font-medium">
                         <Award className="h-3.5 w-3.5" /> Level {stats.progress.level}
@@ -518,6 +605,14 @@ const Profile = () => {
                         <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 text-sm font-medium">
                             <GraduationCap className="h-3.5 w-3.5" /> {userProfile.studyField}
                         </span>
+                    )}
+                    {userProfile.originCountry && (
+                      <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-sm font-medium">
+                        {(() => {
+                          const country = COUNTRIES.find(c => c.code === userProfile.originCountry);
+                          return country ? <>{country.flag} {country.name}</> : null;
+                        })()}
+                      </span>
                     )}
                 </div>
                 
@@ -531,6 +626,7 @@ const Profile = () => {
                     </div>
                 </div>
             </div>
+            )}
             
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-border/40">
                 {stats.items.map((stat, idx) => (
