@@ -9,12 +9,16 @@ import Flashcards from './pages/Flashcards';
 import Settings from './pages/Settings';
 import Practice from './pages/Practice';
 import Profile from './pages/Profile';
+import Calendar from './pages/Calendar';
+import Notes from './pages/Notes';
 
 const AnimatedRoutes = () => {
   return (
     <Routes>
       <Route path="/" element={<Layout />}>
         <Route index element={<Dashboard />} />
+        <Route path="calendar" element={<Calendar />} />
+        <Route path="notes" element={<Notes />} />
         <Route path="questions" element={<Questions />} />
         <Route path="sets" element={<ExamSets />} />
         <Route path="practice/:setId" element={<Practice />} />

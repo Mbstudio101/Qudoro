@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useStore, Question } from '../store/useStore';
-import { Plus, Trash2, Edit2, Search, CheckSquare, Square, Save, Check, ChevronDown, ChevronRight, Folder, LayoutGrid, List } from 'lucide-react';
+import { Plus, Trash2, Edit2, Search, CheckSquare, Square, Save, Check, ChevronDown, ChevronRight, Folder, List } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
 import Textarea from '../components/ui/Textarea';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 const Questions = () => {
   const { questions, sets, addQuestion, deleteQuestion, updateQuestion, addQuestionToSet, addSet } = useStore();
@@ -336,12 +336,16 @@ const Questions = () => {
 
   return (
     <div className="space-y-6 pb-20">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mb-8">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">Questions</h2>
-          <p className="text-muted-foreground">Manage your study questions and rationales.</p>
+          <h1 className="text-3xl font-bold tracking-tight bg-linear-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+            Question Bank
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Manage your study materials and organize them into sets.
+          </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-3">
             {selectedQuestionIds.length > 0 && (
                 <Button onClick={handleSaveSetClick} variant="secondary" className="animate-in fade-in slide-in-from-right-4">
                     <Save className="mr-2 h-4 w-4" /> Save Set ({selectedQuestionIds.length})

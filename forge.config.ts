@@ -10,6 +10,7 @@ import { FuseV1Options, FuseVersion } from '@electron/fuses';
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
+    icon: './public/icon', // This will automatically look for icon.icns (Mac) and icon.ico (Windows)
   },
   rebuildConfig: {},
   makers: [

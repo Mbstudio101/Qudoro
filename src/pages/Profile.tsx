@@ -1,7 +1,7 @@
 import React, { useRef, useState, useMemo } from 'react';
 import { useStore, AVAILABLE_ACHIEVEMENTS } from '../store/useStore';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Trophy, Flame, Award, User, Clock, Star, Brain, Layers, BookOpen, HelpCircle, Folder, X, GraduationCap, Palette, Shuffle, AlertTriangle, Zap, Pen, Shield, Moon, Sun, Calendar, Download, Skull, CheckSquare } from 'lucide-react';
+import { Trophy, Flame, Award, User, Clock, Star, Layers, BookOpen, HelpCircle, X, GraduationCap, Palette, Shuffle, AlertTriangle, Zap, Pen, Shield, Moon, Sun, Calendar, Download, Skull, CheckSquare, Crown } from 'lucide-react';
 import { GameBadge } from '../components/ui/GameBadge';
 
 // Debug component to help identify image loading issues
@@ -25,7 +25,7 @@ const ImageWithDebug = ({ src, alt, className, ...props }: React.ImgHTMLAttribut
             src={src}
             alt={alt}
             className={className}
-            onError={(e) => {
+            onError={() => {
                 console.error(`[ImageDebug] Failed to load: ${src}`);
                 setError(true);
             }}
@@ -184,7 +184,7 @@ interface AvatarBuilderOptions {
     clothingColor: string;
 }
 
-const CustomAvatarBuilder = ({ initialAvatar, onSave, onCancel }: { initialAvatar?: string, onSave: (url: string) => void, onCancel: () => void }) => {
+const CustomAvatarBuilder = ({ initialAvatar, onSave }: { initialAvatar?: string, onSave: (url: string) => void, onCancel: () => void }) => {
   const [options, setOptions] = useState<AvatarBuilderOptions>(() => {
     const defaultOptions = {
         style: 'avataaars',
@@ -457,7 +457,7 @@ const ACHIEVEMENT_ICONS: Record<string, any> = {
   pen: Pen,
   shield: Shield,
   book: BookOpen,
-  crown: Trophy,
+  crown: Crown,
   flame: Flame,
   clock: Clock,
   moon: Moon,
@@ -469,10 +469,11 @@ const ACHIEVEMENT_ICONS: Record<string, any> = {
   download: Download,
   skull: Skull,
   check_square: CheckSquare,
+  layers: Layers,
 };
 
 const Profile = () => {
-  const { userProfile, setUserProfile, questions, sets } = useStore();
+  const { userProfile, setUserProfile } = useStore();
   const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState('fun');
   
@@ -530,28 +531,16 @@ const Profile = () => {
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  const scrollLeft = () => {
-    if (scrollContainerRef.current) {
-        scrollContainerRef.current.scrollBy({ left: -300, behavior: 'smooth' });
-    }
-  };
-
-  const scrollRight = () => {
-    if (scrollContainerRef.current) {
-        scrollContainerRef.current.scrollBy({ left: 300, behavior: 'smooth' });
-    }
-  };
-
   return (
     <div className="space-y-10 pb-20">
       {/* Header / Hero Section */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary/20 via-background to-background border border-border/50 p-8 md:p-12 shadow-2xl">
+      <div className="relative overflow-hidden rounded-3xl bg-linear-to-br from-primary/20 via-background to-background border border-border/50 p-8 md:p-12 shadow-2xl">
         <div className="absolute top-0 right-0 p-4 opacity-5 blur-3xl">
           <User size={400} />
         </div>
         <div className="relative z-10 flex flex-col md:flex-row items-center gap-8">
           <div className="relative group cursor-pointer" onClick={() => setIsAvatarModalOpen(true)}>
-              <div className="h-32 w-32 rounded-full bg-gradient-to-tr from-primary to-purple-500 p-1 shadow-lg group-hover:scale-105 transition-transform duration-300">
+              <div className="h-32 w-32 rounded-full bg-linear-to-tr from-primary to-purple-500 p-1 shadow-lg group-hover:scale-105 transition-transform duration-300">
                 <div className="h-full w-full rounded-full bg-card flex items-center justify-center overflow-hidden relative">
                     {userProfile.avatar ? (
                       <ImageWithDebug 
@@ -595,7 +584,7 @@ const Profile = () => {
                 <div className="mt-4 max-w-sm mx-auto md:mx-0">
                     <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
                         <div 
-                            className="h-full bg-gradient-to-r from-yellow-400 to-yellow-600 rounded-full transition-all duration-1000"
+                            className="h-full bg-linear-to-r from-yellow-400 to-yellow-600 rounded-full transition-all duration-1000"
                             style={{ width: `${stats.progress.percentage}%` }}
                         />
                     </div>

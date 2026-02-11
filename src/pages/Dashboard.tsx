@@ -197,7 +197,7 @@ const Dashboard = () => {
               </form>
             ) : (
               <h1 
-                className="text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent cursor-pointer hover:opacity-80 transition-opacity"
+                className="text-4xl font-bold tracking-tight bg-linear-to-r from-primary to-purple-600 bg-clip-text text-transparent cursor-pointer hover:opacity-80 transition-opacity"
                 onClick={() => setIsEditingName(true)}
                 title="Click to edit name"
               >

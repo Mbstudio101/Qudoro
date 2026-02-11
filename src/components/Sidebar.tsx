@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { BookOpen, Layers, Settings, Brain, LayoutDashboard, User, ChevronLeft, ChevronRight } from 'lucide-react';
+import { BookOpen, Layers, Settings, Brain, LayoutDashboard, User, ChevronLeft, ChevronRight, Calendar, FileText } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Logo } from './ui/Logo';
 import { useStore } from '../store/useStore';
@@ -40,6 +40,8 @@ const Sidebar = () => {
 
   const navItems = [
     { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
+    { to: '/calendar', icon: Calendar, label: 'Calendar' },
+    { to: '/notes', icon: FileText, label: 'Notes' },
     { to: '/questions', icon: BookOpen, label: 'Questions' },
     { to: '/sets', icon: Layers, label: 'Exams' },
     { to: '/flashcards', icon: Brain, label: 'Flashcards' },
@@ -55,13 +57,13 @@ const Sidebar = () => {
       </button>
 
       <div className={`mb-8 pt-4 flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 px-4'}`}>
-        <Logo className="w-8 h-8 flex-shrink-0" />
+        <Logo className="w-8 h-8 shrink-0" />
         {!isCollapsed && (
           <motion.h1 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="text-2xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent tracking-tight whitespace-nowrap overflow-hidden"
+            className="text-2xl font-bold bg-linear-to-r from-primary to-purple-600 bg-clip-text text-transparent tracking-tight whitespace-nowrap overflow-hidden"
           >
             Qudoro
           </motion.h1>
@@ -82,7 +84,7 @@ const Sidebar = () => {
               }`
             }
           >
-            <item.icon size={20} className="flex-shrink-0" />
+            <item.icon size={20} className="shrink-0" />
             {!isCollapsed && <span className="font-medium whitespace-nowrap overflow-hidden">{item.label}</span>}
           </NavLink>
         ))}
@@ -100,7 +102,7 @@ const Sidebar = () => {
               }`
             }
         >
-            <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center border border-primary/50 overflow-hidden flex-shrink-0">
+            <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center border border-primary/50 overflow-hidden shrink-0">
                 {userProfile.avatar ? (
                     <img 
                         src={getAvatarUrl(userProfile.avatar)} 
@@ -125,7 +127,7 @@ const Sidebar = () => {
               }`
             }
         >
-            <Settings size={20} className="flex-shrink-0" />
+            <Settings size={20} className="shrink-0" />
             {!isCollapsed && <span className="font-medium whitespace-nowrap overflow-hidden">Settings</span>}
         </NavLink>
       </div>

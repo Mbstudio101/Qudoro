@@ -132,7 +132,7 @@ export const GameBadge = ({ icon: Icon, xpReward, unlocked, size = 'md', classNa
 
   return (
     <motion.div 
-        className={`relative ${SIZES[size]} ${className} flex-shrink-0`}
+        className={`relative ${SIZES[size]} ${className} shrink-0`}
         whileHover={unlocked ? { scale: 1.1, rotate: [0, -5, 5, 0] } : {}}
     >
       <svg viewBox="0 0 100 100" className={`w-full h-full drop-shadow-xl ${!unlocked ? 'grayscale opacity-70' : ''}`}>

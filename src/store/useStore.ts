@@ -34,6 +34,24 @@ export interface StudySession {
   duration?: number; // seconds
 }
 
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  date: number; // timestamp
+  type: 'assignment' | 'exam' | 'quiz' | 'study' | 'other';
+  completed: boolean;
+  description?: string;
+  time?: string; // e.g., "14:00"
+}
+
+export interface Note {
+  id: string;
+  title: string;
+  content: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface Achievement {
   id: string;
   title: string;
@@ -69,6 +87,8 @@ interface AppState {
   questions: Question[];
   sets: ExamSet[];
   sessions: StudySession[];
+  calendarEvents: CalendarEvent[];
+  notes: Note[];
   userProfile: UserProfile;
   addQuestion: (q: Omit<Question, 'id' | 'createdAt' | 'box' | 'nextReviewDate' | 'lastReviewed'>) => string;
   updateQuestion: (id: string, q: Partial<Question>) => void;
@@ -80,6 +100,15 @@ interface AppState {
   addQuestionToSet: (setId: string, questionId: string) => void;
   removeQuestionFromSet: (setId: string, questionId: string) => void;
   addSession: (session: Omit<StudySession, 'id'>) => void;
+  // Calendar Actions
+  addCalendarEvent: (event: Omit<CalendarEvent, 'id'>) => void;
+  updateCalendarEvent: (id: string, event: Partial<CalendarEvent>) => void;
+  deleteCalendarEvent: (id: string) => void;
+  toggleEventCompletion: (id: string) => void;
+  // Note Actions
+  addNote: (note: Omit<Note, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  updateNote: (id: string, note: Partial<Note>) => void;
+  deleteNote: (id: string) => void;
   importData: (data: { questions: Question[]; sets: ExamSet[] }) => void;
   resetData: () => void;
   setUserProfile: (profile: Partial<UserProfile>) => void;
@@ -124,8 +153,11 @@ export const AVAILABLE_ACHIEVEMENTS = [
   { id: 'marathon', title: 'Marathoner', description: 'Answer 1000 questions', icon: 'award', xp: 2500 },
 ];
 
-const calculateLevel = (xp: number) => Math.floor(Math.sqrt(xp / 100)) + 1;
-const xpForNextLevel = (level: number) => 100 * Math.pow(level, 2);
+const calculateLevel = (xp: number) => {
+    if (typeof xp !== 'number' || isNaN(xp) || xp < 0) return 1;
+    return Math.floor(Math.sqrt(xp / 100)) + 1;
+};
+// const xpForNextLevel = (level: number) => 100 * Math.pow(level, 2);
 
 const storage: StateStorage = {
   getItem: async (name: string): Promise<string | null> => {
@@ -151,6 +183,8 @@ export const useStore = create<AppState>()(
       questions: [] as Question[],
       sets: [] as ExamSet[],
       sessions: [] as StudySession[],
+      calendarEvents: [] as CalendarEvent[],
+      notes: [] as Note[],
       userProfile: { 
         name: 'Student', 
         lastVisit: null, 
@@ -286,6 +320,38 @@ export const useStore = create<AppState>()(
         });
         get().checkAchievements();
       },
+      addCalendarEvent: (event) =>
+        set((state) => ({
+          calendarEvents: [...state.calendarEvents, { ...event, id: uuidv4() }],
+        })),
+      updateCalendarEvent: (id, event) =>
+        set((state) => ({
+          calendarEvents: state.calendarEvents.map((e) =>
+            e.id === id ? { ...e, ...event } : e
+          ),
+        })),
+      deleteCalendarEvent: (id) =>
+        set((state) => ({
+          calendarEvents: state.calendarEvents.filter((e) => e.id !== id),
+        })),
+      toggleEventCompletion: (id) =>
+        set((state) => ({
+          calendarEvents: state.calendarEvents.map((e) =>
+            e.id === id ? { ...e, completed: !e.completed } : e
+          ),
+        })),
+      addNote: (note) =>
+        set((state) => ({
+          notes: [...state.notes, { ...note, id: uuidv4(), createdAt: Date.now(), updatedAt: Date.now() }],
+        })),
+      updateNote: (id, note) =>
+        set((state) => ({
+          notes: state.notes.map((n) => (n.id === id ? { ...n, ...note, updatedAt: Date.now() } : n)),
+        })),
+      deleteNote: (id) =>
+        set((state) => ({
+          notes: state.notes.filter((n) => n.id !== id),
+        })),
       importData: (data) =>
         set((state) => {
           const newStats = { ...state.userProfile.stats };

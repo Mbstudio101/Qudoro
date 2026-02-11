@@ -11,6 +11,8 @@ contextBridge.exposeInMainWorld('electron', {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     set: (key: string, value: any) => ipcRenderer.send('set-store-value', key, value),
   },
+  fetchUrl: (url: string) => ipcRenderer.invoke('fetch-url', url),
+  parsePdf: (buffer: number[]) => ipcRenderer.invoke('parse-pdf', buffer),
   updater: {
     checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
     downloadUpdate: () => ipcRenderer.invoke('download-update'),

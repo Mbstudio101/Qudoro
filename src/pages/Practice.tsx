@@ -16,7 +16,7 @@ const Practice = () => {
   const [showResults, setShowResults] = useState(false);
   const [score, setScore] = useState(0);
   const [incorrectQuestionIds, setIncorrectQuestionIds] = useState<string[]>([]);
-  const [startTime, setStartTime] = useState(Date.now());
+  const [startTime] = useState(Date.now());
   const sessionSaved = useRef(false);
   
   const currentSet = sets.find((s) => s.id === setId);

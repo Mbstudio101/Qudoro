@@ -5,13 +5,16 @@ import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
 import { useStore } from '../store/useStore';
+// import { v4 as uuidv4 } from 'uuid';
+// import { parseQuizletHTML } from '../utils/quizletImport';
+// import { parsePDFText } from '../utils/pdfImport';
 
 const Settings = () => {
   const { userProfile, setUserProfile, questions, sets, importData, resetData } = useStore();
   
   // Update State
   const [status, setStatus] = useState<string>('idle'); 
-  const [updateInfo, setUpdateInfo] = useState<any>(null);
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [progress, setProgress] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,6 +30,12 @@ const Settings = () => {
 
   // Data State
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // const pdfInputRef = useRef<HTMLInputElement>(null);
+  // const [showQuizletModal, setShowQuizletModal] = useState(false);
+  // const [quizletUrl, setQuizletUrl] = useState('');
+  // const [isImporting, setIsImporting] = useState(false);
+  // const [isPdfProcessing, setIsPdfProcessing] = useState(false);
+
 
   useEffect(() => {
     // Listeners
@@ -38,7 +47,7 @@ const Settings = () => {
         setUpdateInfo(info);
       });
 
-      window.electron.updater.onUpdateNotAvailable((info) => {
+      window.electron.updater.onUpdateNotAvailable(() => {
         setStatus('not-available');
         setUpdateInfo(null);
       });
@@ -109,6 +118,126 @@ const Settings = () => {
   const handleImportClick = () => {
     fileInputRef.current?.click();
   };
+
+  /*
+  const handlePdfImportClick = () => {
+    pdfInputRef.current?.click();
+  };
+
+  const handlePdfFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setIsPdfProcessing(true);
+    try {
+        // Read file as ArrayBuffer in renderer
+        const arrayBuffer = await file.arrayBuffer();
+        // Convert to standard array for IPC transfer
+        const buffer = Array.from(new Uint8Array(arrayBuffer));
+
+        const result = await window.electron.parsePdf(buffer);
+        if (result.success && result.text) {
+             const extractedQuestions = parsePDFText(result.text);
+             
+             if (extractedQuestions.length > 0) {
+                 const newSetId = uuidv4();
+                 const newQuestions: Question[] = extractedQuestions.map(q => ({
+                     id: uuidv4(),
+                     content: q.question,
+                     answer: [q.answer],
+                     rationale: '',
+                     options: [] as string[],
+                     tags: ['pdf-import'],
+                     createdAt: Date.now(),
+                     box: 1,
+                     nextReviewDate: Date.now()
+                 }));
+
+                 const newSet = {
+                    id: newSetId,
+                    title: file.name.replace('.pdf', ''),
+                    description: 'Imported from PDF',
+                    questionIds: newQuestions.map(q => q.id),
+                    createdAt: Date.now(),
+                    updatedAt: Date.now(),
+                 };
+
+                 importData({
+                     questions: newQuestions,
+                     sets: [newSet]
+                 });
+                 
+                 alert(`Successfully extracted ${extractedQuestions.length} questions from PDF!`);
+             } else {
+                 alert('Could not find any clearly formatted questions (Q: ... A: ...) in this PDF.');
+             }
+        } else {
+            alert(`Failed to parse PDF text: ${result.error || 'Unknown error'}`);
+        }
+    } catch (err: any) {
+        console.error(err);
+        alert(`Error processing PDF: ${err.message || 'Unknown error'}`);
+    } finally {
+        setIsPdfProcessing(false);
+        // Reset input
+        e.target.value = '';
+    }
+  };
+
+  const handleQuizletImport = async () => {
+    if (!quizletUrl.trim()) return;
+    
+    setIsImporting(true);
+    try {
+        const result = await window.electron.fetchUrl(quizletUrl);
+        if (result.success && result.data) {
+            const parsed = parseQuizletHTML(result.data);
+            if (parsed && parsed.terms.length > 0) {
+                // Create new Set and Questions
+                const newSetId = uuidv4();
+                const newQuestions: Question[] = parsed.terms.map((term: any) => ({
+                    id: uuidv4(),
+                    content: term.term,
+                    answer: [term.definition],
+                    rationale: '',
+                    options: [] as string[], 
+                    tags: ['quizlet-import'],
+                    createdAt: Date.now(),
+                    box: 1,
+                    nextReviewDate: Date.now()
+                }));
+                
+                const newSet = {
+                    id: newSetId,
+                    title: parsed.title,
+                    description: `Imported from Quizlet`,
+                    questionIds: newQuestions.map((q: any) => q.id),
+                    createdAt: Date.now(),
+                    updatedAt: Date.now(),
+                };
+                
+                importData({
+                    questions: newQuestions,
+                    sets: [newSet]
+                });
+                
+                alert(`Successfully imported "${parsed.title}" with ${parsed.terms.length} terms!`);
+                setShowQuizletModal(false);
+                setQuizletUrl('');
+            } else {
+                alert('Could not find any terms in this Quizlet set. Make sure the set is public.');
+            }
+        } else {
+            alert('Failed to fetch Quizlet page. Please check the URL.');
+        }
+    } catch (err) {
+        console.error(err);
+        alert('An error occurred during import.');
+    } finally {
+        setIsImporting(false);
+    }
+  };
+  */
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -295,6 +424,7 @@ const Settings = () => {
                         <Upload className="h-6 w-6" />
                         <span>Import Data</span>
                     </Button>
+
                     <input 
                         type="file" 
                         ref={fileInputRef} 

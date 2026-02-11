@@ -41,7 +41,7 @@ const ExamSets = () => {
     <div className="space-y-6 pb-20">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">Exams</h2>
+          <h2 className="text-3xl font-bold tracking-tight bg-linear-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">Exams</h2>
           <p className="text-muted-foreground">Select an exam set to begin your practice session.</p>
         </div>
       </div>

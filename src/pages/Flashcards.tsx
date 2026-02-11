@@ -91,7 +91,7 @@ const Flashcards = () => {
         <div className="space-y-6 pb-20">
             <div className="flex items-center justify-between">
                 <div>
-                <h2 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">Flashcards</h2>
+                <h2 className="text-3xl font-bold tracking-tight bg-linear-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">Flashcards</h2>
                 <p className="text-muted-foreground">Select a deck to start your review session.</p>
                 </div>
             </div>
@@ -214,7 +214,7 @@ const Flashcards = () => {
            <Button variant="ghost" size="sm" onClick={() => setSelectedSetId(null)} className="mb-2 -ml-2 text-muted-foreground">
              ← Back to Decks
            </Button>
-          <h2 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+          <h2 className="text-3xl font-bold tracking-tight bg-linear-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
              {selectedSetId === 'all' ? 'All Decks' : sets.find(s => s.id === selectedSetId)?.title || 'Flashcards'}
           </h2>
           <p className="text-muted-foreground">
@@ -227,7 +227,7 @@ const Flashcards = () => {
       </div>
 
       <div className="flex-1 flex flex-col items-center justify-center perspective-1000 min-h-[400px]">
-        <div className="relative w-full max-w-xl aspect-[3/2] group">
+        <div className="relative w-full max-w-xl aspect-3/2 group">
           <motion.div
             initial={false}
             animate={{ rotateY: isFlipped ? 180 : 0 }}
