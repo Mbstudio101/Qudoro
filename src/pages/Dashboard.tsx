@@ -44,12 +44,23 @@ const Dashboard = () => {
       updateLastVisit();
     }
 
+    const hour = new Date().getHours();
+    let timeGreeting = 'Welcome';
+    
+    if (hour >= 5 && hour < 12) {
+      timeGreeting = 'Good morning';
+    } else if (hour >= 12 && hour < 18) {
+      timeGreeting = 'Good afternoon';
+    } else if (hour >= 18 || hour < 5) {
+      timeGreeting = 'Good evening';
+    }
+
     if (!lastVisit) {
       setGreeting(`Welcome, ${userProfile.name}!`);
     } else {
-      setGreeting(`Welcome back, ${userProfile.name}!`);
+      setGreeting(`${timeGreeting}, ${userProfile.name}!`);
     }
-  }, []); // Run once on mount
+  }, [userProfile.lastVisit, userProfile.name, updateLastVisit]); // Run when profile changes
 
   // Calculate Stats
   const stats = useMemo(() => {
@@ -166,7 +177,6 @@ const Dashboard = () => {
     e.preventDefault();
     setUserProfile({ name: newName });
     setIsEditingName(false);
-    setGreeting(`Welcome back, ${newName}!`);
   };
 
   return (
