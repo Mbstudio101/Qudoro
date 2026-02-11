@@ -39,38 +39,42 @@ const createWindow = () => {
 
   // Open the DevTools.
   // mainWindow.webContents.openDevTools();
-
-  // IPC Handlers
-  ipcMain.on('minimize-window', () => {
-    mainWindow.minimize();
-  });
-
-  ipcMain.on('maximize-window', () => {
-    if (process.platform === 'darwin') {
-        const isFullScreen = mainWindow.isFullScreen();
-        mainWindow.setFullScreen(!isFullScreen);
-    } else {
-        if (mainWindow.isMaximized()) {
-            mainWindow.unmaximize();
-        } else {
-            mainWindow.maximize();
-        }
-    }
-  });
-
-  ipcMain.on('close-window', () => {
-    mainWindow.close();
-  });
-
-  // Store IPC
-  ipcMain.handle('get-store-value', (event, key) => {
-    return store.get(key);
-  });
-
-  ipcMain.on('set-store-value', (event, key, value) => {
-    store.set(key, value);
-  });
 };
+
+// IPC Handlers
+ipcMain.on('minimize-window', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  win?.minimize();
+});
+
+ipcMain.on('maximize-window', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win) return;
+  if (process.platform === 'darwin') {
+      const isFullScreen = win.isFullScreen();
+      win.setFullScreen(!isFullScreen);
+  } else {
+      if (win.isMaximized()) {
+          win.unmaximize();
+      } else {
+          win.maximize();
+      }
+  }
+});
+
+ipcMain.on('close-window', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  win?.close();
+});
+
+// Store IPC
+ipcMain.handle('get-store-value', (event, key) => {
+  return store.get(key);
+});
+
+ipcMain.on('set-store-value', (event, key, value) => {
+  store.set(key, value);
+});
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.

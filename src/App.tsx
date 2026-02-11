@@ -1,6 +1,6 @@
-import React from 'react';
-import { HashRouter, Routes, Route, useLocation } from 'react-router-dom';
-import { AnimatePresence, motion } from 'framer-motion';
+import React, { useEffect } from 'react';
+import { HashRouter, Routes, Route } from 'react-router-dom';
+import { useStore } from './store/useStore';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import Questions from './pages/Questions';
@@ -11,68 +11,52 @@ import Practice from './pages/Practice';
 import Profile from './pages/Profile';
 
 const AnimatedRoutes = () => {
-  const location = useLocation();
-
   return (
-    <AnimatePresence mode="wait">
-      <Routes location={location} key={location.pathname}>
-        <Route path="/" element={<Layout />}>
-          <Route index element={
-            <PageTransition>
-              <Dashboard />
-            </PageTransition>
-          } />
-          <Route path="questions" element={
-            <PageTransition>
-              <Questions />
-            </PageTransition>
-          } />
-          <Route path="sets" element={
-            <PageTransition>
-              <ExamSets />
-            </PageTransition>
-          } />
-          <Route path="practice/:setId" element={
-            <PageTransition>
-              <Practice />
-            </PageTransition>
-          } />
-          <Route path="flashcards" element={
-            <PageTransition>
-              <Flashcards />
-            </PageTransition>
-          } />
-          <Route path="settings" element={
-            <PageTransition>
-              <Settings />
-            </PageTransition>
-          } />
-          <Route path="profile" element={
-            <PageTransition>
-              <Profile />
-            </PageTransition>
-          } />
-        </Route>
-      </Routes>
-    </AnimatePresence>
-  );
-};
-
-const PageTransition = ({ children }: { children: React.ReactNode }) => {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
-      transition={{ duration: 0.2 }}
-      className="h-full"
-    >
-      {children}
-    </motion.div>
+    <Routes>
+      <Route path="/" element={<Layout />}>
+        <Route index element={<Dashboard />} />
+        <Route path="questions" element={<Questions />} />
+        <Route path="sets" element={<ExamSets />} />
+        <Route path="practice/:setId" element={<Practice />} />
+        <Route path="flashcards" element={<Flashcards />} />
+        <Route path="settings" element={<Settings />} />
+        <Route path="profile" element={<Profile />} />
+      </Route>
+    </Routes>
   );
 };
 
 const App = () => {
+  const { userProfile } = useStore();
+
+  useEffect(() => {
+    const applyTheme = () => {
+      const root = window.document.documentElement;
+      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      const theme = userProfile.theme || 'system';
+
+      root.classList.remove('light', 'dark');
+
+      if (theme === 'system') {
+        root.classList.add(systemTheme);
+      } else {
+        root.classList.add(theme);
+      }
+    };
+
+    applyTheme();
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleSystemChange = () => {
+      if (userProfile.theme === 'system') {
+        applyTheme();
+      }
+    };
+
+    mediaQuery.addEventListener('change', handleSystemChange);
+    return () => mediaQuery.removeEventListener('change', handleSystemChange);
+  }, [userProfile.theme]);
+
   return (
     <HashRouter>
       <AnimatedRoutes />

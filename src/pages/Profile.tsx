@@ -1,7 +1,7 @@
 import React, { useRef, useState, useMemo } from 'react';
-import { useStore } from '../store/useStore';
+import { useStore, AVAILABLE_ACHIEVEMENTS } from '../store/useStore';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Trophy, Flame, Award, User, Clock, Star, Brain, Layers, BookOpen, HelpCircle, Folder, X, GraduationCap, Palette, Shuffle, AlertTriangle } from 'lucide-react';
+import { Trophy, Flame, Award, User, Clock, Star, Brain, Layers, BookOpen, HelpCircle, Folder, X, GraduationCap, Palette, Shuffle, AlertTriangle, Zap, Pen, Shield, Moon, Sun, Calendar } from 'lucide-react';
 
 // Debug component to help identify image loading issues
 const ImageWithDebug = ({ src, alt, className, ...props }: React.ImgHTMLAttributes<HTMLImageElement>) => {
@@ -450,28 +450,78 @@ const CustomAvatarBuilder = ({ initialAvatar, onSave, onCancel }: { initialAvata
   );
 };
 
+const ACHIEVEMENT_ICONS: Record<string, any> = {
+  flag: Trophy,
+  zap: Zap,
+  pen: Pen,
+  shield: Shield,
+  book: BookOpen,
+  crown: Trophy,
+  flame: Flame,
+  clock: Clock,
+  moon: Moon,
+  sun: Sun,
+  calendar: Calendar,
+  star: Star,
+  award: Award,
+};
+
 const Profile = () => {
   const { userProfile, setUserProfile, questions, sets } = useStore();
   const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState('fun');
   
-  // Mock achievements for now
-  const achievements = [
-    { id: 1, title: 'Early Bird', description: 'Completed a session before 8 AM', icon: Clock, unlocked: true },
-    { id: 2, title: 'On Fire', description: '7 day streak achieved', icon: Flame, unlocked: true },
-    { id: 3, title: 'Master Mind', description: 'Scored 100% on a difficult set', icon: Brain, unlocked: false },
-    { id: 4, title: 'Collector', description: 'Created 10+ question sets', icon: Layers, unlocked: sets.length >= 10 },
-    { id: 5, title: 'Scholar', description: 'Answered 100+ questions', icon: BookOpen, unlocked: false },
-    { id: 6, title: 'Speedster', description: 'Answered 10 questions in 1 min', icon: Clock, unlocked: false },
-  ];
+  const stats = useMemo(() => {
+    const s = userProfile.stats || {
+      totalQuestionsAnswered: 0,
+      totalCorrectAnswers: 0,
+      totalStudyTime: 0,
+      totalSetsCompleted: 0,
+      streakDays: 0,
+      lastStudyDate: 0,
+      xp: 0,
+      level: 1
+    };
+    
+    // Level calculation helpers matching store logic
+    // Level = floor(sqrt(xp / 100)) + 1
+    // Therefore: (Level - 1) = sqrt(xp / 100) -> (Level - 1)^2 = xp / 100 -> xp = 100 * (Level - 1)^2
+    
+    const currentLevel = s.level || 1;
+    const currentXp = s.xp || 0;
+    
+    const xpForCurrentLevel = 100 * Math.pow(currentLevel - 1, 2);
+    const xpForNextLevel = 100 * Math.pow(currentLevel, 2);
+    const xpProgress = currentXp - xpForCurrentLevel;
+    const xpRequiredForNext = xpForNextLevel - xpForCurrentLevel;
+    const progressPercentage = Math.min(100, Math.max(0, (xpProgress / xpRequiredForNext) * 100));
 
-  // Mock stats
-  const stats = [
-    { label: 'Total Questions', value: questions.length, icon: HelpCircle },
-    { label: 'Sets Created', value: sets.length, icon: Folder },
-    { label: 'Study Streak', value: '3 Days', icon: Flame },
-    { label: 'Mastery Level', value: 'Novice', icon: Star },
-  ];
+    return {
+      items: [
+        { label: 'Total Questions', value: s.totalQuestionsAnswered, icon: HelpCircle },
+        { label: 'Study Time', value: `${Math.round(s.totalStudyTime)}m`, icon: Clock },
+        { label: 'Study Streak', value: `${s.streakDays} Days`, icon: Flame },
+        { label: 'XP Gained', value: s.xp, icon: Star },
+      ],
+      progress: {
+        current: Math.round(xpProgress),
+        total: Math.round(xpRequiredForNext),
+        percentage: progressPercentage,
+        level: currentLevel
+      }
+    };
+  }, [userProfile.stats]);
+
+  const achievements = useMemo(() => {
+    return AVAILABLE_ACHIEVEMENTS.map(ach => {
+      const unlocked = (userProfile.achievements || []).some(ua => ua.id === ach.id);
+      return {
+        ...ach,
+        unlocked,
+        icon: ACHIEVEMENT_ICONS[ach.icon] || Trophy
+      };
+    }).sort((a, b) => (b.unlocked ? 1 : 0) - (a.unlocked ? 1 : 0));
+  }, [userProfile.achievements]);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -524,10 +574,10 @@ const Profile = () => {
                 <h2 className="text-4xl font-bold tracking-tight mb-2">{userProfile.name}</h2>
                 <div className="flex items-center gap-3 justify-center md:justify-start flex-wrap">
                     <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border border-yellow-500/20 text-sm font-medium">
-                        <Award className="h-3.5 w-3.5" /> Level 5 Scholar
+                        <Award className="h-3.5 w-3.5" /> Level {stats.progress.level}
                     </span>
                     <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 text-sm font-medium">
-                        Pro Member
+                        {stats.progress.current} / {stats.progress.total} XP
                     </span>
                     {userProfile.studyField && (
                         <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 text-sm font-medium">
@@ -535,10 +585,20 @@ const Profile = () => {
                         </span>
                     )}
                 </div>
+                
+                {/* XP Bar */}
+                <div className="mt-4 max-w-sm mx-auto md:mx-0">
+                    <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
+                        <div 
+                            className="h-full bg-gradient-to-r from-yellow-400 to-yellow-600 rounded-full transition-all duration-1000"
+                            style={{ width: `${stats.progress.percentage}%` }}
+                        />
+                    </div>
+                </div>
             </div>
             
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-border/40">
-                {stats.map((stat, idx) => (
+                {stats.items.map((stat, idx) => (
                     <div key={idx} className="flex flex-col">
                         <span className="text-2xl font-bold">{stat.value}</span>
                         <span className="text-xs text-muted-foreground uppercase tracking-wider">{stat.label}</span>

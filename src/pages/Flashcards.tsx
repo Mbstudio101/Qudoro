@@ -1,16 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useStore, Question } from '../store/useStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RotateCw, CheckCircle, AlertCircle, Layers, Play } from 'lucide-react';
 import Button from '../components/ui/Button';
 
 const Flashcards = () => {
-  const { questions, sets, reviewQuestion } = useStore();
+  const { questions, sets, reviewQuestion, addSession } = useStore();
   const [dueQuestions, setDueQuestions] = useState<Question[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [sessionComplete, setSessionComplete] = useState(false);
   const [selectedSetId, setSelectedSetId] = useState<string | null>(null);
+  const [correctCount, setCorrectCount] = useState(0);
+  const [incorrectIds, setIncorrectIds] = useState<string[]>([]);
 
   // Calculate due questions for all sets initially to show counts
   const getDueQuestionsForSet = (setId: string | 'all') => {
@@ -35,6 +37,8 @@ const Flashcards = () => {
     setCurrentIndex(0);
     setIsFlipped(false);
     setSessionComplete(false);
+    setCorrectCount(0);
+    setIncorrectIds([]);
   };
 
   const currentQuestion = dueQuestions[currentIndex];
@@ -43,6 +47,13 @@ const Flashcards = () => {
     if (!currentQuestion) return;
     
     reviewQuestion(currentQuestion.id, rating);
+    
+    if (rating === 'good' || rating === 'easy') {
+      setCorrectCount(prev => prev + 1);
+    } else {
+      setIncorrectIds(prev => [...prev, currentQuestion.id]);
+    }
+
     setIsFlipped(false);
     
     if (currentIndex < dueQuestions.length - 1) {
@@ -50,6 +61,16 @@ const Flashcards = () => {
         setCurrentIndex((prev) => prev + 1);
       }, 200);
     } else {
+      const finalCorrectCount = (rating === 'good' || rating === 'easy') ? correctCount + 1 : correctCount;
+      const finalIncorrectIds = (rating === 'again' || rating === 'hard') ? [...incorrectIds, currentQuestion.id] : incorrectIds;
+      
+      addSession({
+        setId: selectedSetId || 'all',
+        date: Date.now(),
+        score: finalCorrectCount,
+        totalQuestions: dueQuestions.length,
+        incorrectQuestionIds: finalIncorrectIds
+      });
       setSessionComplete(true);
     }
   };

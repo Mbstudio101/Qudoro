@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useStore, Question } from '../store/useStore';
 import { ArrowLeft, CheckCircle2, XCircle, AlertCircle, BookOpen, Target, Brain, ArrowRight } from 'lucide-react';
@@ -16,6 +16,7 @@ const Practice = () => {
   const [showResults, setShowResults] = useState(false);
   const [score, setScore] = useState(0);
   const [incorrectQuestionIds, setIncorrectQuestionIds] = useState<string[]>([]);
+  const sessionSaved = useRef(false);
   
   const currentSet = sets.find((s) => s.id === setId);
   
@@ -41,7 +42,8 @@ const Practice = () => {
 
   // Save session when results are shown
   useEffect(() => {
-    if (showResults && currentSet) {
+    if (showResults && currentSet && !sessionSaved.current) {
+      sessionSaved.current = true;
       addSession({
         setId: currentSet.id,
         date: Date.now(),
@@ -50,7 +52,7 @@ const Practice = () => {
         incorrectQuestionIds: incorrectQuestionIds
       });
     }
-  }, [showResults]);
+  }, [showResults, currentSet, score, setQuestions.length, incorrectQuestionIds, addSession]);
 
   if (!currentSet || !currentQuestion) {
     return (

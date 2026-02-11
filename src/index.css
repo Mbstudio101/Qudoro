@@ -112,9 +112,7 @@
   }
   body {
     @apply bg-background text-foreground antialiased selection:bg-primary/20 selection:text-primary;
-    background-image: 
-      radial-gradient(circle at 0% 0%, hsl(var(--primary) / 0.05) 0%, transparent 50%),
-      radial-gradient(circle at 100% 100%, hsl(var(--primary) / 0.05) 0%, transparent 50%);
+    background-image: none;
     background-attachment: fixed;
   }
 }

@@ -243,7 +243,7 @@ const Dashboard = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="lg:col-span-2 bg-card/50 backdrop-blur-sm border border-border/50 rounded-2xl p-6 shadow-sm"
+            className="lg:col-span-2 bg-card border border-border rounded-2xl p-6 shadow-sm"
         >
             <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
                 <Activity className="h-5 w-5 text-primary" />
@@ -291,13 +291,13 @@ const Dashboard = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-2xl p-6 shadow-sm min-h-[200px]"
+                className="bg-card border border-border rounded-2xl p-6 shadow-sm min-h-[200px]"
             >
                 <h3 className="text-lg font-semibold mb-4">Insights</h3>
                 <div className="space-y-4">
                     {insights.map((insight, idx) => (
-                        <div key={idx} className="flex items-start gap-3 p-3 rounded-xl bg-background/50 border border-border/50 hover:bg-background/80 transition-colors">
-                            <div className="mt-1 p-2 rounded-full bg-secondary/50">
+                        <div key={idx} className="flex items-start gap-3 p-3 rounded-xl bg-secondary/30 border border-border hover:bg-secondary/50 transition-colors">
+                            <div className="mt-1 p-2 rounded-full bg-background">
                                 {insight.icon}
                             </div>
                             <div className="flex-1">
@@ -324,7 +324,7 @@ const Dashboard = () => {
                  initial={{ opacity: 0, y: 20 }}
                  animate={{ opacity: 1, y: 0 }}
                  transition={{ delay: 0.3 }}
-                 className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-2xl p-6 shadow-sm flex flex-col items-center justify-center"
+                 className="bg-card border border-border rounded-2xl p-6 shadow-sm flex flex-col items-center justify-center"
             >
                  <h3 className="text-lg font-semibold mb-2 w-full text-left">Progress Distribution</h3>
                  <div className="h-[180px] w-full flex items-center justify-center" style={{ minWidth: 0, minHeight: 0 }}>
@@ -373,11 +373,11 @@ const Dashboard = () => {
 const StatCard = ({ title, value, icon, trend, highlight }: { title: string, value: string | number, icon: React.ReactNode, trend?: string, highlight?: boolean }) => (
     <motion.div 
         whileHover={{ y: -2 }}
-        className={`p-6 rounded-2xl border ${highlight ? 'border-primary/50 bg-primary/5' : 'border-border/50 bg-card/50'} backdrop-blur-sm shadow-sm transition-all`}
+        className={`p-6 rounded-2xl border ${highlight ? 'border-primary/50 bg-primary/5' : 'border-border bg-card'} shadow-sm transition-all`}
     >
         <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-muted-foreground">{title}</span>
-            <div className={`p-2 rounded-full ${highlight ? 'bg-primary/20' : 'bg-secondary/50'}`}>
+            <div className={`p-2 rounded-full ${highlight ? 'bg-primary/20' : 'bg-secondary'}`}>
                 {icon}
             </div>
         </div>
