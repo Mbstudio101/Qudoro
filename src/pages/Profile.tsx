@@ -2,6 +2,7 @@ import React, { useRef, useState, useMemo } from 'react';
 import { useStore, AVAILABLE_ACHIEVEMENTS } from '../store/useStore';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Trophy, Flame, Award, User, Clock, Star, Brain, Layers, BookOpen, HelpCircle, Folder, X, GraduationCap, Palette, Shuffle, AlertTriangle, Zap, Pen, Shield, Moon, Sun, Calendar, Download, Skull, CheckSquare } from 'lucide-react';
+import { GameBadge } from '../components/ui/GameBadge';
 
 // Debug component to help identify image loading issues
 const ImageWithDebug = ({ src, alt, className, ...props }: React.ImgHTMLAttributes<HTMLImageElement>) => {
@@ -632,26 +633,48 @@ const Profile = () => {
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ delay: 0.1 * idx }}
-                        className={`min-w-[280px] snap-center rounded-xl border p-5 flex flex-col gap-3 transition-all hover:scale-[1.02] ${
+                        className={`min-w-[320px] snap-center rounded-2xl border p-6 flex flex-col gap-4 transition-all hover:scale-[1.02] relative overflow-hidden group ${
                             achievement.unlocked 
-                                ? 'bg-gradient-to-br from-card to-secondary/10 border-border/50 shadow-sm' 
-                                : 'bg-muted/20 border-border/20 opacity-60 grayscale'
+                                ? 'bg-card/80 backdrop-blur-sm border-primary/20 shadow-lg' 
+                                : 'bg-muted/10 border-border/20 opacity-80'
                         }`}
                     >
-                        <div className="flex justify-between items-start">
-                            <div className={`p-3 rounded-xl inline-flex ${achievement.unlocked ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
-                                <achievement.icon size={24} />
+                        {/* Decorative background glow for unlocked items */}
+                        {achievement.unlocked && (
+                            <div className="absolute -top-10 -right-10 w-32 h-32 bg-primary/10 rounded-full blur-3xl group-hover:bg-primary/20 transition-colors" />
+                        )}
+
+                        <div className="flex justify-between items-start z-10">
+                            <GameBadge 
+                                icon={achievement.icon}
+                                xpReward={achievement.xp}
+                                unlocked={achievement.unlocked}
+                                size="lg"
+                            />
+                            
+                            <div className="flex flex-col items-end gap-1">
+                                {achievement.unlocked ? (
+                                    <span className="flex items-center gap-1 text-xs font-bold text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded-full uppercase tracking-wider">
+                                        <Star size={12} className="fill-yellow-500" /> Unlocked
+                                    </span>
+                                ) : (
+                                    <span className="text-xs font-medium text-muted-foreground bg-secondary px-2 py-1 rounded-full">
+                                        Locked
+                                    </span>
+                                )}
+                                <span className="text-xs font-mono text-muted-foreground mt-1">
+                                    {achievement.xp} XP
+                                </span>
                             </div>
-                            {achievement.unlocked && <Star size={16} className="text-yellow-500 fill-yellow-500" />}
                         </div>
                         
-                        <div>
-                            <h4 className="font-semibold text-lg">{achievement.title}</h4>
+                        <div className="z-10 mt-2">
+                            <h4 className="font-bold text-xl tracking-tight mb-1">{achievement.title}</h4>
                             <p className="text-sm text-muted-foreground leading-relaxed">{achievement.description}</p>
                         </div>
                         
                         {!achievement.unlocked && (
-                            <div className="mt-auto pt-2">
+                            <div className="mt-auto pt-2 z-10">
                                 <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
                                     <div className="h-full bg-primary/50 w-[30%] rounded-full" />
                                 </div>
