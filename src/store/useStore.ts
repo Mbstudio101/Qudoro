@@ -265,7 +265,17 @@ export const useStore = create<AppState>()(
         set((state) => {
             const newStats = { ...state.userProfile.stats };
             newStats.totalSetsCompleted += 1;
-            newStats.totalStudyTime += Math.ceil(session.totalQuestions * 1); 
+            
+            // Calculate duration in minutes (session.duration is in seconds)
+            // Fallback to 1 minute per question if duration is missing
+            const durationInMinutes = session.duration 
+                ? session.duration / 60 
+                : Math.ceil(session.totalQuestions * 1);
+            
+            // Ensure we are adding to a number, handling potential NaN/undefined from legacy data
+            const currentTotalTime = isNaN(newStats.totalStudyTime) ? 0 : (newStats.totalStudyTime || 0);
+            newStats.totalStudyTime = currentTotalTime + durationInMinutes;
+
             newStats.xp += session.score * 5;
             newStats.level = calculateLevel(newStats.xp);
 
@@ -318,10 +328,30 @@ export const useStore = create<AppState>()(
       updateLastVisit: () =>
         set((state) => {
             const now = Date.now();
-            const lastDate = new Date(state.userProfile.stats?.lastStudyDate || 0);
+            // Sanitize stats to prevent NaN issues
+            const currentStats = state.userProfile.stats || {
+                totalQuestionsAnswered: 0,
+                totalCorrectAnswers: 0,
+                totalStudyTime: 0,
+                totalSetsCompleted: 0,
+                streakDays: 0,
+                lastStudyDate: 0,
+                xp: 0,
+                level: 1,
+                perfectedSetIds: [],
+                importedSetsCount: 0
+            };
+
+            // Fix any NaN values
+            if (isNaN(currentStats.totalStudyTime)) currentStats.totalStudyTime = 0;
+            if (isNaN(currentStats.totalQuestionsAnswered)) currentStats.totalQuestionsAnswered = 0;
+            if (isNaN(currentStats.totalCorrectAnswers)) currentStats.totalCorrectAnswers = 0;
+            if (isNaN(currentStats.xp)) currentStats.xp = 0;
+
+            const lastDate = new Date(currentStats.lastStudyDate || 0);
             const today = new Date(now);
             
-            let streak = state.userProfile.stats?.streakDays || 0;
+            let streak = currentStats.streakDays || 0;
             
             if (lastDate.toDateString() !== today.toDateString()) {
                 const diffTime = Math.abs(today.getTime() - lastDate.getTime());
@@ -329,9 +359,9 @@ export const useStore = create<AppState>()(
                 
                 if (diffDays === 1) {
                     streak += 1;
-                } else if (diffDays > 1 && state.userProfile.stats?.lastStudyDate !== 0) {
+                } else if (diffDays > 1 && currentStats.lastStudyDate !== 0) {
                     streak = 1; 
-                } else if (!state.userProfile.stats?.lastStudyDate) {
+                } else if (!currentStats.lastStudyDate) {
                     streak = 1;
                 }
             }
@@ -341,7 +371,7 @@ export const useStore = create<AppState>()(
                     ...state.userProfile,
                     lastVisit: now,
                     stats: {
-                        ...state.userProfile.stats,
+                        ...currentStats,
                         lastStudyDate: now,
                         streakDays: streak
                     }
