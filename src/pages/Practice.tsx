@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useStore, Question } from '../store/useStore';
 import { ArrowLeft, CheckCircle2, XCircle, BookOpen, Target, Brain, ArrowRight, AlertCircle } from 'lucide-react';
 
@@ -9,6 +9,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 const Practice = () => {
   const { setId } = useParams<{ setId: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const mode = searchParams.get('mode');
   const { sets: allSets, questions, addSession, userProfile, activeProfileId } = useStore();
   
   const sets = useMemo(() => allSets.filter(s => !s.profileId || s.profileId === activeProfileId), [allSets, activeProfileId]);
@@ -24,11 +26,25 @@ const Practice = () => {
   
   const currentSet = sets.find((s) => s.id === setId);
   
-  const setQuestions = currentSet
-    ? currentSet.questionIds
-        .map((id) => questions.find((q) => q.id === id))
-        .filter((q): q is Question => !!q)
-    : [];
+  const [setQuestions, setSetQuestions] = useState<Question[]>([]);
+
+  useEffect(() => {
+    if (currentSet) {
+        const qs = currentSet.questionIds
+            .map((id) => questions.find((q) => q.id === id))
+            .filter((q): q is Question => !!q);
+        
+        if (mode === 'cram') {
+            // Fisher-Yates shuffle
+            for (let i = qs.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [qs[i], qs[j]] = [qs[j], qs[i]];
+            }
+        }
+        
+        setSetQuestions(qs);
+    }
+  }, [currentSet, questions, mode]);
 
   const currentQuestion = setQuestions[currentQuestionIndex];
 
@@ -49,6 +65,9 @@ const Practice = () => {
     if (showResults && currentSet && !sessionSaved.current) {
       sessionSaved.current = true;
       const duration = (Date.now() - startTime) / 1000; // duration in seconds
+      
+      // Note: Practice mode doesn't use reviewQuestion, so stats like Streak/XP 
+      // are calculated in addSession. This is correct and consistent.
       addSession({
         setId: currentSet.id,
         date: startTime, // use start time as session date

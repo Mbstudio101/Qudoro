@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useStore, Question } from '../store/useStore';
 import { calculateSM2 } from '../utils/sm2';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RotateCw, CheckCircle, AlertCircle, Layers, Play } from 'lucide-react';
+import { RotateCw, CheckCircle, AlertCircle, Layers, Play, ArrowLeft, Zap } from 'lucide-react';
 import Button from '../components/ui/Button';
 
 const Flashcards = () => {
@@ -83,6 +83,8 @@ const Flashcards = () => {
       const finalIncorrectIds = (rating === 'again' || rating === 'hard') ? [...incorrectIds, currentQuestion.id] : incorrectIds;
       const duration = (Date.now() - startTime) / 1000;
 
+      // Note: real-time stats (streak, XP, time) are handled by reviewQuestion per card.
+      // addSession here just logs the historical session record and ensures consistency.
       addSession({
         setId: selectedSetId || 'all',
         date: startTime, // Use start time as session date
@@ -136,9 +138,9 @@ const Flashcards = () => {
                             <span className="text-sm text-muted-foreground ml-2">cards due</span>
                         </div>
                     </div>
-                    <div className="mt-6">
-                         <Button className="w-full" disabled={allDueCount === 0}>
-                            <Play className="mr-2 h-4 w-4" /> Start Review
+                    <div className="mt-6 flex flex-wrap gap-2">
+                         <Button className="w-full min-w-[140px]" disabled={allDueCount === 0}>
+                            <Play className="mr-2 h-4 w-4 shrink-0" /> <span className="truncate">Start Review</span>
                          </Button>
                     </div>
                 </motion.div>
@@ -170,9 +172,9 @@ const Flashcards = () => {
                                     <span className="text-sm text-muted-foreground ml-2">cards due</span>
                                 </div>
                             </div>
-                            <div className="mt-6">
-                                <Button className="w-full" disabled={dueCount === 0}>
-                                    <Play className="mr-2 h-4 w-4" /> Start Review
+                            <div className="mt-6 flex flex-wrap gap-2">
+                                <Button className="w-full min-w-[140px]" disabled={dueCount === 0}>
+                                    <Play className="mr-2 h-4 w-4 shrink-0" /> <span className="truncate">Start Review</span>
                                 </Button>
                             </div>
                         </motion.div>
@@ -225,20 +227,30 @@ const Flashcards = () => {
 
   return (
     <div className="flex flex-col h-full max-w-3xl mx-auto pb-10">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-           <Button variant="ghost" size="sm" onClick={() => setSelectedSetId(null)} className="mb-2 -ml-2 text-muted-foreground">
-             ← Back to Decks
+      <div className="mb-6 space-y-4">
+        <div className="flex items-center justify-between">
+           <Button variant="ghost" size="sm" onClick={() => setSelectedSetId(null)} className="-ml-2 text-muted-foreground hover:text-foreground">
+             <ArrowLeft size={16} className="mr-1" /> Back
            </Button>
-          <h2 className="text-3xl font-bold tracking-tight bg-linear-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-             {selectedSetId === 'all' ? 'All Decks' : sets.find(s => s.id === selectedSetId)?.title || 'Flashcards'}
-          </h2>
-          <p className="text-muted-foreground">
-            {dueQuestions.length - currentIndex} cards due for review
-          </p>
+           
+           <div className="flex items-center gap-2 px-3 py-1 bg-orange-500/10 border border-orange-500/20 rounded-full text-orange-600 text-sm font-medium">
+              <Zap size={14} className="fill-orange-500" />
+              <span>Streak: {currentIndex}</span>
+           </div>
         </div>
-        <div className="text-sm font-medium px-4 py-1.5 bg-secondary/50 backdrop-blur-md border border-border/50 rounded-full shadow-sm">
-          Streak: {currentIndex} / {dueQuestions.length}
+
+        {/* Progress Bar */}
+        <div className="w-full bg-secondary/50 rounded-full h-2.5 overflow-hidden">
+            <motion.div 
+                className="bg-primary h-full rounded-full"
+                initial={{ width: 0 }}
+                animate={{ width: `${((currentIndex) / dueQuestions.length) * 100}%` }}
+                transition={{ duration: 0.5 }}
+            />
+        </div>
+        <div className="flex justify-between text-xs text-muted-foreground px-1">
+            <span>{currentIndex} reviewed</span>
+            <span>{dueQuestions.length - currentIndex} remaining</span>
         </div>
       </div>
 

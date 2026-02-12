@@ -31,6 +31,7 @@ const createWindow = () => {
     title: 'Qudoro',
     frame: false, // Frameless
     titleBarStyle: 'hidden', 
+    backgroundColor: '#0f172a', // Dark background color (slate-900) to match dark theme
     trafficLightPosition: { x: -100, y: -100 }, // Hide macOS controls
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),

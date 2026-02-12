@@ -558,6 +558,41 @@ export const useStore = create<AppState>()(
           if (performance === 'easy') xpGain = 30;
           newStats.xp += xpGain;
           newStats.level = calculateLevel(newStats.xp);
+          
+          // Streak Logic (Real-time update)
+          const now = new Date();
+          const lastDate = new Date(newStats.lastStudyDate || 0);
+          
+          // Normalize to midnight for accurate day comparison
+          const todayMidnight = new Date(now);
+          todayMidnight.setHours(0,0,0,0);
+          
+          const lastMidnight = new Date(lastDate);
+          lastMidnight.setHours(0,0,0,0);
+          
+          const diffTime = todayMidnight.getTime() - lastMidnight.getTime();
+          const diffDays = diffTime / (1000 * 60 * 60 * 24);
+
+          if (diffDays === 1) {
+              // Studied yesterday, increment streak
+              newStats.streakDays += 1;
+          } else if (diffDays > 1) {
+              // Missed a day, reset streak (but start at 1 for today)
+              newStats.streakDays = 1;
+          } else if (diffDays === 0 && newStats.streakDays === 0) {
+               // First session of the day and streak was broken/zero
+               newStats.streakDays = 1;
+          }
+          
+          // Add estimated study time (0.5 mins per question) for real-time tracking
+          // This ensures stats update even if session isn't completed.
+          // Note: addSession will reconcile total time if needed, or we just accumulate here.
+          // To avoid double counting, we will adjust addSession logic.
+          const currentTotalTime = isNaN(newStats.totalStudyTime) ? 0 : (newStats.totalStudyTime || 0);
+          newStats.totalStudyTime = currentTotalTime + 0.5; 
+          
+          // Update last study date
+          newStats.lastStudyDate = Date.now();
 
           const updatedProfile = { ...state.userProfile, stats: newStats };
           const updatedAccounts = state.accounts.map(a => 
@@ -621,13 +656,28 @@ export const useStore = create<AppState>()(
                 : Math.ceil(session.totalQuestions * 1);
             
             // Ensure we are adding to a number, handling potential NaN/undefined from legacy data
+            // Note: reviewQuestion now adds 0.5 mins per question incrementally.
+            // We should only add the *extra* time if the session took longer than estimated,
+            // or just use the session time minus the estimated time already added.
+            // Estimated added: session.totalQuestions * 0.5
+            // Actual session time: durationInMinutes
+            // Difference to add: durationInMinutes - (session.totalQuestions * 0.5)
+            // If difference is negative (user was fast), we don't subtract time.
+            
+            const estimatedAdded = session.totalQuestions * 0.5;
+            const extraTime = Math.max(0, durationInMinutes - estimatedAdded);
+
             const currentTotalTime = isNaN(newStats.totalStudyTime) ? 0 : (newStats.totalStudyTime || 0);
-            newStats.totalStudyTime = currentTotalTime + durationInMinutes;
+            newStats.totalStudyTime = currentTotalTime + extraTime;
 
             newStats.xp += session.score * 5;
             newStats.level = calculateLevel(newStats.xp);
             
-            // Streak Logic
+            // Note: Streak Logic is now handled in reviewQuestion for real-time updates.
+            // However, Practice Mode (quizzes) calls addSession DIRECTLY without calling reviewQuestion.
+            // So we MUST also handle streak updates here for Practice sessions.
+            // The logic below ensures we don't double-count if reviewQuestion was already called today.
+            
             const now = new Date();
             const lastDate = new Date(newStats.lastStudyDate || 0);
             
@@ -642,14 +692,14 @@ export const useStore = create<AppState>()(
             const diffDays = diffTime / (1000 * 60 * 60 * 24);
 
             if (diffDays === 1) {
-                // Consecutive day
-                newStats.streakDays = (newStats.streakDays || 0) + 1;
+                // Studied yesterday, increment streak
+                newStats.streakDays += 1;
             } else if (diffDays > 1) {
-                // Missed a day
+                // Missed a day, reset streak (but start at 1 for today)
                 newStats.streakDays = 1;
-            } else if (diffDays === 0 && !newStats.streakDays) {
-                // First study of the day for a new user/reset
-                newStats.streakDays = 1;
+            } else if (diffDays === 0 && newStats.streakDays === 0) {
+                 // First session of the day and streak was broken/zero
+                 newStats.streakDays = 1;
             }
             
             newStats.lastStudyDate = Date.now();

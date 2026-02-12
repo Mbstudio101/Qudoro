@@ -234,13 +234,13 @@ const Dashboard = () => {
               "{dailyQuote.text}" <span className="text-xs not-italic text-primary/80">— {dailyQuote.author}</span>
             </p>
           </div>
-          <div className="flex items-center gap-3">
-              <div className="hidden md:flex items-center gap-2 px-3 py-2 bg-orange-500/10 border border-orange-500/20 rounded-lg text-orange-600 font-semibold">
+          <div className="flex items-center gap-3 flex-wrap justify-end">
+              <div className="hidden md:flex items-center gap-2 px-3 py-2 bg-orange-500/10 border border-orange-500/20 rounded-lg text-orange-600 font-semibold shrink-0">
                   <Zap className="h-4 w-4 fill-orange-500" />
                   <span>{userProfile.stats.streakDays || 0} Day Streak</span>
               </div>
-              <Button onClick={() => navigate('/flashcards')} className="shadow-lg shadow-primary/20">
-                  <Zap className="mr-2 h-4 w-4" /> Start Review
+              <Button onClick={() => navigate('/flashcards')} className="shadow-lg shadow-primary/20 min-w-[140px] shrink-0">
+                  <Zap className="mr-2 h-4 w-4 shrink-0" /> <span className="truncate">Start Review</span>
               </Button>
           </div>
         </div>

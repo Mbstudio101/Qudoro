@@ -51,6 +51,8 @@ const AnimatedRoutes = () => {
   );
 };
 
+import { Logo } from './components/ui/Logo';
+
 const App = () => {
   const { userProfile } = useStore();
   
@@ -93,6 +95,8 @@ const App = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  const [isAppReady, setIsAppReady] = React.useState(false);
+
   useEffect(() => {
     const applyTheme = () => {
       const root = window.document.documentElement;
@@ -118,8 +122,28 @@ const App = () => {
     };
 
     mediaQuery.addEventListener('change', handleSystemChange);
-    return () => mediaQuery.removeEventListener('change', handleSystemChange);
+    
+    // Simulate initial loading time or wait for resources
+    const timer = setTimeout(() => {
+      setIsAppReady(true);
+    }, 1000);
+
+    return () => {
+      mediaQuery.removeEventListener('change', handleSystemChange);
+      clearTimeout(timer);
+    };
   }, [userProfile.theme]);
+
+  if (!isAppReady) {
+     return (
+       <div className="fixed inset-0 flex flex-col items-center justify-center bg-background text-foreground z-50 transition-opacity duration-500">
+          <div className="relative w-24 h-24 animate-pulse">
+            <Logo className="w-full h-full" />
+          </div>
+          <h1 className="mt-8 text-2xl font-bold tracking-tighter animate-pulse">Qudoro</h1>
+       </div>
+     );
+  }
 
   return (
     <HashRouter>
