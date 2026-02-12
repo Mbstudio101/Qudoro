@@ -2,16 +2,15 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import { BlackboardClient } from '../services/blackboard';
-import { BlackboardToken } from '../types/blackboard';
-import { Book, GraduationCap, FileText, Link as LinkIcon, CheckCircle, Clock, AlertTriangle, RefreshCw } from 'lucide-react';
+import { BlackboardToken, BlackboardContent } from '../types/blackboard';
+import { Book, GraduationCap, FileText, Link as LinkIcon } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
-import { BlackboardContent } from '../types/blackboard';
 import { BLACKBOARD_CONFIG } from '../config/blackboard';
 
 const School = () => {
-  const { userProfile, connectBlackboard, updateBlackboardData, disconnectBlackboard, setBlackboardConfig } = useStore();
+  const { userProfile, connectBlackboard, updateBlackboardData, disconnectBlackboard } = useStore();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   

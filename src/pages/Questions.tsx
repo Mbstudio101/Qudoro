@@ -1,12 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { useStore, Question } from '../store/useStore';
-import { Plus, Trash2, Edit2, Search, Save, Check, ChevronDown, ChevronRight, Folder, List, CheckSquare, Square } from 'lucide-react';
+import { Plus, Trash2, Edit2, Search, Save, Check, ChevronDown, ChevronRight, Folder, List, CheckSquare, Square, Bot } from 'lucide-react';
 
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
 import Textarea from '../components/ui/Textarea';
 import { motion } from 'framer-motion';
+import { NURSING_DOMAINS, QUESTION_STYLES, classifyQuestion } from '../utils/nursingConstants';
 
 const Questions = () => {
   const { questions: allQuestions, sets: allSets, addQuestion, deleteQuestion, updateQuestion, addQuestionToSet, addSet, activeProfileId } = useStore();
@@ -25,6 +26,8 @@ const Questions = () => {
       answer: string[];
       options: string[];
       tags: string[];
+      domain?: string;
+      questionStyle?: string;
   };
   
   const [draftQuestions, setDraftQuestions] = useState<DraftQuestion[]>([]);
@@ -40,6 +43,8 @@ const Questions = () => {
     answer: [] as string[],
     options: [] as string[],
     tags: '',
+    domain: '',
+    questionStyle: ''
   });
 
   const [setCreationData, setSetCreationData] = useState({
@@ -105,7 +110,7 @@ const Questions = () => {
   const handleOpenSetBuilder = () => {
     setIsSetBuilderMode(true);
     setEditingQuestion(null);
-    setFormData({ content: '', rationale: '', answer: [], options: [], tags: '' });
+    setFormData({ content: '', rationale: '', answer: [], options: [], tags: '', domain: '', questionStyle: '' });
     setSetCreationData({ title: '', description: '' });
     setDraftQuestions([]);
     setIsModalOpen(true);
@@ -121,11 +126,13 @@ const Questions = () => {
         answer: Array.isArray(question.answer) ? question.answer : [question.answer],
         options: question.options || [],
         tags: question.tags.join(', '),
+        domain: question.domain || '',
+        questionStyle: question.questionStyle || ''
       });
       setSelectedSetId('');
     } else {
       setEditingQuestion(null);
-      setFormData({ content: '', rationale: '', answer: [], options: [], tags: '' });
+      setFormData({ content: '', rationale: '', answer: [], options: [], tags: '', domain: '', questionStyle: '' });
       // Keep selectedSetId if it was set previously
     }
     setIsModalOpen(true);
@@ -226,7 +233,9 @@ const Questions = () => {
             rationale: '',
             answer: [],
             options: [],
-            tags: formData.tags
+            tags: formData.tags,
+            domain: '',
+            questionStyle: ''
         });
         
         const textarea = document.querySelector('textarea');
@@ -250,7 +259,9 @@ const Questions = () => {
         rationale: '',
         answer: [],
         options: [],
-        tags: formData.tags // Keep tags for convenience
+        tags: formData.tags, // Keep tags for convenience
+        domain: '',
+        questionStyle: ''
     });
     // Keep selectedSetId for the next question
     
@@ -347,6 +358,17 @@ const Questions = () => {
             return { ...prev, answer: [...prev.answer, option] };
         }
     });
+  };
+
+  const handleAutoClassify = () => {
+    const { domain, style } = classifyQuestion(formData.content, formData.options);
+    if (domain || style) {
+        setFormData(prev => ({
+            ...prev,
+            domain: domain || prev.domain,
+            questionStyle: style || prev.questionStyle
+        }));
+    }
   };
 
   return (
@@ -682,6 +704,51 @@ const Questions = () => {
               value={formData.rationale}
               onChange={(e) => setFormData({ ...formData, rationale: e.target.value })}
             />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <label className="text-sm font-medium leading-none">Nursing Domain</label>
+                    <Button 
+                        type="button" 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-6 text-xs text-primary" 
+                        onClick={handleAutoClassify}
+                        title="Auto-detect domain and style based on content"
+                    >
+                        <Bot className="h-3 w-3 mr-1" /> Auto-Classify
+                    </Button>
+                  </div>
+                  <select
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      value={formData.domain || ''}
+                      onChange={(e) => setFormData({ ...formData, domain: e.target.value })}
+                  >
+                      <option value="">Select Domain...</option>
+                      {NURSING_DOMAINS.map((domain) => (
+                          <option key={domain} value={domain}>
+                              {domain}
+                          </option>
+                      ))}
+                  </select>
+              </div>
+              <div className="space-y-2">
+                  <label className="text-sm font-medium leading-none">Question Style</label>
+                  <select
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      value={formData.questionStyle || ''}
+                      onChange={(e) => setFormData({ ...formData, questionStyle: e.target.value })}
+                  >
+                      <option value="">Select Style...</option>
+                      {QUESTION_STYLES.map((style) => (
+                          <option key={style} value={style}>
+                              {style}
+                          </option>
+                      ))}
+                  </select>
+              </div>
           </div>
           {!isSetBuilderMode && (
           <div className="space-y-2">

@@ -14,6 +14,8 @@ export interface Question {
   options?: string[];
   imageUrl?: string;
   tags: string[];
+  domain?: string;
+  questionStyle?: string;
   createdAt: number;
   box: number;
   nextReviewDate: number;

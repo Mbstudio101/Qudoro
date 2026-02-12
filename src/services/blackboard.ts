@@ -10,17 +10,6 @@ interface TokenResponse {
   user_id: string;
 }
 
-interface RawCourse {
-  id: string;
-  courseId: string;
-  name: string;
-  description?: string;
-  created: string;
-  termId?: string;
-  organization?: boolean;
-  enrollment?: unknown;
-}
-
 interface RawContent {
   id: string;
   title: string;
