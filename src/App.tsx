@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useStore } from './store/useStore';
 import { useNotificationScheduler } from './hooks/useNotificationScheduler';
@@ -95,7 +95,7 @@ const App = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const [isAppReady, setIsAppReady] = React.useState(false);
+  const [isAppReady, setIsAppReady] = useState(false);
 
   useEffect(() => {
     const applyTheme = () => {
