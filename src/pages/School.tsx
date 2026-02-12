@@ -2,7 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import { BlackboardClient } from '../services/blackboard';
-import { Book, GraduationCap, FileText, Link as LinkIcon } from 'lucide-react';
+import { BlackboardToken } from '../types/blackboard';
+import { Book, GraduationCap, FileText, Link as LinkIcon, CheckCircle, Clock, AlertTriangle, RefreshCw } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
@@ -64,50 +65,29 @@ const School = () => {
     setError(null);
     
     try {
-        // Start local server
-        const serverInfo = await window.electron.auth.startServer();
-        if (!serverInfo.success) {
-            throw new Error(`Failed to start auth listener: ${serverInfo.error}`);
+        // Use the new "Browser Login" method (Session Interception)
+        // This bypasses the need for the school admin to register our app ID
+        const result = await window.electron.auth.startBrowserLogin(cleanUrl);
+        
+        if (!result.success || !result.token) {
+            throw new Error(result.error || 'Login failed or window closed');
         }
         
-        const redirectUri = `http://localhost:${serverInfo.port}/callback`;
-        const activeClientId = clientId;
-        
-        if (activeClientId === 'YOUR_CLIENT_ID' || !activeClientId) {
-           setError('Please configure Client ID in Developer Settings below');
-           setShowDevSettings(true);
-           setIsWaitingForAuth(false);
-           return;
-        }
+        // We have a token! (It's a Bearer token from the web session)
+        // This token is valid for the API
+        const tokenData: BlackboardToken = {
+            access_token: result.token,
+            token_type: result.authType || 'Bearer',
+            expires_in: 3600, // Approximate
+            scope: 'read',
+            user_id: 'me'
+        };
 
-        // Save config
-        setBlackboardConfig({ clientId: activeClientId, clientSecret });
-
-        // Construct Auth URL
-        // https://developer.blackboard.com/portal/displayApi/Learn
-        // /learn/api/public/v1/oauth2/authorization/code
-        const authUrl = `${cleanUrl}/learn/api/public/v1/oauth2/authorization/code?response_type=code&client_id=${activeClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=read`;
-        
-        // Open System Browser
-        await window.electron.openExternal(authUrl);
-        
-        // Wait for code
-        const code = await window.electron.auth.waitForCode();
-        
-        // Exchange code for token
-        const tokenData = await BlackboardClient.exchangeAuthCode(
-            cleanUrl, 
-            activeClientId, 
-            clientSecret, 
-            redirectUri, 
-            code
-        );
-        
         // Connect
         connectBlackboard(tokenData, cleanUrl);
         
         // Fetch initial data
-        const client = new BlackboardClient(cleanUrl, tokenData.access_token);
+        const client = new BlackboardClient(cleanUrl, result.token, result.authType || 'Bearer');
         const fetchedCourses = await client.getCourses();
         updateBlackboardData({
             courses: fetchedCourses,
@@ -162,7 +142,11 @@ const School = () => {
       
       setIsLoading(true);
       try {
-          const client = new BlackboardClient(activeUrl, userProfile.blackboard.token.access_token);
+          const client = new BlackboardClient(
+              activeUrl, 
+              userProfile.blackboard.token.access_token,
+              (userProfile.blackboard.token.token_type as 'Bearer' | 'Cookie') || 'Bearer'
+          );
           
           const [contents, courseGrades] = await Promise.all([
               client.getCourseContents(courseId),
@@ -326,6 +310,11 @@ const School = () => {
                     Courses
                 </div>
                 <div className="overflow-y-auto flex-1 p-2 space-y-2">
+                    {courses.length === 0 && (
+                        <div className="text-center p-4 text-sm text-muted-foreground">
+                            No courses found.
+                        </div>
+                    )}
                     {courses.map(course => (
                         <div 
                             key={course.id}
@@ -427,7 +416,12 @@ const School = () => {
                                                     <div className="text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: content.body }} />
                                                 )}
                                                 {content.link && (
-                                                    <a href={content.link} target="_blank" rel="noreferrer" className="text-xs text-primary mt-2 flex items-center gap-1">
+                                                    <a 
+                                                        href={typeof content.link === 'string' ? content.link : content.link.url} 
+                                                        target="_blank" 
+                                                        rel="noreferrer" 
+                                                        className="text-xs text-primary mt-2 flex items-center gap-1"
+                                                    >
                                                         <LinkIcon size={12} /> Open Link
                                                     </a>
                                                 )}

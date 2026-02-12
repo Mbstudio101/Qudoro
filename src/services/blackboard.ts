@@ -50,10 +50,12 @@ interface RawGrade {
 export class BlackboardClient {
   private baseUrl: string;
   private accessToken: string;
+  private tokenType: string;
 
-  constructor(baseUrl: string, accessToken: string) {
+  constructor(baseUrl: string, accessToken: string, tokenType = 'Bearer') {
     this.baseUrl = baseUrl.replace(/\/$/, '');
     this.accessToken = accessToken;
+    this.tokenType = tokenType;
   }
 
   static async exchangeAuthCode(baseUrl: string, clientId: string, clientSecret: string, redirectUri: string, code: string): Promise<TokenResponse> {
@@ -90,9 +92,16 @@ export class BlackboardClient {
     const url = `${this.baseUrl}/learn/api/public/v1${endpoint}`;
     
     const headers: HeadersInit = {
-      'Authorization': `Bearer ${this.accessToken}`,
       'Content-Type': 'application/json',
     };
+
+    if (this.tokenType === 'Bearer') {
+        headers['Authorization'] = `Bearer ${this.accessToken}`;
+    } else {
+        headers['Cookie'] = this.accessToken;
+        // Sometimes X-Xsrf-Token is also needed if we are mimicking a browser session
+        // But let's start with just Cookie
+    }
 
     const response = await fetch(url, {
       method,
@@ -110,26 +119,85 @@ export class BlackboardClient {
 
   // --- Courses ---
   async getCourses(): Promise<BlackboardCourse[]> {
-    // V3 is often used for courses
-    const url = `${this.baseUrl}/learn/api/public/v3/courses?limit=100&sort=created(desc)`;
+    // Attempt V3 first, fallback to V1 if needed
+    // IMPORTANT: For students, we often need to call /users/me/courses to see what they are ENROLLED in.
+    // Calling /courses directly might return all public courses or fail with permission errors.
     
-    const response = await fetch(url, {
-      headers: { 'Authorization': `Bearer ${this.accessToken}` }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let results: any[] = [];
+
+    console.log('Fetching courses...');
+
+    try {
+        // 1. Try getting courses for the current user using 'me'
+        console.log('Attempting /users/me/courses');
+        const data = await this.request<{ results: unknown[] }>('/users/me/courses?limit=100');
+        console.log('Got data from /users/me/courses:', data);
+        results = data.results;
+    } catch (e) {
+        console.warn('Failed to fetch /users/me/courses', e);
+        
+        try {
+            // 2. Try getting user ID first, then fetch courses for that ID
+            console.log('Attempting to fetch user UUID...');
+            const me = await this.request<{ id: string }>('/users/me');
+            console.log('User UUID:', me.id);
+            
+            console.log(`Attempting /users/${me.id}/courses`);
+            const data = await this.request<{ results: unknown[] }>(`/users/${me.id}/courses?limit=100`);
+            results = data.results;
+        } catch (innerE) {
+            console.warn('Failed to fetch user UUID or courses by UUID', innerE);
+
+            // 3. Fallback: Global course list (might be restricted)
+            console.log('Fallback: Fetching global V3 course list');
+            const url = `${this.baseUrl}/learn/api/public/v3/courses?limit=100&sort=created(desc)`;
+            
+            const headers: HeadersInit = {};
+            if (this.tokenType === 'Bearer') {
+                headers['Authorization'] = `Bearer ${this.accessToken}`;
+            } else {
+                headers['Cookie'] = this.accessToken;
+            }
+
+            const response = await fetch(url, { headers });
+            if (!response.ok) {
+                 const txt = await response.text();
+                 console.error('Global course list failed:', response.status, txt);
+                 throw new Error('Failed to fetch courses');
+            }
+            const data = await response.json();
+            console.log('Global course list data:', data);
+            results = data.results;
+        }
+    }
+    
+    // If we used the /users/me/courses endpoint, the structure might be wrapped in a 'course' object
+    // or it returns a CourseUser object which contains the course.
+    
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return results.map((item: any) => {
+        // Handle CourseUser object (from /users/me/courses)
+        // If it's a CourseUser object, it has 'courseId' (the uuid of course) but not the full course object in older APIs?
+        // Actually in V1 it usually returns just linkage info. We might need to fetch course details if 'course' object is missing.
+        // But let's assume standard V1/V3 response where 'course' might be expanded or available.
+        
+        const c = item.course || item; 
+        
+        return {
+            id: c.id || item.courseId, // Fallback if structure is flat
+            courseId: c.courseId || 'Unknown ID',
+            name: c.name || c.courseId || 'Untitled Course',
+            description: c.description,
+            created: c.created || new Date().toISOString(),
+            termId: c.termId,
+            organization: c.organization,
+            enrollment: item.course ? { // If it was a CourseUser object
+                type: 'Student', // Simplify for now
+                role: item.courseRoleId
+            } : c.enrollment
+        };
     });
-    
-    if (!response.ok) throw new Error('Failed to fetch courses');
-    
-    const data = await response.json();
-    return data.results.map((c: RawCourse) => ({
-      id: c.id,
-      courseId: c.courseId,
-      name: c.name,
-      description: c.description,
-      created: c.created,
-      termId: c.termId,
-      organization: c.organization,
-      enrollment: c.enrollment
-    }));
   }
 
   // --- Contents (Syllabus, Assignments) ---
@@ -189,7 +257,7 @@ export class BlackboardClient {
                     name: col.name,
                     score: gradeData.score,
                     possible: col.score?.possible || 100, // API structure varies
-                    status: gradeData.status, // 'Graded', 'NeedsGrading'
+                    status: gradeData.status as 'Graded' | 'NeedsGrading' | 'Exempt' | 'Incomplete', // Cast or map if needed
                     feedback: gradeData.feedback
                 });
             }

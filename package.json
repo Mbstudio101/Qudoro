@@ -2,7 +2,7 @@
   "name": "qudoro",
   "productName": "Qudoro",
   "version": "1.0.0",
-  "description": "My Electron application description",
+  "description": "Master your potential with Qudoro—the ultimate intelligent study companion featuring spaced repetition, gamification, and seamless Blackboard integration.",
   "repository": {
     "type": "git",
     "url": "https://github.com/Mbstudio101/qudoro.git"

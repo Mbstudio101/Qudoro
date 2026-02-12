@@ -23,6 +23,7 @@ declare global {
     electron: {
       minimize: () => void;
       maximize: () => void;
+      exitFullscreen: () => void;
       close: () => void;
       store: {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -33,8 +34,9 @@ declare global {
       fetchUrl: (url: string) => Promise<{ success: boolean; data?: string; error?: string }>;
       openExternal: (url: string) => Promise<void>;
       auth: {
-        startServer: () => Promise<{ success: boolean; port: number; error?: string }>;
-        waitForCode: () => Promise<string>;
+          startServer: () => Promise<{ success: boolean; port: number; error?: string }>;
+          waitForCode: () => Promise<string>;
+          startBrowserLogin: (schoolUrl: string) => Promise<{ success: boolean; token?: string; error?: string; authType?: 'Bearer' | 'Cookie' }>;
       };
       parsePdf: (buffer: number[]) => Promise<{ success: boolean; text?: string; error?: string }>;
       updater: {

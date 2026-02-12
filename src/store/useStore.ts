@@ -96,12 +96,23 @@ export interface Note {
   updatedAt: number;
 }
 
+export interface AchievementLevel {
+  level: number;
+  title: string;
+  description: string;
+  xp: number;
+  threshold: number;
+}
+
 export interface Achievement {
   id: string;
   title: string;
   description: string;
   icon: string;
   unlockedAt?: number;
+  xp?: number;
+  level?: number;
+  levels?: AchievementLevel[];
 }
 
 export interface UserStats {
@@ -176,36 +187,161 @@ interface AppState {
 
 // Achievement Definitions
 export const AVAILABLE_ACHIEVEMENTS = [
-  // Small Wins
-  { id: 'first_step', title: 'First Step', description: 'Complete your first study session', icon: 'flag', xp: 50 },
-  { id: 'quick_learner', title: 'Quick Learner', description: 'Answer 10 questions correctly', icon: 'zap', xp: 100 },
-  { id: 'note_taker', title: 'Note Taker', description: 'Create 5 custom questions', icon: 'pen', xp: 75 },
+  // Small Wins (Tiered)
+  { 
+    id: 'first_step', 
+    title: 'First Step', 
+    description: 'Complete your first study session', 
+    icon: 'flag', 
+    xp: 50,
+    levels: [
+      { level: 1, threshold: 1, title: 'First Step', description: 'Complete your first study session', xp: 25 },
+      { level: 2, threshold: 2, title: 'Second Step', description: 'Complete your second study session', xp: 75 },
+      { level: 3, threshold: 3, title: 'Third Step', description: 'Complete your third study session', xp: 150 },
+      { level: 4, threshold: 10, title: 'Habit Former', description: 'Complete 10 study sessions', xp: 500 },
+      { level: 5, threshold: 50, title: 'Bookworm', description: 'Complete 50 study sessions', xp: 1500 }
+    ]
+  },
+  { 
+    id: 'quick_learner', 
+    title: 'Quick Learner', 
+    description: 'Answer 10 questions correctly', 
+    icon: 'zap', 
+    xp: 25,
+    levels: [
+      { level: 1, threshold: 10, title: 'Quick Learner', description: 'Answer 10 questions correctly', xp: 25 },
+      { level: 2, threshold: 50, title: 'Knowledge Seeker', description: 'Answer 50 questions correctly', xp: 75 },
+      { level: 3, threshold: 100, title: 'Centurion', description: 'Answer 100 questions correctly', xp: 200 },
+      { level: 4, threshold: 500, title: 'Brainiac', description: 'Answer 500 questions correctly', xp: 500 },
+      { level: 5, threshold: 1000, title: 'Marathoner', description: 'Answer 1000 questions correctly', xp: 1500 }
+    ]
+  },
+  { 
+    id: 'note_taker', 
+    title: 'Note Taker', 
+    description: 'Create 5 custom questions', 
+    icon: 'pen', 
+    xp: 75,
+    levels: [
+      { level: 1, threshold: 5, title: 'Note Taker', description: 'Create 5 custom questions', xp: 75 },
+      { level: 2, threshold: 20, title: 'Scribe', description: 'Create 20 custom questions', xp: 150 },
+      { level: 3, threshold: 50, title: 'Author', description: 'Create 50 custom questions', xp: 300 }
+    ]
+  },
   
   // Milestones
-  { id: 'centurion', title: 'Centurion', description: 'Answer 100 questions total', icon: 'shield', xp: 500 },
-  { id: 'scholar', title: 'Scholar', description: 'Complete 10 exam sets', icon: 'book', xp: 300 },
-  { id: 'mastery', title: 'Mastery', description: 'Master 20 questions (Box 5)', icon: 'crown', xp: 1000 },
+  { 
+    id: 'scholar', 
+    title: 'Scholar', 
+    description: 'Complete 10 exam sets', 
+    icon: 'book', 
+    xp: 300,
+    levels: [
+      { level: 1, threshold: 10, title: 'Scholar', description: 'Complete 10 exam sets', xp: 300 },
+      { level: 2, threshold: 25, title: 'Researcher', description: 'Complete 25 exam sets', xp: 600 },
+      { level: 3, threshold: 50, title: 'Professor', description: 'Complete 50 exam sets', xp: 1200 },
+      { level: 4, threshold: 100, title: 'Dean', description: 'Complete 100 exam sets', xp: 2500 },
+      { level: 5, threshold: 250, title: 'Chancellor', description: 'Complete 250 exam sets', xp: 5000 }
+    ]
+  },
+  { 
+    id: 'mastery', 
+    title: 'Mastery', 
+    description: 'Master 20 questions (Box 5)', 
+    icon: 'crown', 
+    xp: 1000,
+    levels: [
+      { level: 1, threshold: 20, title: 'Mastery', description: 'Master 20 questions', xp: 1000 },
+      { level: 2, threshold: 50, title: 'Expert', description: 'Master 50 questions', xp: 2000 },
+      { level: 3, threshold: 100, title: 'Guru', description: 'Master 100 questions', xp: 4000 },
+      { level: 4, threshold: 500, title: 'Sage', description: 'Master 500 questions', xp: 8000 },
+      { level: 5, threshold: 1000, title: 'Oracle', description: 'Master 1000 questions', xp: 15000 }
+    ]
+  },
   
   // Behavioral Gains
-  { id: 'consistent', title: 'Consistent', description: 'Maintain a 3-day study streak', icon: 'flame', xp: 200 },
-  { id: 'dedicated', title: 'Dedicated', description: 'Study for over 60 minutes total', icon: 'clock', xp: 150 },
+  { 
+    id: 'consistent', 
+    title: 'Consistent', 
+    description: 'Maintain a 3-day study streak', 
+    icon: 'flame', 
+    xp: 200,
+    levels: [
+      { level: 1, threshold: 3, title: 'Consistent', description: 'Maintain a 3-day study streak', xp: 200 },
+      { level: 2, threshold: 7, title: 'Committed', description: 'Maintain a 7-day study streak', xp: 400 },
+      { level: 3, threshold: 14, title: 'Unstoppable', description: 'Maintain a 14-day study streak', xp: 800 },
+      { level: 4, threshold: 30, title: 'Monthly Master', description: 'Maintain a 30-day study streak', xp: 1500 },
+      { level: 5, threshold: 100, title: 'Iron Will', description: 'Maintain a 100-day study streak', xp: 5000 }
+    ]
+  },
+  { 
+    id: 'dedicated', 
+    title: 'Dedicated', 
+    description: 'Study for over 60 minutes total', 
+    icon: 'clock', 
+    xp: 150,
+    levels: [
+      { level: 1, threshold: 60, title: 'Dedicated', description: 'Study for over 1 hour total', xp: 150 },
+      { level: 2, threshold: 300, title: 'Focused', description: 'Study for over 5 hours total', xp: 300 },
+      { level: 3, threshold: 600, title: 'Diligent', description: 'Study for over 10 hours total', xp: 600 },
+      { level: 4, threshold: 1440, title: 'Tireless', description: 'Study for over 24 hours total', xp: 1200 },
+      { level: 5, threshold: 6000, title: 'Time Lord', description: 'Study for over 100 hours total', xp: 3000 }
+    ]
+  },
   { id: 'night_owl', title: 'Night Owl', description: 'Complete a session after 10 PM', icon: 'moon', xp: 100 },
   { id: 'early_bird', title: 'Early Bird', description: 'Complete a session before 8 AM', icon: 'sun', xp: 100 },
   { id: 'weekend_warrior', title: 'Weekend Warrior', description: 'Study on a weekend', icon: 'calendar', xp: 150 },
   
   // Custom Badges
-  { id: 'bookworm', title: 'Bookworm', description: 'Complete 50 full study sessions', icon: 'book_open', xp: 500 },
-  { id: 'mentorship', title: 'Mentorship', description: 'Score 100% on 5 different sets', icon: 'crown', xp: 1000 },
+  { 
+    id: 'mentorship', 
+    title: 'Mentorship', 
+    description: 'Score 100% on 5 different sets', 
+    icon: 'crown', 
+    xp: 1000,
+    levels: [
+      { level: 1, threshold: 5, title: 'Mentorship', description: 'Score 100% on 5 different sets', xp: 1000 },
+      { level: 2, threshold: 10, title: 'Perfectionist', description: 'Score 100% on 10 different sets', xp: 2000 },
+      { level: 3, threshold: 25, title: 'Flawless', description: 'Score 100% on 25 different sets', xp: 4000 },
+      { level: 4, threshold: 50, title: 'Immaculate', description: 'Score 100% on 50 different sets', xp: 8000 },
+      { level: 5, threshold: 100, title: 'Divine', description: 'Score 100% on 100 different sets', xp: 15000 }
+    ]
+  },
   { id: 'massed_practitioner', title: 'Massed Practitioner', description: 'Complete a single session lasting over 2 hours', icon: 'layers', xp: 800 },
   { id: 'all_nighter', title: 'All-nighter Puller', description: 'Study through the night (1 AM - 5 AM)', icon: 'moon', xp: 600 },
-  { id: 'leave_no_trace', title: 'Leave No Trace', description: 'Import 20+ sets from external sources', icon: 'download', xp: 300 },
+  { 
+    id: 'leave_no_trace', 
+    title: 'Leave No Trace', 
+    description: 'Import 20+ sets from external sources', 
+    icon: 'download', 
+    xp: 300,
+    levels: [
+      { level: 1, threshold: 20, title: 'Leave No Trace', description: 'Import 20+ sets', xp: 300 },
+      { level: 2, threshold: 50, title: 'Gatherer', description: 'Import 50+ sets', xp: 600 },
+      { level: 3, threshold: 100, title: 'Collector', description: 'Import 100+ sets', xp: 1200 },
+      { level: 4, threshold: 250, title: 'Archivist', description: 'Import 250+ sets', xp: 2500 },
+      { level: 5, threshold: 500, title: 'Librarian', description: 'Import 500+ sets', xp: 5000 }
+    ]
+  },
   { id: 'hasty', title: 'Hasty', description: 'Complete an exam quickly (<15s/question) with >80% accuracy', icon: 'zap', xp: 700 },
   { id: 'happy_camper', title: 'Happy Camper', description: 'Wake up bright and early (5 AM - 8 AM) to complete an exam', icon: 'sun', xp: 400 },
   { id: 'daredevil', title: 'Daredevil', description: 'Complete a marathon session ending between 3 AM - 6 AM', icon: 'skull', xp: 1500 },
 
   // Long-term Goals
-  { id: 'legend', title: 'Legend', description: 'Reach Level 10', icon: 'star', xp: 2000 },
-  { id: 'marathon', title: 'Marathoner', description: 'Answer 1000 questions', icon: 'award', xp: 2500 },
+  { 
+    id: 'legend', 
+    title: 'Legend', 
+    description: 'Reach Level 10', 
+    icon: 'star', 
+    xp: 2000,
+    levels: [
+      { level: 1, threshold: 10, title: 'Legend', description: 'Reach Level 10', xp: 2000 },
+      { level: 2, threshold: 25, title: 'Mythic', description: 'Reach Level 25', xp: 5000 },
+      { level: 3, threshold: 50, title: 'Ascended', description: 'Reach Level 50', xp: 10000 },
+      { level: 4, threshold: 75, title: 'Immortal', description: 'Reach Level 75', xp: 25000 },
+      { level: 5, threshold: 100, title: 'Godlike', description: 'Reach Level 100', xp: 50000 }
+    ]
+  },
 ];
 
 const calculateLevel = (xp: number) => {
@@ -626,42 +762,41 @@ export const useStore = create<AppState>()(
       updateLastVisit: () =>
         set((state) => {
             const now = Date.now();
-            // Sanitize stats to prevent NaN issues
-            const currentStats = state.userProfile.stats || {
-                totalQuestionsAnswered: 0,
-                totalCorrectAnswers: 0,
-                totalStudyTime: 0,
-                totalSetsCompleted: 0,
-                streakDays: 0,
-                lastStudyDate: 0,
-                xp: 0,
-                level: 1,
-                perfectedSetIds: [],
-                importedSetsCount: 0
+            const rawStats = state.userProfile.stats;
+            
+            // Create a sanitized stats object to prevent NaN issues and ensure all fields exist
+            const currentStats: UserStats = {
+                totalQuestionsAnswered: rawStats?.totalQuestionsAnswered || 0,
+                totalCorrectAnswers: rawStats?.totalCorrectAnswers || 0,
+                totalStudyTime: rawStats?.totalStudyTime || 0,
+                totalSetsCompleted: rawStats?.totalSetsCompleted || 0,
+                streakDays: rawStats?.streakDays || 0,
+                lastStudyDate: rawStats?.lastStudyDate || 0,
+                xp: rawStats?.xp || 0,
+                level: rawStats?.level || 1,
+                perfectedSetIds: rawStats?.perfectedSetIds || [],
+                importedSetsCount: rawStats?.importedSetsCount || 0
             };
-
-            // Fix any NaN values
-            if (isNaN(currentStats.totalStudyTime)) currentStats.totalStudyTime = 0;
-            if (isNaN(currentStats.totalQuestionsAnswered)) currentStats.totalQuestionsAnswered = 0;
-            if (isNaN(currentStats.totalCorrectAnswers)) currentStats.totalCorrectAnswers = 0;
-            if (isNaN(currentStats.xp)) currentStats.xp = 0;
 
             const lastDate = new Date(currentStats.lastStudyDate || 0);
             const today = new Date(now);
             
-            let streak = currentStats.streakDays || 0;
+            // Normalize to midnight for accurate day comparison
+            const todayMidnight = new Date(today);
+            todayMidnight.setHours(0,0,0,0);
             
-            if (lastDate.toDateString() !== today.toDateString()) {
-                const diffTime = Math.abs(today.getTime() - lastDate.getTime());
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-                
-                if (diffDays === 1) {
-                    streak += 1;
-                } else if (diffDays > 1 && currentStats.lastStudyDate !== 0) {
-                    streak = 1; 
-                } else if (!currentStats.lastStudyDate) {
-                    streak = 1;
-                }
+            const lastMidnight = new Date(lastDate);
+            lastMidnight.setHours(0,0,0,0);
+            
+            const diffTime = todayMidnight.getTime() - lastMidnight.getTime();
+            const diffDays = diffTime / (1000 * 60 * 60 * 24);
+
+            let streak = currentStats.streakDays;
+
+            // If user missed a day, reset streak to 0
+            // We do NOT increment here; streak only increments on completed study sessions
+            if (diffDays > 1) {
+                streak = 0;
             }
 
             const updatedProfile = {
@@ -669,7 +804,6 @@ export const useStore = create<AppState>()(
                 lastVisit: now,
                 stats: {
                     ...currentStats,
-                    lastStudyDate: now,
                     streakDays: streak
                 }
             };
@@ -715,85 +849,103 @@ export const useStore = create<AppState>()(
             const newAchievements = [...achievements];
             let updated = false;
 
+            const checkTier = (id: string, value: number) => {
+                const def = AVAILABLE_ACHIEVEMENTS.find(a => a.id === id);
+                if (!def || !def.levels) return;
+
+                let existingIndex = newAchievements.findIndex(a => a.id === id);
+                const existing = newAchievements[existingIndex];
+                const currentLevel = existing?.level || (existing ? 1 : 0);
+                
+                const levels = [...def.levels].sort((a, b) => a.level - b.level);
+
+                for (const lvl of levels) {
+                    if (lvl.level > currentLevel && value >= lvl.threshold) {
+                         stats.xp += lvl.xp;
+                         const newEntry: Achievement = {
+                             id: def.id,
+                             title: lvl.title,
+                             description: lvl.description,
+                             icon: def.icon,
+                             xp: lvl.xp,
+                             level: lvl.level,
+                             unlockedAt: Date.now()
+                         };
+                         
+                         if (existingIndex !== -1) {
+                             newAchievements[existingIndex] = newEntry;
+                         } else {
+                             newAchievements.push(newEntry);
+                             existingIndex = newAchievements.length - 1;
+                         }
+                         updated = true;
+                    }
+                }
+            };
+
             const unlock = (id: string) => {
                 if (!newAchievements.find(a => a.id === id)) {
                     const def = AVAILABLE_ACHIEVEMENTS.find(a => a.id === id);
                     if (def) {
-                        newAchievements.push({ ...def, unlockedAt: Date.now() });
+                        newAchievements.push({ 
+                            id: def.id,
+                            title: def.title,
+                            description: def.description,
+                            icon: def.icon,
+                            xp: def.xp,
+                            unlockedAt: Date.now()
+                        });
                         stats.xp += def.xp; 
                         updated = true;
                     }
                 }
             };
 
-            if (state.sessions.length >= 1) unlock('first_step');
-            if (stats.totalCorrectAnswers >= 10) unlock('quick_learner');
-            if (state.questions.filter(q => !q.imageUrl).length >= 5) unlock('note_taker');
-            
-            if (stats.totalQuestionsAnswered >= 100) unlock('centurion');
-            if (stats.totalSetsCompleted >= 10) unlock('scholar');
-            if (state.questions.filter(q => q.box >= 5).length >= 20) unlock('mastery');
+            checkTier('first_step', state.sessions.length);
+            checkTier('quick_learner', stats.totalCorrectAnswers);
+            checkTier('note_taker', state.questions.filter(q => !q.imageUrl).length);
+            checkTier('consistent', stats.streakDays);
 
-            if (stats.streakDays >= 3) unlock('consistent');
-            if (stats.totalStudyTime >= 60) unlock('dedicated');
+            checkTier('scholar', stats.totalSetsCompleted);
+            checkTier('mastery', state.questions.filter(q => q.box >= 5).length);
+            checkTier('dedicated', stats.totalStudyTime);
             
             const lastSession = state.sessions[state.sessions.length - 1];
             if (lastSession) {
                 const date = new Date(lastSession.date);
                 const hour = date.getHours();
                 
-                // Existing
                 if (hour >= 22) unlock('night_owl');
                 if (hour < 8) unlock('early_bird');
                 if (date.getDay() === 0 || date.getDay() === 6) unlock('weekend_warrior');
-
-                // Custom Badges Logic
                 
-                // All-nighter: 1 AM - 5 AM
                 if (hour >= 1 && hour <= 5) unlock('all_nighter');
-
-                // Happy Camper: 5 AM - 8 AM
                 if (hour >= 5 && hour < 8) unlock('happy_camper');
-
-                // Massed Practitioner: > 2 hours (120 mins)
                 if (lastSession.duration && lastSession.duration >= 7200) unlock('massed_practitioner');
                 
-                // Mentorship: 100% score on 5 different sets
                 if (lastSession.score === lastSession.totalQuestions && lastSession.totalQuestions > 0) {
                      if (!stats.perfectedSetIds.includes(lastSession.setId)) {
                          stats.perfectedSetIds.push(lastSession.setId);
                          updated = true;
                      }
                 }
-                if (stats.perfectedSetIds.length >= 5) unlock('mentorship');
+                checkTier('mentorship', stats.perfectedSetIds.length);
 
-                // Hasty: <15s/question AND >80% accuracy
                 if (lastSession.duration && lastSession.totalQuestions > 0) {
                     const avgTime = lastSession.duration / lastSession.totalQuestions;
                     const accuracy = lastSession.score / lastSession.totalQuestions;
                     if (avgTime < 15 && accuracy > 0.8) unlock('hasty');
                 }
 
-                // Massed Practitioner: > 2 hours (7200 seconds)
-                if (lastSession.duration && lastSession.duration > 7200) unlock('massed_practitioner');
-
-                // Daredevil: > 4 hours (14400s) AND ending between 3 AM - 6 AM
                 if (lastSession.duration && lastSession.duration > 14400) {
-                     // date is Start time. End time = date + duration*1000
                      const endTime = new Date(lastSession.date + (lastSession.duration * 1000));
                      const endHour = endTime.getHours();
                      if (endHour >= 3 && endHour <= 6) unlock('daredevil');
                 }
             }
             
-            // Bookworm: 50 sessions
-            if (state.sessions.length >= 50) unlock('bookworm');
-
-            // Leave No Trace: 20+ imported sets
-            if (stats.importedSetsCount >= 20) unlock('leave_no_trace');
-
-            if (stats.level >= 10) unlock('legend');
-            if (stats.totalQuestionsAnswered >= 1000) unlock('marathon');
+            checkTier('leave_no_trace', stats.importedSetsCount);
+            checkTier('legend', stats.level);
 
             if (!updated) return state;
 
@@ -819,13 +971,30 @@ export const useStore = create<AppState>()(
         }),
       
       connectBlackboard: (token, schoolUrl) => set((state) => {
+        // Ensure token is formatted as BlackboardToken if it's a string (backwards compatibility or cookie)
+        // If token is just a string, we assume it's an access_token.
+        // We really should update the signature of connectBlackboard, but let's handle it here.
+        
+        let tokenObj: BlackboardToken;
+        if (typeof token === 'string') {
+            tokenObj = {
+                access_token: token,
+                token_type: 'Bearer', // Default
+                expires_in: 3600,
+                scope: '',
+                user_id: ''
+            };
+        } else {
+            tokenObj = token;
+        }
+
         const updatedProfile = {
             ...state.userProfile,
             blackboard: {
                 clientId: state.userProfile.blackboard?.clientId,
                 clientSecret: state.userProfile.blackboard?.clientSecret,
                 isConnected: true,
-                token,
+                token: tokenObj,
                 schoolUrl: schoolUrl || state.userProfile.blackboard?.schoolUrl,
                 courses: [] as BlackboardCourse[],
                 assignments: [] as BlackboardAssignment[],

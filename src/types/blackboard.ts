@@ -44,13 +44,13 @@ export interface BlackboardContent {
   position: number;
   hasChildren: boolean;
   parentId?: string;
-  link?: string; // If it's a link to a file or external resource
+  link?: string | { url: string; target?: string }; // If it's a link to a file or external resource
   mimeType?: string; // To distinguish between folder, file, assignment, etc.
 }
 
 export interface BlackboardToken {
   access_token: string;
-  token_type: string;
+  token_type: string; // 'Bearer' or 'Cookie'
   expires_in: number;
   refresh_token?: string;
   scope: string;

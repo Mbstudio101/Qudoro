@@ -481,11 +481,36 @@ const Profile = () => {
 
   const achievements = useMemo(() => {
     return AVAILABLE_ACHIEVEMENTS.map(ach => {
-      const unlocked = (userProfile.achievements || []).some(ua => ua.id === ach.id);
+      const userAch = (userProfile.achievements || []).find(ua => ua.id === ach.id);
+      
+      let displayAch = { ...ach };
+      let unlocked = !!userAch;
+      
+      if (ach.levels) {
+          const currentLevel = userAch?.level || 0;
+          const levels = [...ach.levels].sort((a, b) => a.level - b.level);
+          const maxLevel = levels[levels.length - 1].level;
+          
+          // Show next level if not maxed, otherwise show max level
+          const targetLevel = currentLevel < maxLevel ? currentLevel + 1 : maxLevel;
+          
+          const targetDef = levels.find(l => l.level === targetLevel);
+          if (targetDef) {
+              displayAch = {
+                  ...displayAch,
+                  title: targetDef.title,
+                  description: targetDef.description,
+                  xp: targetDef.xp,
+              };
+              // It is unlocked only if we have reached this specific target level
+              unlocked = currentLevel >= targetLevel;
+          }
+      }
+
       return {
-        ...ach,
+        ...displayAch,
         unlocked,
-        icon: ACHIEVEMENT_ICONS[ach.icon] || Trophy
+        icon: ACHIEVEMENT_ICONS[displayAch.icon] || Trophy
       };
     }).sort((a, b) => (b.unlocked ? 1 : 0) - (a.unlocked ? 1 : 0));
   }, [userProfile.achievements]);

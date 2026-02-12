@@ -5,6 +5,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 contextBridge.exposeInMainWorld('electron', {
   minimize: () => ipcRenderer.send('minimize-window'),
   maximize: () => ipcRenderer.send('maximize-window'),
+  exitFullscreen: () => ipcRenderer.send('exit-fullscreen'),
   close: () => ipcRenderer.send('close-window'),
   store: {
     get: (key: string) => ipcRenderer.invoke('get-store-value', key),
@@ -39,6 +40,7 @@ contextBridge.exposeInMainWorld('electron', {
   openExternal: (url: string) => ipcRenderer.invoke('open-external-url', url),
   auth: {
       startServer: () => ipcRenderer.invoke('start-auth-server'),
-      waitForCode: () => ipcRenderer.invoke('wait-for-auth-code')
+      waitForCode: () => ipcRenderer.invoke('wait-for-auth-code'),
+      startBrowserLogin: (schoolUrl: string) => ipcRenderer.invoke('start-browser-login', schoolUrl)
   }
 });

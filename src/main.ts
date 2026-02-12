@@ -74,6 +74,14 @@ ipcMain.on('maximize-window', (event) => {
   }
 });
 
+ipcMain.on('exit-fullscreen', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) return;
+    if (win.isFullScreen()) {
+        win.setFullScreen(false);
+    }
+});
+
 ipcMain.on('close-window', (event) => {
   const win = BrowserWindow.fromWebContents(event.sender);
   win?.close();
@@ -102,6 +110,105 @@ ipcMain.handle('start-auth-server', async () => {
 
     authServer = server;
   });
+});
+
+ipcMain.handle('start-browser-login', async (event, schoolUrl: string) => {
+    return new Promise<{ success: boolean; token?: string; error?: string; authType?: 'Bearer' | 'Cookie' }>((resolve) => {
+        const loginWindow = new BrowserWindow({
+            width: 1000,
+            height: 800,
+            webPreferences: {
+                nodeIntegration: false,
+                contextIsolation: true
+            },
+            title: 'Login to Blackboard'
+        });
+
+        const cleanUrl = schoolUrl.replace(/\/$/, '');
+        loginWindow.loadURL(cleanUrl);
+
+        let tokenFound = false;
+
+        // Intercept requests to find Authorization header
+        const filter = {
+            urls: ['*://*/*']
+        };
+
+        // 1. Try to catch Bearer Token (Preferred)
+        loginWindow.webContents.session.webRequest.onBeforeSendHeaders(filter, (details, callback) => {
+            if (!tokenFound) {
+                // Check if request is to the school's API (roughly) or contains Bearer token
+                const authHeader = Object.entries(details.requestHeaders).find(
+                    ([key]) => key.toLowerCase() === 'authorization'
+                )?.[1];
+
+                if (authHeader && authHeader.match(/^Bearer /i)) {
+                    const token = authHeader.substring(7);
+                    tokenFound = true;
+                    console.log('Intercepted Bearer Token');
+                    loginWindow.close();
+                    resolve({ success: true, token, authType: 'Bearer' });
+                }
+            }
+            callback({ requestHeaders: details.requestHeaders });
+        });
+
+        // 2. Fallback: Catch Cookies on Navigation to Dashboard
+        loginWindow.webContents.on('did-navigate', async (event, url) => {
+            // Check if we are on a dashboard-like page (not login page)
+            // Common Blackboard dashboard paths: /ultra/, /webapps/portal/, /
+            if (!url.includes('login') && (url.includes('/ultra/') || url.includes('/webapps/portal/') || url === cleanUrl + '/')) {
+                
+                // Wait a moment for cookies to be set
+                setTimeout(async () => {
+                    if (tokenFound) return;
+
+                    try {
+                        const cookies = await loginWindow.webContents.session.cookies.get({ url });
+                        // Look for session cookies
+                        const sessionCookie = cookies.find(c => c.name === 'JSESSIONID' || c.name.includes('Session'));
+                        
+                        if (sessionCookie) {
+                             // Construct Cookie string
+                             const cookieString = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+                             
+                             // If we haven't found a Bearer token yet, maybe this is enough?
+                             // Let's force a fetch to be sure
+                             const hasApiAccess = await loginWindow.webContents.executeJavaScript(`
+                                fetch('/learn/api/public/v1/users/me').then(r => r.ok).catch(() => false)
+                             `);
+
+                             if (hasApiAccess && !tokenFound) {
+                                 tokenFound = true;
+                                 console.log('Intercepted Session Cookies');
+                                 loginWindow.close();
+                                 resolve({ success: true, token: cookieString, authType: 'Cookie' });
+                             }
+                        }
+                    } catch (err) {
+                        console.error('Cookie check failed', err);
+                    }
+                }, 2000);
+            }
+        });
+        
+        // 3. Force API Check Injection
+        loginWindow.webContents.on('did-finish-load', () => {
+             const url = loginWindow.webContents.getURL();
+             if (url.includes('blackboard') && !url.includes('login')) {
+                 // Attempt to force a request that might trigger the token sniffer
+                 loginWindow.webContents.executeJavaScript(`
+                    fetch('/learn/api/public/v1/users/me').catch(e => console.error(e));
+                 `);
+             }
+        });
+
+        loginWindow.on('closed', () => {
+            if (!tokenFound) {
+                resolve({ success: false, error: 'Login window closed without capturing token.' });
+            }
+        });
+    });
 });
 
 ipcMain.handle('wait-for-auth-code', async () => {

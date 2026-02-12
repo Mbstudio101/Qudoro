@@ -1,7 +1,6 @@
 export const BLACKBOARD_CONFIG = {
-    // TODO: Replace with your Application Key and Secret from Blackboard Developer Portal
-    // Register at https://developer.blackboard.com/
-    CLIENT_ID: 'YOUR_CLIENT_ID',
-    CLIENT_SECRET: 'YOUR_CLIENT_SECRET',
+    // Registered Qudoro Application Credentials
+    CLIENT_ID: '34f2c906-5851-4c7c-96e8-826f675db06c',
+    CLIENT_SECRET: 'vRTO4iDEal7CHDGJ6D1gI557DrPRVzjw',
     REDIRECT_URI: 'http://localhost:54321/callback'
 };
