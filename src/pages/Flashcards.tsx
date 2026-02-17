@@ -50,25 +50,6 @@ const Flashcards = () => {
   };
 
   const currentQuestion = dueQuestions[currentIndex];
-  const normalizeAnswerText = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ');
-  const incorrectOptions = useMemo(() => {
-    if (!currentQuestion || !Array.isArray(currentQuestion.options) || currentQuestion.options.length < 2) {
-      return [];
-    }
-
-    const answers = Array.isArray(currentQuestion.answer)
-      ? currentQuestion.answer
-      : [String(currentQuestion.answer || '')];
-    const answerSet = new Set(
-      answers
-        .map((answer) => normalizeAnswerText(String(answer || '')))
-        .filter(Boolean)
-    );
-
-    return currentQuestion.options.filter(
-      (option) => !answerSet.has(normalizeAnswerText(String(option || '')))
-    );
-  }, [currentQuestion]);
 
   const getIntervalLabel = (rating: 'again' | 'hard' | 'good' | 'easy') => {
     if (!currentQuestion) return '-';
@@ -311,18 +292,10 @@ const Flashcards = () => {
               className="absolute inset-0 backface-hidden bg-card border border-border/50 rounded-2xl p-8 flex flex-col items-center justify-center text-center shadow-sm overflow-y-auto"
               style={{ transform: 'rotateY(180deg)' }}
             >
-              <span className="absolute top-6 left-6 text-xs font-semibold text-primary tracking-wider uppercase bg-primary/10 px-2 py-1 rounded">
-                {incorrectOptions.length > 0 ? 'Incorrect Choices' : 'Answer'}
-              </span>
+              <span className="absolute top-6 left-6 text-xs font-semibold text-primary tracking-wider uppercase bg-primary/10 px-2 py-1 rounded">Answer</span>
               <div className="prose dark:prose-invert max-w-none w-full flex flex-col items-center">
                 <div className="text-xl font-bold mb-4 w-full">
-                  {incorrectOptions.length > 0
-                    ? incorrectOptions.map((ans, i) => (
-                        <div key={i} className="mb-1 last:mb-0">
-                          <RichText content={ans} />
-                        </div>
-                      ))
-                    : Array.isArray(currentQuestion.answer)
+                  {Array.isArray(currentQuestion.answer)
                     ? currentQuestion.answer.map((ans, i) => (
                         <div key={i} className="mb-1 last:mb-0">
                             <RichText content={ans} />
@@ -332,7 +305,7 @@ const Flashcards = () => {
                   }
                 </div>
 
-                {incorrectOptions.length === 0 && currentQuestion.rationale && (
+                {currentQuestion.rationale && (
                   <div className="pt-4 border-t border-border/50 w-full mt-4">
                     <div className="text-sm text-muted-foreground italic">
                       <RichText content={currentQuestion.rationale} />
