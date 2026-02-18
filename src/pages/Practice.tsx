@@ -4,6 +4,7 @@ import { useStore, Question } from '../store/useStore';
 import { ArrowLeft, CheckCircle2, XCircle, BookOpen, Target, Brain, ArrowRight, AlertCircle } from 'lucide-react';
 
 import Button from '../components/ui/Button';
+import RichText from '../components/ui/RichText';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const Practice = () => {
@@ -262,12 +263,17 @@ const Practice = () => {
                                             {idx + 1}
                                         </div>
                                         <div className="flex-1 space-y-4">
-                                            <h4 className="font-medium text-lg">{q.content}</h4>
+                                            <div className="font-medium text-lg">
+                                                <RichText content={q.content} className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]" />
+                                            </div>
                                             
                                             <div className="grid md:grid-cols-2 gap-4 text-sm">
                                                 <div className="p-3 rounded-xl bg-green-500/5 border border-green-500/10">
                                                     <span className="text-green-600 font-semibold block mb-1">Correct Answer</span>
-                                                    {Array.isArray(q.answer) ? q.answer.join(', ') : q.answer}
+                                                    {Array.isArray(q.answer) 
+                                                        ? q.answer.map((a, i) => <div key={i}><RichText content={a} className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]" /></div>) 
+                                                        : <RichText content={q.answer} className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]" />
+                                                    }
                                                 </div>
                                             </div>
 
@@ -277,7 +283,9 @@ const Practice = () => {
                                                         <Brain size={16} />
                                                         <span>Rationale</span>
                                                     </div>
-                                                    <p className="text-muted-foreground leading-relaxed">{q.rationale}</p>
+                                                    <div className="text-muted-foreground leading-relaxed">
+                                                        <RichText content={q.rationale} className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]" />
+                                                    </div>
                                                 </div>
                                             )}
                                             
@@ -352,11 +360,13 @@ const Practice = () => {
                         />
                     </div>
                 )}
-                <h2 className="text-2xl font-medium leading-relaxed">{currentQuestion.content}</h2>
+                <div className="text-2xl font-medium leading-relaxed w-full">
+                    <RichText content={currentQuestion.content} className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]" />
+                </div>
             </div>
 
             {isMCQ ? (
-                <div className="grid gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {currentQuestion.options?.map((option, idx) => {
                         const isSelected = selectedOptions.includes(option);
                         const correctAnswers = Array.isArray(currentQuestion.answer) ? currentQuestion.answer : [currentQuestion.answer];
@@ -381,12 +391,14 @@ const Practice = () => {
                                 key={idx}
                                 whileTap={{ scale: 0.98 }}
                                 onClick={() => handleOptionSelect(option)}
-                                className={`w-full p-4 rounded-xl border-2 text-left transition-all duration-200 flex items-center justify-between ${extraClasses}`}
+                                className={`w-full p-4 rounded-xl border-2 text-left transition-all duration-200 flex items-start justify-between ${extraClasses}`}
                                 disabled={isChecked}
                             >
-                                <span className="font-medium text-lg">{option}</span>
-                                {isChecked && isCorrectAnswer && <CheckCircle2 className="h-6 w-6 text-green-500" />}
-                                {isChecked && isSelected && !isCorrectAnswer && <XCircle className="h-6 w-6 text-red-500" />}
+                                <span className="font-medium text-lg flex-1 pr-4 text-left whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+                                    <RichText content={option} className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]" />
+                                </span>
+                                {isChecked && isCorrectAnswer && <CheckCircle2 className="h-6 w-6 text-green-500 shrink-0 mt-1" />}
+                                {isChecked && isSelected && !isCorrectAnswer && <XCircle className="h-6 w-6 text-red-500 shrink-0 mt-1" />}
                             </motion.button>
                         );
                     })}
@@ -399,7 +411,12 @@ const Practice = () => {
                         <Button onClick={() => setIsChecked(true)}>Show Answer</Button>
                     ) : (
                         <div className="text-center animate-in fade-in slide-in-from-bottom-2">
-                            <p className="text-xl font-bold mb-4">{Array.isArray(currentQuestion.answer) ? currentQuestion.answer.join(', ') : currentQuestion.answer}</p>
+                            <div className="text-xl font-bold mb-4">
+                                {Array.isArray(currentQuestion.answer) 
+                                    ? currentQuestion.answer.map((a, i) => <div key={i}><RichText content={a} className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]" /></div>) 
+                                    : <RichText content={currentQuestion.answer} className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]" />
+                                }
+                            </div>
                             <div className="flex gap-4">
                                 <Button variant="destructive" onClick={() => { setIncorrectQuestionIds(prev => [...prev, currentQuestion.id]); handleNext(); }}>I was wrong</Button>
                                 <Button className="bg-green-600 hover:bg-green-700" onClick={() => { setScore(s => s+1); handleNext(); }}>I was right</Button>
@@ -449,7 +466,7 @@ const Practice = () => {
                             {currentQuestion.rationale && (
                                 <div className="text-foreground/90">
                                     <span className="font-semibold block mb-1">Rationale:</span>
-                                    {currentQuestion.rationale}
+                                    <RichText content={currentQuestion.rationale} className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]" />
                                 </div>
                             )}
                         </div>

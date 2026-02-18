@@ -1,6 +1,26 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore, Question } from '../store/useStore';
-import { Plus, Trash2, Search, FileText, Brain } from 'lucide-react';
+import {
+  Plus,
+  Trash2,
+  Search,
+  FileText,
+  Brain,
+  Bold,
+  Italic,
+  Underline,
+  Strikethrough,
+  List,
+  ListOrdered,
+  Quote,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  Undo2,
+  Redo2,
+  Eraser,
+  Link as LinkIcon,
+} from 'lucide-react';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
@@ -20,13 +40,124 @@ const Notes = () => {
   const [targetSetId, setTargetSetId] = useState<string>('');
   const [newSetTitle, setNewSetTitle] = useState('');
   const [isCreatingNewSet, setIsCreatingNewSet] = useState(false);
+  const editorRef = useRef<HTMLDivElement>(null);
+  const loadedNoteIdRef = useRef<string | null>(null);
+  const autosaveTimerRef = useRef<number | null>(null);
+  const [characterCount, setCharacterCount] = useState(0);
+  const [fontFamily, setFontFamily] = useState('Arial');
+  const [fontSize, setFontSize] = useState('3');
+  const [saveStatus, setSaveStatus] = useState<'saving' | 'saved'>('saved');
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+  const [timeTick, setTimeTick] = useState(0);
 
   const selectedNote = notes.find(n => n.id === selectedNoteId);
+  const stripHtml = (content: string) => content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  const isLikelyHtml = (content: string) => /<\/?[a-z][\s\S]*>/i.test(content);
+  const escapeHtml = (content: string) =>
+    content
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  const toEditableHtml = (content: string) => {
+    if (!content) return '';
+    if (isLikelyHtml(content)) return content;
+    return escapeHtml(content).replace(/\n/g, '<br>');
+  };
+
+  const markAutosaved = () => {
+    setSaveStatus('saving');
+    if (autosaveTimerRef.current) {
+      window.clearTimeout(autosaveTimerRef.current);
+    }
+    autosaveTimerRef.current = window.setTimeout(() => {
+      setSaveStatus('saved');
+      setLastSavedAt(Date.now());
+    }, 300);
+  };
+
+  const saveNoteUpdate = (noteId: string, update: { title?: string; content?: string }) => {
+    updateNote(noteId, update);
+    markAutosaved();
+  };
+
+  const getSaveLabel = () => {
+    if (saveStatus === 'saving') return 'Saving...';
+    if (!lastSavedAt) return 'Saved';
+    const seconds = Math.max(0, Math.floor((Date.now() - lastSavedAt) / 1000));
+    if (seconds < 10) return 'Saved just now';
+    if (seconds < 60) return `Saved ${seconds}s ago`;
+
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `Saved ${minutes}m ago`;
+
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `Saved ${hours}h ago`;
+
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `Saved ${days}d ago`;
+
+    return `Saved ${new Date(lastSavedAt).toLocaleDateString()}`;
+  };
+
+  const applyCommand = (command: string, value?: string) => {
+    if (!editorRef.current) return;
+    editorRef.current.focus();
+    document.execCommand(command, false, value);
+    const html = editorRef.current.innerHTML;
+    const plain = editorRef.current.innerText || '';
+    if (selectedNote) {
+      saveNoteUpdate(selectedNote.id, { content: html });
+      setCharacterCount(plain.length);
+    }
+  };
+
+  const handleEditorInput = () => {
+    if (!selectedNote || !editorRef.current) return;
+    const html = editorRef.current.innerHTML;
+    const plain = editorRef.current.innerText || '';
+    saveNoteUpdate(selectedNote.id, { content: html });
+    setCharacterCount(plain.length);
+  };
+
+  useEffect(() => {
+    if (!selectedNote || !editorRef.current) return;
+    if (loadedNoteIdRef.current === selectedNote.id) return;
+
+    editorRef.current.innerHTML = toEditableHtml(selectedNote.content);
+    setCharacterCount((editorRef.current.innerText || '').length);
+    loadedNoteIdRef.current = selectedNote.id;
+  }, [selectedNote]);
+
+  useEffect(() => {
+    if (!selectedNote) {
+      loadedNoteIdRef.current = null;
+      setCharacterCount(0);
+      if (editorRef.current) editorRef.current.innerHTML = '';
+    }
+  }, [selectedNote]);
+
+  useEffect(() => {
+    if (!selectedNote) return;
+    setSaveStatus('saved');
+    setLastSavedAt(selectedNote.updatedAt);
+  }, [selectedNote?.id, selectedNote?.updatedAt]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setTimeTick((prev) => prev + 1), 15000);
+    return () => {
+      window.clearInterval(interval);
+      if (autosaveTimerRef.current) {
+        window.clearTimeout(autosaveTimerRef.current);
+      }
+    };
+  }, []);
 
   const filteredNotes = notes
     .filter(note => 
       note.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      note.content.toLowerCase().includes(searchQuery.toLowerCase())
+      stripHtml(note.content).toLowerCase().includes(searchQuery.toLowerCase())
     )
     .sort((a, b) => b.updatedAt - a.updatedAt);
 
@@ -57,7 +188,7 @@ const Notes = () => {
     
     setFlashcardContent({
         question: selectedNote.title,
-        answer: selection || selectedNote.content
+        answer: selection || stripHtml(selectedNote.content)
     });
     setShowFlashcardModal(true);
   };
@@ -147,7 +278,7 @@ const Notes = () => {
                             </button>
                         </div>
                         <p className="text-sm text-muted-foreground line-clamp-2 h-10">
-                            {note.content || 'No content...'}
+                            {stripHtml(note.content) || 'No content...'}
                         </p>
                         <div className="mt-2 text-xs text-muted-foreground">
                             {new Date(note.updatedAt).toLocaleDateString()}
@@ -162,13 +293,12 @@ const Notes = () => {
       <div className="flex-1 bg-card rounded-2xl border border-border flex flex-col overflow-hidden shadow-sm">
         {selectedNote ? (
             <>
-                {/* Editor Toolbar */}
-                <div className="p-4 border-b border-border flex items-center justify-between bg-secondary/10">
+                <div className="p-4 border-b border-border flex items-center justify-between bg-secondary/10 gap-4">
                     <div className="flex-1 mr-4">
                         <input
                             type="text"
                             value={selectedNote.title}
-                            onChange={(e) => updateNote(selectedNote.id, { title: e.target.value })}
+                            onChange={(e) => saveNoteUpdate(selectedNote.id, { title: e.target.value })}
                             className="w-full bg-transparent text-xl font-bold focus:outline-none placeholder:text-muted-foreground/50"
                             placeholder="Note Title"
                         />
@@ -181,16 +311,96 @@ const Notes = () => {
                     </div>
                 </div>
 
-                {/* Editor Content */}
-                <textarea
-                    value={selectedNote.content}
-                    onChange={(e) => updateNote(selectedNote.id, { content: e.target.value })}
-                    className="flex-1 p-6 bg-transparent resize-none focus:outline-none leading-relaxed text-lg"
-                    placeholder="Start typing your note here..."
-                />
+                <div className="px-4 py-3 border-b border-border bg-background flex items-center gap-2 flex-wrap">
+                    <select
+                        value={fontFamily}
+                        onChange={(e) => {
+                          setFontFamily(e.target.value);
+                          applyCommand('fontName', e.target.value);
+                        }}
+                        className="h-8 rounded-md border bg-card px-2 text-xs"
+                    >
+                        <option value="Arial">Arial</option>
+                        <option value="Georgia">Georgia</option>
+                        <option value="Times New Roman">Times New Roman</option>
+                        <option value="Verdana">Verdana</option>
+                        <option value="Trebuchet MS">Trebuchet MS</option>
+                    </select>
+                    <select
+                        value={fontSize}
+                        onChange={(e) => {
+                          setFontSize(e.target.value);
+                          applyCommand('fontSize', e.target.value);
+                        }}
+                        className="h-8 rounded-md border bg-card px-2 text-xs w-20"
+                    >
+                        <option value="2">10</option>
+                        <option value="3">12</option>
+                        <option value="4">14</option>
+                        <option value="5">18</option>
+                        <option value="6">24</option>
+                        <option value="7">32</option>
+                    </select>
+                    <div className="h-5 w-px bg-border mx-1" />
+                    <Button variant="ghost" size="sm" onClick={() => applyCommand('bold')} title="Bold"><Bold className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="sm" onClick={() => applyCommand('italic')} title="Italic"><Italic className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="sm" onClick={() => applyCommand('underline')} title="Underline"><Underline className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="sm" onClick={() => applyCommand('strikeThrough')} title="Strikethrough"><Strikethrough className="h-4 w-4" /></Button>
+                    <div className="h-5 w-px bg-border mx-1" />
+                    <Button variant="ghost" size="sm" onClick={() => applyCommand('formatBlock', 'H1')} title="Heading 1">H1</Button>
+                    <Button variant="ghost" size="sm" onClick={() => applyCommand('formatBlock', 'H2')} title="Heading 2">H2</Button>
+                    <Button variant="ghost" size="sm" onClick={() => applyCommand('formatBlock', 'BLOCKQUOTE')} title="Quote"><Quote className="h-4 w-4" /></Button>
+                    <div className="h-5 w-px bg-border mx-1" />
+                    <Button variant="ghost" size="sm" onClick={() => applyCommand('insertUnorderedList')} title="Bulleted List"><List className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="sm" onClick={() => applyCommand('insertOrderedList')} title="Numbered List"><ListOrdered className="h-4 w-4" /></Button>
+                    <div className="h-5 w-px bg-border mx-1" />
+                    <Button variant="ghost" size="sm" onClick={() => applyCommand('justifyLeft')} title="Align Left"><AlignLeft className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="sm" onClick={() => applyCommand('justifyCenter')} title="Align Center"><AlignCenter className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="sm" onClick={() => applyCommand('justifyRight')} title="Align Right"><AlignRight className="h-4 w-4" /></Button>
+                    <div className="h-5 w-px bg-border mx-1" />
+                    <input
+                        type="color"
+                        title="Text Color"
+                        className="h-8 w-8 rounded border bg-card p-0.5"
+                        onChange={(e) => applyCommand('foreColor', e.target.value)}
+                    />
+                    <input
+                        type="color"
+                        title="Highlight"
+                        className="h-8 w-8 rounded border bg-card p-0.5"
+                        onChange={(e) => applyCommand('hiliteColor', e.target.value)}
+                    />
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          const url = window.prompt('Enter URL');
+                          if (url) applyCommand('createLink', url);
+                        }}
+                        title="Insert Link"
+                    >
+                        <LinkIcon className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => applyCommand('removeFormat')} title="Clear Formatting"><Eraser className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="sm" onClick={() => applyCommand('undo')} title="Undo"><Undo2 className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="sm" onClick={() => applyCommand('redo')} title="Redo"><Redo2 className="h-4 w-4" /></Button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto bg-secondary/5 p-8">
+                    <div
+                        ref={editorRef}
+                        contentEditable
+                        suppressContentEditableWarning
+                        onInput={handleEditorInput}
+                        className="mx-auto min-h-[700px] w-full max-w-[860px] rounded-md border bg-white p-10 text-[17px] leading-8 text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        style={{ fontFamily }}
+                        data-placeholder="Start typing your note here..."
+                    />
+                </div>
                 
-                <div className="p-2 border-t text-xs text-muted-foreground text-right px-4">
-                    {selectedNote.content.length} characters
+                <div className="p-2 border-t text-xs text-muted-foreground px-4 flex items-center justify-between">
+                    <span key={timeTick}>{getSaveLabel()}</span>
+                    <span>{characterCount} characters</span>
                 </div>
             </>
         ) : (

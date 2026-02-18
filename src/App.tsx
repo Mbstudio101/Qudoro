@@ -15,6 +15,7 @@ import Notes from './pages/Notes';
 import Login from './pages/Auth/Login';
 import Signup from './pages/Auth/Signup';
 import ProfileSelect from './pages/Auth/ProfileSelect';
+import { Logo } from './components/ui/Logo';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, activeProfileId } = useStore();
@@ -51,8 +52,6 @@ const AnimatedRoutes = () => {
   );
 };
 
-import { Logo } from './components/ui/Logo';
-
 const App = () => {
   const { userProfile } = useStore();
   
@@ -71,23 +70,10 @@ const App = () => {
             window.electron.maximize(); // maximize-window toggles fullscreen on macOS in our main.ts
         }
         
-        // Exit Fullscreen on 'Escape'
+        // Exit fullscreen on Escape.
         if (e.key === 'Escape') {
-             // We can trigger the same toggle, or ensure we exit.
-             // Since maximize-window toggles, this might need a specific 'exit-fullscreen' if we want to be strict.
-             // But for now, let's reuse the toggle if we are in fullscreen.
-             // However, we don't know the state here easily without querying.
-             // A better UX is to let the user hit ESC to leave. 
-             // Let's send a specific 'exit-fullscreen' event if needed, or just reuse maximize for toggle.
-             // Given the user request: "ESC to get it off fullscreen"
-             
-             // We'll send a specific intent to ensure we don't accidentally enter fullscreen with ESC
-             window.electron.minimize(); // Just kidding, minimize hides the window.
-             
-             // Let's rely on the toggle for now, or add a specific handler if the user wants strictness.
-             // Actually, standard behavior is usually handled by the OS, but since we are frameless, we need to handle it.
-             // Let's add a new IPC handler for 'exit-fullscreen' to be safe.
-             window.electron.exitFullscreen?.();
+             e.preventDefault();
+             window.electron.exitFullscreen();
         }
     };
 
@@ -126,7 +112,7 @@ const App = () => {
     // Simulate initial loading time or wait for resources
     const timer = setTimeout(() => {
       setIsAppReady(true);
-    }, 1000);
+    }, 200);
 
     return () => {
       mediaQuery.removeEventListener('change', handleSystemChange);

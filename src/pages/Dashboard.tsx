@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../store/useStore';
 import { motion } from 'framer-motion';
 import {
@@ -45,6 +45,10 @@ const Dashboard = () => {
   
   const [isEditingName, setIsEditingName] = useState(false);
   const [newName, setNewName] = useState(userProfile.name);
+  const barChartContainerRef = useRef<HTMLDivElement | null>(null);
+  const pieChartContainerRef = useRef<HTMLDivElement | null>(null);
+  const [barChartReady, setBarChartReady] = useState(false);
+  const [pieChartReady, setPieChartReady] = useState(false);
 
   // Update last visit on mount and determine greeting
   useEffect(() => {
@@ -85,6 +89,23 @@ const Dashboard = () => {
         setTodaysHoliday(null);
     }
   }, [userProfile.lastVisit, userProfile.name, userProfile.originCountry, userProfile.studyField, updateLastVisit]); // Run when profile changes
+
+  useEffect(() => {
+    const evaluateChartContainers = () => {
+      const barRect = barChartContainerRef.current?.getBoundingClientRect();
+      const pieRect = pieChartContainerRef.current?.getBoundingClientRect();
+      setBarChartReady(Boolean(barRect && barRect.width > 20 && barRect.height > 20));
+      setPieChartReady(Boolean(pieRect && pieRect.width > 20 && pieRect.height > 20));
+    };
+
+    evaluateChartContainers();
+    const rafId = window.requestAnimationFrame(evaluateChartContainers);
+    window.addEventListener('resize', evaluateChartContainers);
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      window.removeEventListener('resize', evaluateChartContainers);
+    };
+  }, []);
 
   // Calculate Stats
   const stats = useMemo(() => {
@@ -235,6 +256,13 @@ const Dashboard = () => {
             </p>
           </div>
           <div className="flex items-center gap-3 flex-wrap justify-end">
+              {/* Level Badge */}
+              <div className="hidden md:flex items-center gap-2 px-3 py-2 bg-purple-500/10 border border-purple-500/20 rounded-lg text-purple-600 font-semibold shrink-0">
+                  <Award className="h-4 w-4 text-purple-500" />
+                  <span>Lvl {userProfile.stats.level || 1}</span>
+              </div>
+
+              {/* Streak Badge */}
               <div className="hidden md:flex items-center gap-2 px-3 py-2 bg-orange-500/10 border border-orange-500/20 rounded-lg text-orange-600 font-semibold shrink-0">
                   <Zap className="h-4 w-4 fill-orange-500" />
                   <span>{userProfile.stats.streakDays || 0} Day Streak</span>
@@ -305,38 +333,46 @@ const Dashboard = () => {
                 <Activity className="h-5 w-5 text-primary" />
                 Upcoming Reviews
             </h3>
-            <div className="h-[300px] w-full" style={{ minHeight: '300px', minWidth: '100%' }}>
-                <ResponsiveContainer width="100%" height="100%" debounce={50}>
-                    <BarChart data={dueData}>
-                        <XAxis 
-                            dataKey="day" 
-                            stroke="hsl(var(--muted-foreground))" 
-                            fontSize={12} 
-                            tickLine={false} 
-                            axisLine={false} 
-                        />
-                        <YAxis 
-                            stroke="hsl(var(--muted-foreground))" 
-                            fontSize={12} 
-                            tickLine={false} 
-                            axisLine={false} 
-                        />
-                        <Tooltip 
-                            contentStyle={{ 
-                                backgroundColor: 'hsl(var(--card))', 
-                                borderColor: 'hsl(var(--border))',
-                                borderRadius: '8px',
-                                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
-                            }}
-                            cursor={{ fill: 'hsl(var(--muted) / 0.2)' }}
-                        />
-                        <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                            {dueData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={index === 0 ? 'hsl(var(--primary))' : 'hsl(var(--primary) / 0.3)'} />
-                            ))}
-                        </Bar>
-                    </BarChart>
-                </ResponsiveContainer>
+            <div ref={barChartContainerRef} className="h-[300px] w-full" style={{ minHeight: '300px', minWidth: '100%' }}>
+                {stats.totalQuestions > 0 ? (
+                  barChartReady ? (
+                    <ResponsiveContainer width="100%" height="100%" debounce={50}>
+                        <BarChart data={dueData}>
+                            <XAxis 
+                                dataKey="day" 
+                                stroke="hsl(var(--muted-foreground))" 
+                                fontSize={12} 
+                                tickLine={false} 
+                                axisLine={false} 
+                            />
+                            <YAxis 
+                                stroke="hsl(var(--muted-foreground))" 
+                                fontSize={12} 
+                                tickLine={false} 
+                                axisLine={false} 
+                            />
+                            <Tooltip 
+                                contentStyle={{ 
+                                    backgroundColor: 'hsl(var(--card))', 
+                                    borderColor: 'hsl(var(--border))',
+                                    borderRadius: '8px',
+                                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
+                                }}
+                                cursor={{ fill: 'hsl(var(--muted) / 0.2)' }}
+                            />
+                            <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                                {dueData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={index === 0 ? 'hsl(var(--primary))' : 'hsl(var(--primary) / 0.3)'} />
+                                ))}
+                            </Bar>
+                        </BarChart>
+                    </ResponsiveContainer>
+                  ) : null
+                ) : (
+                  <div className="h-full w-full flex items-center justify-center text-muted-foreground text-sm">
+                    Add questions to unlock your upcoming review timeline.
+                  </div>
+                )}
             </div>
         </motion.div>
 
@@ -383,8 +419,8 @@ const Dashboard = () => {
                  className="bg-card border border-border rounded-2xl p-6 shadow-sm flex flex-col items-center justify-center"
             >
                  <h3 className="text-lg font-semibold mb-2 w-full text-left">Progress Distribution</h3>
-                 <div className="h-[180px] w-full flex items-center justify-center" style={{ minWidth: 0, minHeight: 0 }}>
-                    {stats.totalQuestions > 0 ? (
+                 <div ref={pieChartContainerRef} className="h-[180px] w-full flex items-center justify-center" style={{ minWidth: 0, minHeight: 0 }}>
+                    {stats.totalQuestions > 0 && pieChartReady ? (
                         <ResponsiveContainer width="100%" height="100%" debounce={50}>
                             <PieChart>
                                 <Pie

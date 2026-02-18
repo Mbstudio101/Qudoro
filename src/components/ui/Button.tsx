@@ -3,7 +3,7 @@ import { twMerge } from 'tailwind-merge';
 
 interface ButtonProps extends ComponentProps<'button'> {
   variant?: 'primary' | 'secondary' | 'destructive' | 'ghost' | 'outline';
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'icon';
 }
 
 const Button = ({ className, variant = 'primary', size = 'md', ...props }: ButtonProps) => {
@@ -21,6 +21,7 @@ const Button = ({ className, variant = 'primary', size = 'md', ...props }: Butto
     sm: 'h-8 px-3 text-xs',
     md: 'h-10 px-4 py-2',
     lg: 'h-12 px-8',
+    icon: 'h-10 w-10',
   };
 
   return (

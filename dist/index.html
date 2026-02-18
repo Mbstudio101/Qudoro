@@ -1,0 +1,43 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: https://api.dicebear.com; img-src 'self' data: https://api.dicebear.com https: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval';">
+    <link rel="icon" type="image/svg+xml" href="./icon.svg" />
+    <title>Qudoro</title>
+    <script>
+      (function() {
+        try {
+          const storage = localStorage.getItem('qudoro-storage');
+          let theme = 'system';
+          if (storage) {
+            const parsed = JSON.parse(storage);
+            if (parsed.state && parsed.state.userProfile && parsed.state.userProfile.theme) {
+              theme = parsed.state.userProfile.theme;
+            }
+          }
+          
+          const root = document.documentElement;
+          root.classList.remove('light', 'dark');
+          
+          if (theme === 'system') {
+            if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+              root.classList.add('dark');
+            } else {
+              root.classList.add('light');
+            }
+          } else {
+            root.classList.add(theme);
+          }
+        } catch (e) {
+          console.error('Failed to initialize theme:', e);
+        }
+      })();
+    </script>
+    <script type="module" crossorigin src="./assets/index-CA91j5VO.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-DsPh83nF.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

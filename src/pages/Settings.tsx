@@ -1,14 +1,13 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { RefreshCw, Download, Check, AlertCircle, Package, User, Save, Upload, Trash2, Database, MessageSquare, Moon, Sun, Laptop, Shield, FileText, Lock, Users, ExternalLink, Mail, GraduationCap } from 'lucide-react';
+import { RefreshCw, Download, Check, AlertCircle, Package, User, Save, Upload, Trash2, Database, MessageSquare, Moon, Sun, Laptop, Shield, FileText, Lock, Users, ExternalLink, Mail } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
 import { useStore } from '../store/useStore';
-import School from './School';
 
 const Settings = () => {
-  const { userProfile, setUserProfile, questions, sets, importData, resetData } = useStore();
+  const { userProfile, setUserProfile, questions, sets, importData, resetData, addQuestion, addSet, addQuestionToSet } = useStore();
   
   // Update State
   const [status, setStatus] = useState<string>('idle'); 
@@ -28,6 +27,354 @@ const Settings = () => {
 
   // Data State
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Quizlet Import State
+  const [quizletUrl, setQuizletUrl] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
+  const [importStatus, setImportStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [importMsg, setImportMsg] = useState('');
+
+  type LooseRecord = Record<string, unknown>;
+  type QuizletTermLike = LooseRecord & {
+    word?: string;
+    term?: string;
+    definition?: string;
+    def?: string;
+    cardSides?: Array<LooseRecord>;
+  };
+
+  const asRecord = (value: unknown): LooseRecord | null => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    return value as LooseRecord;
+  };
+
+  const asRecordArray = (value: unknown): LooseRecord[] => {
+    if (!Array.isArray(value)) return [];
+    return value
+      .map((item) => asRecord(item))
+      .filter((item): item is LooseRecord => item !== null);
+  };
+
+  const getErrorMessage = (error: unknown): string => {
+    if (error instanceof Error && error.message) return error.message;
+    return 'Failed to import. Please check the URL.';
+  };
+
+  const normalizeText = (value: string): string =>
+    value.toLowerCase().replace(/[\s\W_]+/g, '');
+
+  const parseFrontAsMcq = (frontText: string): { stem: string; options: string[]; labels: string[] } | null => {
+    const text = frontText.replace(/\r\n/g, '\n').trim();
+    if (!text) return null;
+
+    const optionLineRegex = /^\s*(?:[-*•]\s*)?(?:\(?([A-Za-z])\)|([A-Za-z])[).:-]|([0-9]{1,2})[).:-])\s*(.+)\s*$/;
+    const lines = text.split('\n').map((line) => line.trim()).filter(Boolean);
+    const lineMatches = lines
+      .map((line, index) => ({ line, index, match: line.match(optionLineRegex) }))
+      .filter((entry): entry is { line: string; index: number; match: RegExpMatchArray } => Boolean(entry.match));
+
+    if (lineMatches.length >= 2) {
+      const firstOptionLine = lineMatches[0].index;
+      const stem = lines.slice(0, firstOptionLine).join(' ').trim();
+      const options = lineMatches.map((entry) => entry.match[4].trim()).filter(Boolean);
+      const labels = lineMatches.map((entry) =>
+        String(entry.match[1] || entry.match[2] || entry.match[3] || '').toLowerCase()
+      );
+      if (options.length >= 2) {
+        return { stem: stem || 'Question', options, labels };
+      }
+    }
+
+    const inlineRegex = /(?:^|\s)(?:\(?([A-Za-z])\)|([A-Za-z])[).:-]|([0-9]{1,2})[).:-])\s+/g;
+    const matches = [...text.matchAll(inlineRegex)];
+    if (matches.length < 2) return null;
+
+    const firstIndex = matches[0].index;
+    if (firstIndex === undefined) return null;
+
+    const stem = text.slice(0, firstIndex).trim() || 'Question';
+    const labels = matches.map((m) => String(m[1] || m[2] || m[3] || '').toLowerCase());
+    const options: string[] = [];
+
+    matches.forEach((match, index) => {
+      const currentIndex = match.index;
+      if (currentIndex === undefined) return;
+      const start = currentIndex + match[0].length;
+      const nextIndex = matches[index + 1]?.index;
+      const end = nextIndex === undefined ? text.length : nextIndex;
+      const option = text.slice(start, end).trim();
+      if (option) options.push(option);
+    });
+
+    if (options.length >= 2) {
+      return { stem, options, labels };
+    }
+
+    return null;
+  };
+
+  const resolveMcqAnswer = (backText: string, options: string[], labels: string[]): string => {
+    const trimmed = backText.trim();
+    const labelByPrefix = trimmed.match(/^(?:answer|ans|correct answer|correct)\s*[:-]?\s*\(?([A-Za-z0-9]{1,2})\)?/i);
+    const standaloneLabel = trimmed.match(/^\(?([A-Za-z])\)?[).:-]?\s*$/);
+    const standaloneNumber = trimmed.match(/^([0-9]{1,2})$/);
+    const labelToken = labelByPrefix?.[1] || standaloneLabel?.[1] || standaloneNumber?.[1] || '';
+
+    if (labelToken) {
+      const normalized = labelToken.toLowerCase();
+      const labelIndex = labels.findIndex((label) => label === normalized);
+      if (labelIndex >= 0 && options[labelIndex]) return options[labelIndex];
+
+      if (/^\d+$/.test(normalized)) {
+        const numericIndex = Number.parseInt(normalized, 10) - 1;
+        if (numericIndex >= 0 && numericIndex < options.length) return options[numericIndex];
+      }
+    }
+
+    const cleaned = trimmed
+      .replace(/^(?:answer|ans|correct answer|correct)\s*[:-]?\s*/i, '')
+      .replace(/^["']|["']$/g, '')
+      .trim();
+
+    const exactMatch = options.find((option) => normalizeText(option) === normalizeText(cleaned));
+    if (exactMatch) return exactMatch;
+
+    const partialMatch = options.find((option) =>
+      normalizeText(option).includes(normalizeText(cleaned)) ||
+      normalizeText(cleaned).includes(normalizeText(option))
+    );
+    if (partialMatch) return partialMatch;
+
+    return cleaned || trimmed;
+  };
+
+  const handleQuizletImport = async () => {
+    if (!quizletUrl) return;
+    
+    setIsImporting(true);
+    setImportStatus('loading');
+    setImportMsg('Fetching Quizlet data...');
+
+    try {
+        let htmlContent = '';
+        
+        // Strategy 0: Electron Native Fetch (Best for bypassing CORS/Bot checks)
+        if (window.electron && window.electron.fetchUrl) {
+             setImportMsg('Launching browser fetch...');
+             try {
+                 const result = await window.electron.fetchUrl(quizletUrl);
+                 if (result.success && result.data) {
+                     htmlContent = result.data;
+                 } else {
+                     console.warn('Electron fetch failed:', result.error);
+                 }
+             } catch (e) {
+                 console.warn('Electron fetch threw error:', e);
+             }
+        }
+
+        // Fallback Strategy 1: AllOrigins Proxy
+        if (!htmlContent) {
+            setImportMsg('Trying proxy server 1...');
+            try {
+                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(quizletUrl)}`;
+                const response = await fetch(proxyUrl);
+                const data = await response.json();
+                if (data.contents) htmlContent = data.contents;
+            } catch (e) {
+                console.warn('AllOrigins proxy failed, attempting fallback...', e);
+            }
+        }
+
+        // Fallback Strategy 2: CorsProxy.io
+        if (!htmlContent) {
+             setImportMsg('Trying proxy server 2...');
+             try {
+                 const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(quizletUrl)}`;
+                 const response = await fetch(proxyUrl);
+                 if (response.ok) htmlContent = await response.text();
+             } catch (e) {
+                 console.warn('CorsProxy failed:', e);
+             }
+        }
+
+        if (!htmlContent) throw new Error('Failed to fetch content. Please ensure the set is Public.');
+        
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(htmlContent, 'text/html');
+
+        // Extract Title
+        const title = doc.querySelector('title')?.textContent?.split(' | ')[0] || 'Imported Quizlet Set';
+
+        // Extract Terms
+        const terms: { term: string, def: string }[] = [];
+        
+        // Strategy 0: JSON Extraction (Most Reliable)
+        const nextDataScript = doc.getElementById('__NEXT_DATA__');
+        if (nextDataScript && nextDataScript.textContent) {
+            try {
+                const json: unknown = JSON.parse(nextDataScript.textContent);
+                
+                // Recursive search for terms array
+                const findTerms = (obj: unknown): LooseRecord[] => {
+                    const rec = asRecord(obj);
+                    if (!rec) return [];
+                    
+                    // Check direct match for standard "terms"
+                    const directTerms = asRecordArray(rec.terms);
+                    if (directTerms.length > 0) {
+                         const item = directTerms[0] as QuizletTermLike;
+                         if (item.word !== undefined || item.term !== undefined || item.definition !== undefined) {
+                             return directTerms;
+                         }
+                    }
+
+                    // Check for "studiableItems" (New Quizlet structure)
+                    const studiableItems = asRecordArray(rec.studiableItems);
+                    if (studiableItems.length > 0) {
+                        return studiableItems;
+                    }
+                    const studiableItemsAlt = asRecordArray(rec.studiable_items);
+                    if (studiableItemsAlt.length > 0) {
+                        return studiableItemsAlt;
+                    }
+                    
+                    // Check children
+                    for (const key in rec) {
+                        if (typeof rec[key] === 'object' && rec[key] !== null) {
+                            const result = findTerms(rec[key]);
+                            if (result.length > 0) return result;
+                        }
+                    }
+                    return [];
+                };
+                
+                const jsonTerms = findTerms(json);
+                jsonTerms.forEach((rawTerm) => {
+                    const t = rawTerm as QuizletTermLike;
+                    let term = '';
+                    let def = '';
+
+                    // Handle standard structure
+                    if (t.word || t.term) {
+                        term = String(t.word || t.term || '');
+                        def = String(t.definition || t.def || '');
+                    } 
+                    // Handle "studiableItems" structure (cardSides)
+                    else if (Array.isArray(t.cardSides)) {
+                        t.cardSides.forEach((sideRaw) => {
+                            const side = asRecord(sideRaw);
+                            if (!side) return;
+                            const label = String(side.label || '');
+                            const media = asRecordArray(side.media);
+                            const firstMedia = media[0];
+                            const plainText = firstMedia && typeof firstMedia.plainText === 'string' ? firstMedia.plainText : '';
+
+                            if (label === 'word') {
+                                term = plainText;
+                            } else if (label === 'definition') {
+                                def = plainText;
+                            }
+                        });
+                    }
+
+                    if (term || def) {
+                        terms.push({ term, def });
+                    }
+                });
+                
+                if (terms.length > 0) console.log('Extracted terms via JSON');
+            } catch (e) {
+                console.warn('JSON parsing failed:', e);
+            }
+        }
+
+        // Strategy 1: CSS Selectors (Modern Layout)
+        if (terms.length === 0) {
+            const termRows = doc.querySelectorAll('.SetPageTerms-term');
+            termRows.forEach(row => {
+                const term = row.querySelector('.SetPageTerm-wordText .TermText')?.textContent || '';
+                const def = row.querySelector('.SetPageTerm-definitionText .TermText')?.textContent || '';
+                if (term || def) terms.push({ term, def });
+            });
+        }
+
+        // Strategy 2: Fallback to old structure or mobile view
+        if (terms.length === 0) {
+             const rows = doc.querySelectorAll('.TermText');
+             for(let i=0; i<rows.length; i+=2) {
+                 if(rows[i] && rows[i+1]) {
+                     terms.push({ 
+                         term: rows[i].textContent || '', 
+                         def: rows[i+1].textContent || '' 
+                     });
+                 }
+             }
+        }
+
+        if (terms.length === 0) throw new Error('No flashcards found. The set might be private or the structure has changed.');
+
+        // Create Set first (empty) to ensure we have a container
+        const newSetId = addSet({
+            profileId: userProfile.id,
+            title: title,
+            description: `Imported from Quizlet (${terms.length} terms)`,
+            questionIds: []
+        });
+
+        const questionIds: string[] = [];
+        
+        // Add Questions to Store
+        terms.forEach(t => {
+            let content = t.term;
+            let options: string[] = [];
+            let questionStyle = 'Flashcard';
+            let answer = [t.def];
+
+            const parsedMcq = parseFrontAsMcq(t.term);
+            if (parsedMcq) {
+                content = parsedMcq.stem;
+                options = parsedMcq.options;
+                questionStyle = 'Multiple Choice';
+                answer = [resolveMcqAnswer(t.def, parsedMcq.options, parsedMcq.labels)];
+            }
+
+            const newQ = {
+                profileId: userProfile.id,
+                content: content,
+                rationale: t.def, // Keep original definition as rationale
+                answer: answer, // Store definition as the "answer" for flashcard mode
+                options: options, 
+                tags: ['quizlet-import'],
+                domain: 'General',
+                questionStyle: questionStyle,
+                createdAt: Date.now(),
+                box: 1,
+                nextReviewDate: Date.now(),
+                easeFactor: 2.5,
+                repetitions: 0,
+                interval: 0
+            };
+            // The store generates the ID and returns it
+            const realId = addQuestion(newQ);
+            questionIds.push(realId);
+            addQuestionToSet(newSetId, realId);
+        });
+        
+        console.log(`Imported Set ${newSetId} with questions:`, questionIds);
+
+        setImportStatus('success');
+        setImportMsg(`Successfully imported "${title}" with ${terms.length} cards!`);
+        setQuizletUrl(''); // Reset input
+
+    } catch (error: unknown) {
+        console.error(error);
+        setImportStatus('error');
+        setImportMsg(getErrorMessage(error));
+    } finally {
+        setIsImporting(false);
+    }
+  };
 
   useEffect(() => {
     // Listeners
@@ -141,6 +488,14 @@ const Settings = () => {
     }
   };
 
+  const handleOpenExternal = async (url: string) => {
+    try {
+      await window.electron.openExternal(url);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   return (
     <div className="max-w-4xl mx-auto p-8 space-y-8 pb-20">
       <motion.div
@@ -155,7 +510,7 @@ const Settings = () => {
 
         {/* Tab Navigation */}
         <div className="flex space-x-1 bg-secondary/20 p-1 rounded-lg w-full max-w-md">
-            {['general', 'school', 'data', 'about'].map((tab) => (
+            {['general', 'data', 'about'].map((tab) => (
                 <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
@@ -267,32 +622,6 @@ const Settings = () => {
         </motion.div>
       )}
 
-      {/* School Tab */}
-      {activeTab === 'school' && (
-        <motion.div 
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="space-y-6"
-        >
-            <div className="bg-card border rounded-xl p-6 space-y-6">
-                <div className="flex items-center gap-4">
-                    <div className="p-3 bg-primary/10 rounded-full text-primary">
-                        <GraduationCap className="h-6 w-6" />
-                    </div>
-                    <div>
-                        <h2 className="text-xl font-semibold">School Integration</h2>
-                        <p className="text-sm text-muted-foreground">Connect your Blackboard account to access courses and grades.</p>
-                    </div>
-                </div>
-                
-                {/* Embed the School component directly */}
-                <div className="border rounded-xl overflow-hidden bg-background min-h-[500px]">
-                    <School />
-                </div>
-            </div>
-        </motion.div>
-      )}
-
       {/* Data Tab */}
       {activeTab === 'data' && (
         <motion.div 
@@ -336,6 +665,60 @@ const Settings = () => {
                         <span>Reset All Data</span>
                     </Button>
                 </div>
+
+                {/* Quizlet Import Section */}
+                <div className="border-t pt-6">
+                    <div className="flex items-center gap-4 mb-4">
+                        <div className="p-3 bg-blue-500/10 rounded-full text-blue-500">
+                            <ExternalLink className="h-6 w-6" />
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-semibold">Import from Quizlet</h2>
+                            <p className="text-sm text-muted-foreground">Reverse-Engineer Quizlet's API to fetch flashcards from a public URL.</p>
+                        </div>
+                    </div>
+                    
+                    <div className="bg-secondary/20 p-6 rounded-xl border border-border/50 space-y-4">
+                        <div className="flex gap-2">
+                            <Input 
+                                placeholder="Paste Quizlet URL (e.g., https://quizlet.com/123456/set-name)"
+                                value={quizletUrl}
+                                onChange={(e) => setQuizletUrl(e.target.value)}
+                                className="flex-1"
+                            />
+                            <Button 
+                                onClick={handleQuizletImport} 
+                                disabled={isImporting || !quizletUrl}
+                                className="min-w-[120px]"
+                            >
+                                {isImporting ? (
+                                    <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                                ) : (
+                                    <Download className="h-4 w-4 mr-2" />
+                                )}
+                                {isImporting ? 'Fetching...' : 'Import'}
+                            </Button>
+                        </div>
+                        
+                        {importStatus === 'success' && (
+                            <div className="flex items-center gap-2 text-green-500 bg-green-500/10 p-3 rounded-lg text-sm">
+                                <Check className="h-4 w-4" />
+                                {importMsg}
+                            </div>
+                        )}
+                        
+                        {importStatus === 'error' && (
+                            <div className="flex items-center gap-2 text-destructive bg-destructive/10 p-3 rounded-lg text-sm">
+                                <AlertCircle className="h-4 w-4" />
+                                {importMsg}
+                            </div>
+                        )}
+                        
+                        <p className="text-xs text-muted-foreground">
+                            Note: This uses a public proxy to access Quizlet. It only works for <strong>public</strong> sets. Private or password-protected sets cannot be imported.
+                        </p>
+                    </div>
+                </div>
             </div>
         </motion.div>
       )}
@@ -369,7 +752,7 @@ const Settings = () => {
                             Have an idea? Post it on our community board. Other users can vote on features they want to see next.
                         </p>
                         <Button 
-                            onClick={() => window.open('https://github.com/Mbstudio101/Qudoro/discussions', '_blank')}
+                            onClick={() => void handleOpenExternal('https://github.com/Mbstudio101/Qudoro/discussions')}
                             className="w-full"
                         >
                             <ExternalLink className="mr-2 h-4 w-4" />
@@ -386,7 +769,7 @@ const Settings = () => {
                             Found a critical bug or have a private concern? Email our support team directly.
                         </p>
                         <Button 
-                            onClick={() => window.open('mailto:feedback@qudoro.com?subject=Qudoro Feedback')}
+                            onClick={() => void handleOpenExternal('mailto:feedback@qudoro.com?subject=Qudoro Feedback')}
                             className="w-full"
                             variant="outline"
                         >

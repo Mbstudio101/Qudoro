@@ -1,23 +1,36 @@
 import React, { useState, useMemo } from 'react';
 import { useStore, Question } from '../store/useStore';
-import { Plus, Trash2, Edit2, Search, Save, Check, ChevronDown, ChevronRight, Folder, List, CheckSquare, Square, Bot } from 'lucide-react';
-
+import { Plus, Trash2, Edit2, Search, Save, Check, ChevronDown, ChevronRight, Folder, List, CheckSquare, Square } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
 import Textarea from '../components/ui/Textarea';
+import RichText from '../components/ui/RichText';
 import { motion } from 'framer-motion';
-import { NURSING_DOMAINS, QUESTION_STYLES, classifyQuestion } from '../utils/nursingConstants';
+import { classifyQuestion } from '../utils/nursingConstants';
 
 const Questions = () => {
-  const { questions: allQuestions, sets: allSets, addQuestion, deleteQuestion, updateQuestion, addQuestionToSet, addSet, activeProfileId } = useStore();
+  const {
+    questions: allQuestions,
+    sets: allSets,
+    addQuestion,
+    deleteQuestion,
+    updateQuestion,
+    addQuestionToSet,
+    addSet,
+    updateSet,
+    deleteSet,
+    activeProfileId,
+  } = useStore();
 
   const questions = useMemo(() => allQuestions.filter(q => !q.profileId || q.profileId === activeProfileId), [allQuestions, activeProfileId]);
   const sets = useMemo(() => allSets.filter(s => !s.profileId || s.profileId === activeProfileId), [allSets, activeProfileId]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSetModalOpen, setIsSetModalOpen] = useState(false);
+  const [isEditSetModalOpen, setIsEditSetModalOpen] = useState(false);
   const [isSetBuilderMode, setIsSetBuilderMode] = useState(false);
+  const [editingSetId, setEditingSetId] = useState<string>('');
   
   // Type for draft questions in Set Builder Mode
   type DraftQuestion = {
@@ -43,11 +56,14 @@ const Questions = () => {
     answer: [] as string[],
     options: [] as string[],
     tags: '',
-    domain: '',
-    questionStyle: ''
+    imageUrl: '', // New field for image
   });
 
   const [setCreationData, setSetCreationData] = useState({
+    title: '',
+    description: '',
+  });
+  const [setEditData, setSetEditData] = useState({
     title: '',
     description: '',
   });
@@ -86,6 +102,45 @@ const Questions = () => {
     );
   };
 
+  const handleDeleteSet = (setId: string, title: string) => {
+    if (window.confirm(`Are you sure you want to delete the set "${title}"? The questions will remain in your library as Unassigned.`)) {
+        deleteSet(setId);
+    }
+  };
+
+  const handleAddQuestionToSet = (setId: string) => {
+    setSelectedSetId(setId);
+    handleOpenModal();
+  };
+
+  const handleOpenEditSet = (setId: string) => {
+    const setToEdit = sets.find((s) => s.id === setId);
+    if (!setToEdit) return;
+    setEditingSetId(setId);
+    setSetEditData({
+      title: setToEdit.title,
+      description: setToEdit.description || '',
+    });
+    setIsEditSetModalOpen(true);
+  };
+
+  const handleUpdateSet = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSetId || !setEditData.title.trim()) return;
+    updateSet(editingSetId, {
+      title: setEditData.title.trim(),
+      description: setEditData.description.trim(),
+    });
+    setIsEditSetModalOpen(false);
+    setEditingSetId('');
+  };
+
+  const handleDeleteAllUnassigned = () => {
+    if (window.confirm(`Are you sure you want to delete ALL ${unassignedQuestions.length} unassigned questions? This action cannot be undone.`)) {
+        unassignedQuestions.forEach(q => deleteQuestion(q.id));
+    }
+  };
+
   const handleSaveSetClick = () => {
     setIsSetModalOpen(true);
   };
@@ -110,7 +165,7 @@ const Questions = () => {
   const handleOpenSetBuilder = () => {
     setIsSetBuilderMode(true);
     setEditingQuestion(null);
-    setFormData({ content: '', rationale: '', answer: [], options: [], tags: '', domain: '', questionStyle: '' });
+    setFormData({ content: '', rationale: '', answer: [], options: [], tags: '', imageUrl: '' });
     setSetCreationData({ title: '', description: '' });
     setDraftQuestions([]);
     setIsModalOpen(true);
@@ -126,13 +181,12 @@ const Questions = () => {
         answer: Array.isArray(question.answer) ? question.answer : [question.answer],
         options: question.options || [],
         tags: question.tags.join(', '),
-        domain: question.domain || '',
-        questionStyle: question.questionStyle || ''
+        imageUrl: question.imageUrl || '',
       });
       setSelectedSetId('');
     } else {
       setEditingQuestion(null);
-      setFormData({ content: '', rationale: '', answer: [], options: [], tags: '', domain: '', questionStyle: '' });
+      setFormData({ content: '', rationale: '', answer: [], options: [], tags: '', imageUrl: '' });
       // Keep selectedSetId if it was set previously
     }
     setIsModalOpen(true);
@@ -152,10 +206,13 @@ const Questions = () => {
     // Include the one currently in the form if it has content
     const finalQuestions = [...draftQuestions];
     if (formData.content) {
+        const { domain, style } = classifyQuestion(formData.content, cleanOptions);
         finalQuestions.push({
             ...formData,
             options: cleanOptions,
-            tags: tagsArray
+            tags: tagsArray,
+            domain: domain || undefined,
+            questionStyle: style || undefined
         });
     }
 
@@ -188,11 +245,17 @@ const Questions = () => {
     const tagsArray = formData.tags.split(',').map((t) => t.trim()).filter(Boolean);
     const cleanOptions = formData.options.map(o => o.trim()).filter(Boolean);
 
+    const { domain, style } = classifyQuestion(formData.content, cleanOptions);
+    const finalDomain = domain || undefined;
+    const finalStyle = style || undefined;
+
     if (editingQuestion) {
       updateQuestion(editingQuestion.id, {
         ...formData,
         options: cleanOptions,
         tags: tagsArray,
+        domain: finalDomain,
+        questionStyle: finalStyle
       });
       setIsModalOpen(false);
     } else {
@@ -200,6 +263,8 @@ const Questions = () => {
         ...formData,
         options: cleanOptions,
         tags: tagsArray,
+        domain: finalDomain,
+        questionStyle: finalStyle
       });
       
       if (selectedSetId) {
@@ -215,6 +280,10 @@ const Questions = () => {
     const tagsArray = formData.tags.split(',').map((t) => t.trim()).filter(Boolean);
     const cleanOptions = formData.options.map(o => o.trim()).filter(Boolean);
 
+    const { domain, style } = classifyQuestion(formData.content, cleanOptions);
+    const finalDomain = domain || undefined;
+    const finalStyle = style || undefined;
+
     if (isSetBuilderMode) {
         if (!formData.content) {
             alert("Question content is required");
@@ -224,7 +293,9 @@ const Questions = () => {
         setDraftQuestions(prev => [...prev, {
             ...formData,
             options: cleanOptions,
-            tags: tagsArray
+            tags: tagsArray,
+            domain: finalDomain,
+            questionStyle: finalStyle
         }]);
 
         // Reset form
@@ -234,8 +305,7 @@ const Questions = () => {
             answer: [],
             options: [],
             tags: formData.tags,
-            domain: '',
-            questionStyle: ''
+            imageUrl: '',
         });
         
         const textarea = document.querySelector('textarea');
@@ -247,6 +317,8 @@ const Questions = () => {
         ...formData,
         options: cleanOptions,
         tags: tagsArray,
+        domain: finalDomain,
+        questionStyle: finalStyle
     });
 
     if (selectedSetId) {
@@ -260,8 +332,7 @@ const Questions = () => {
         answer: [],
         options: [],
         tags: formData.tags, // Keep tags for convenience
-        domain: '',
-        questionStyle: ''
+        imageUrl: '',
     });
     // Keep selectedSetId for the next question
     
@@ -277,11 +348,10 @@ const Questions = () => {
     if (lines.length === 0) return;
 
     const optionPatterns = [
-        /^[A-E]\.\s+/,       // A. Option
-        /^[a-e]\)\s+/,       // a) Option
-        /^[0-9]+\.\s+/,      // 1. Option
-        /^[•\-*]\s+/,      // Bullet points
-        /^\[\s*\]\s+/        // [ ] Checkbox
+        /^\(?[A-Z]\)?[.)]\s+/i, // A. Option / A) Option / (A) Option
+        /^[0-9]+[.)]\s+/,       // 1. Option / 1) Option
+        /^[•\-*]\s+/,           // Bullet points
+        /^\[\s*\]\s+/           // [ ] Checkbox
     ];
 
     const questionLines: string[] = [];
@@ -348,6 +418,17 @@ const Questions = () => {
     setFormData(prev => ({ ...prev, options: newOptions, answer: newAnswers }));
   };
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData(prev => ({ ...prev, imageUrl: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const toggleCorrectAnswer = (option: string) => {
     if (!option) return;
     setFormData(prev => {
@@ -358,17 +439,6 @@ const Questions = () => {
             return { ...prev, answer: [...prev.answer, option] };
         }
     });
-  };
-
-  const handleAutoClassify = () => {
-    const { domain, style } = classifyQuestion(formData.content, formData.options);
-    if (domain || style) {
-        setFormData(prev => ({
-            ...prev,
-            domain: domain || prev.domain,
-            questionStyle: style || prev.questionStyle
-        }));
-    }
   };
 
   return (
@@ -388,12 +458,15 @@ const Questions = () => {
                     <Save className="mr-2 h-4 w-4" /> Save Set ({selectedQuestionIds.length})
                 </Button>
             )}
-            <Button onClick={handleOpenSetBuilder} variant="outline" className="hidden sm:flex">
+            <Button 
+                onClick={handleOpenSetBuilder} 
+                className="hidden sm:flex bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 text-primary-foreground font-semibold"
+            >
                 <Plus className="mr-2 h-4 w-4" /> Create Set
             </Button>
-            <Button onClick={() => handleOpenModal()} className="shadow-lg hover:shadow-primary/25 transition-all duration-300">
+            {/* <Button onClick={() => handleOpenModal()} variant="secondary" className="shadow-lg hover:shadow-primary/25 transition-all duration-300">
             <Plus className="mr-2 h-4 w-4" /> Add Question
-            </Button>
+            </Button> */}
         </div>
       </div>
 
@@ -428,6 +501,26 @@ const Questions = () => {
                                 {set.questions.length}
                             </span>
                         </div>
+                        <div className="flex items-center gap-2">
+                             <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 px-2 text-xs"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleAddQuestionToSet(set.id);
+                                }}
+                             >
+                                <Plus className="h-3.5 w-3.5 mr-1" />
+                                Add Question
+                             </Button>
+                             <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={(e) => {
+                                 e.stopPropagation();
+                                 handleDeleteSet(set.id, set.title);
+                             }}>
+                                 <Trash2 className="h-4 w-4" />
+                             </Button>
+                        </div>
                         <div className="flex-1 h-px bg-border/50 ml-4" />
                     </div>
 
@@ -455,7 +548,9 @@ const Questions = () => {
                                     </div>
                                     <div>
                                     <div className="mb-4 pr-6">
-                                        <h3 className="font-semibold line-clamp-3 mb-2">{question.content}</h3>
+                                        <div className="font-semibold line-clamp-3 mb-2">
+                                            <RichText content={question.content} />
+                                        </div>
                                         {question.imageUrl && (
                                             <div className="mb-2 relative rounded-md overflow-hidden bg-muted/20 h-32 w-full">
                                                 <img 
@@ -469,7 +564,10 @@ const Questions = () => {
                                     </div>
                                     <div className="text-sm text-muted-foreground line-clamp-3 mb-4">
                                         <span className="font-medium text-foreground">Answer: </span>
-                                        {Array.isArray(question.answer) ? question.answer.join(', ') : question.answer}
+                                        {Array.isArray(question.answer) 
+                                            ? question.answer.map((a, i) => <span key={i}><RichText content={a} />{i < question.answer.length - 1 ? ', ' : ''}</span>)
+                                            : <RichText content={question.answer} />
+                                        }
                                     </div>
                                     </div>
                                     <div className="flex justify-end gap-2 opacity-0 transition-opacity group-hover:opacity-100">
@@ -510,6 +608,9 @@ const Questions = () => {
                     <span className="text-sm text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
                         {unassignedQuestions.length}
                     </span>
+                    <Button variant="destructive" size="sm" onClick={handleDeleteAllUnassigned} className="ml-4 h-7 text-xs">
+                        Delete All ({unassignedQuestions.length})
+                    </Button>
                     <div className="flex-1 h-px bg-border/50 ml-4" />
                 </div>
                 
@@ -536,7 +637,9 @@ const Questions = () => {
                             </div>
                             <div>
                             <div className="mb-4 pr-6">
-                                <h3 className="font-semibold line-clamp-3 mb-2">{question.content}</h3>
+                                <div className="font-semibold line-clamp-3 mb-2">
+                                    <RichText content={question.content} />
+                                </div>
                                 {question.imageUrl && (
                                     <div className="mb-2 relative rounded-md overflow-hidden bg-muted/20 h-32 w-full">
                                         <img 
@@ -550,7 +653,10 @@ const Questions = () => {
                             </div>
                             <div className="text-sm text-muted-foreground line-clamp-3 mb-4">
                                 <span className="font-medium text-foreground">Answer: </span>
-                                {Array.isArray(question.answer) ? question.answer.join(', ') : question.answer}
+                                {Array.isArray(question.answer) 
+                                    ? question.answer.map((a, i) => <span key={i}><RichText content={a} />{i < question.answer.length - 1 ? ', ' : ''}</span>)
+                                    : <RichText content={question.answer} />
+                                }
                             </div>
                             </div>
                             <div className="flex justify-end gap-2 opacity-0 transition-opacity group-hover:opacity-100">
@@ -585,6 +691,7 @@ const Questions = () => {
         isOpen={isSetModalOpen}
         onClose={() => setIsSetModalOpen(false)}
         title="Save Selected Questions as Set"
+        maxWidth="max-w-2xl"
       >
         <form onSubmit={handleConfirmSaveSet} className="space-y-4">
             <div className="space-y-2">
@@ -604,10 +711,24 @@ const Questions = () => {
                     onChange={(e) => setSetCreationData({ ...setCreationData, description: e.target.value })}
                 />
             </div>
-            <div className="pt-4 flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">
-                    {selectedQuestionIds.length} questions selected
-                </span>
+            
+            <div className="space-y-2">
+                <label className="text-sm font-medium leading-none">Selected Questions ({selectedQuestionIds.length})</label>
+                <div className="max-h-[300px] overflow-y-auto border rounded-md bg-muted/20 divide-y divide-border/50">
+                    {questions
+                        .filter(q => selectedQuestionIds.includes(q.id))
+                        .map((q, idx) => (
+                        <div key={q.id} className="p-3 text-sm flex gap-3 bg-card/50">
+                            <span className="text-muted-foreground font-mono text-xs mt-0.5">{idx + 1}.</span>
+                            <div className="line-clamp-2 flex-1">
+                                <RichText content={q.content} />
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            <div className="pt-4 flex justify-end items-center">
                 <Button type="submit">
                     Save Set
                 </Button>
@@ -616,167 +737,223 @@ const Questions = () => {
       </Modal>
 
       <Modal
+        isOpen={isEditSetModalOpen}
+        onClose={() => setIsEditSetModalOpen(false)}
+        title="Edit Set"
+        maxWidth="max-w-2xl"
+      >
+        <form onSubmit={handleUpdateSet} className="space-y-4">
+            <div className="space-y-2">
+                <label className="text-sm font-medium leading-none">Set Title</label>
+                <Input
+                    required
+                    placeholder="Set title"
+                    value={setEditData.title}
+                    onChange={(e) => setSetEditData({ ...setEditData, title: e.target.value })}
+                />
+            </div>
+            <div className="space-y-2">
+                <label className="text-sm font-medium leading-none">Description (Optional)</label>
+                <Textarea
+                    placeholder="Brief description of this question set..."
+                    value={setEditData.description}
+                    onChange={(e) => setSetEditData({ ...setEditData, description: e.target.value })}
+                />
+            </div>
+            <div className="pt-4 flex justify-end items-center">
+                <Button type="submit">Save Changes</Button>
+            </div>
+        </form>
+      </Modal>
+
+      <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         title={isSetBuilderMode ? 'Create New Exam Set' : (editingQuestion ? 'Edit Question' : 'New Question')}
+        maxWidth="max-w-5xl"
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-6">
           {isSetBuilderMode && (
-            <div className="bg-secondary/20 p-4 rounded-lg border border-border/50 space-y-4 mb-6">
+            <div className="bg-secondary/20 p-6 rounded-xl border border-border/50 space-y-4 mb-8">
                 <div className="flex justify-between items-center">
-                     <h3 className="font-semibold text-primary">Set Details</h3>
-                     <span className="text-xs font-mono bg-primary/10 text-primary px-2 py-1 rounded-full border border-primary/20">
-                        {draftQuestions.length} Added
+                     <h3 className="font-semibold text-primary text-lg">Set Details</h3>
+                     <span className="text-sm font-mono bg-primary/10 text-primary px-3 py-1 rounded-full border border-primary/20">
+                        {draftQuestions.length} Questions Added
                      </span>
                 </div>
-                <div className="space-y-2">
-                    <label className="text-sm font-medium leading-none">Set Title</label>
-                    <Input
-                        required={isSetBuilderMode}
-                        placeholder="e.g. Biology Final Review"
-                        value={setCreationData.title}
-                        onChange={(e) => setSetCreationData({ ...setCreationData, title: e.target.value })}
-                    />
+                <div className="grid md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium leading-none">Set Title</label>
+                        <Input
+                            required={isSetBuilderMode}
+                            placeholder="e.g. Biology Final Review"
+                            value={setCreationData.title}
+                            onChange={(e) => setSetCreationData({ ...setCreationData, title: e.target.value })}
+                        />
+                    </div>
+                    <div className="space-y-2">
+                         <label className="text-sm font-medium leading-none">Description (Optional)</label>
+                         <Input
+                             placeholder="Brief description..."
+                             value={setCreationData.description}
+                             onChange={(e) => setSetCreationData({ ...setCreationData, description: e.target.value })}
+                         />
+                    </div>
                 </div>
                 <div className="h-px bg-border/50 my-2" />
-                <h3 className="font-semibold text-sm">Add Question {draftQuestions.length + 1}</h3>
+                <h3 className="font-semibold text-base">Add Question {draftQuestions.length + 1}</h3>
             </div>
           )}
-          <div className="space-y-2">
-            <label className="text-sm font-medium leading-none">
-              Question
-            </label>
-            <Textarea
-              required
-              placeholder="What is the capital of France? (Paste formatted question here to auto-fill)"
-              value={formData.content}
-              onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-              onPaste={handlePaste}
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-                <label className="text-sm font-medium leading-none">
-                Distractors / Options
-                </label>
-                <span className="text-xs text-muted-foreground">Check the correct answer(s)</span>
+
+          <div className="grid lg:grid-cols-2 gap-8">
+            {/* Left Column: Content & Image */}
+            <div className="space-y-6">
+                <div className="space-y-2">
+                    <label className="text-sm font-medium leading-none">
+                    Question Content
+                    </label>
+                    <Textarea
+                    required
+                    placeholder="What is the capital of France? (Paste formatted question here to auto-fill)"
+                    value={formData.content}
+                    onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+                    onPaste={handlePaste}
+                    className="min-h-[150px] font-medium"
+                    />
+                </div>
+
+                <div className="space-y-2">
+                    <label className="text-sm font-medium leading-none">
+                    Reference Image (Optional)
+                    </label>
+                    <div className="space-y-4">
+                        {formData.imageUrl ? (
+                            <div className="relative w-full h-64 bg-muted/20 rounded-xl overflow-hidden border border-border/50 group">
+                                <img 
+                                    src={formData.imageUrl} 
+                                    alt="Preview" 
+                                    className="w-full h-full object-contain"
+                                />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormData(prev => ({ ...prev, imageUrl: '' }))}
+                                        className="bg-destructive text-white px-4 py-2 rounded-lg hover:bg-destructive/90 transition-colors flex items-center gap-2"
+                                    >
+                                        <Trash2 size={16} /> Remove Image
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="border-2 border-dashed border-border rounded-xl p-8 text-center hover:bg-muted/30 transition-colors">
+                                <Input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleImageUpload}
+                                    className="hidden"
+                                    id="image-upload"
+                                />
+                                <label htmlFor="image-upload" className="cursor-pointer flex flex-col items-center gap-2">
+                                    <div className="p-3 bg-primary/10 text-primary rounded-full">
+                                        <Plus className="h-6 w-6" />
+                                    </div>
+                                    <span className="text-sm font-medium">Click to upload an image</span>
+                                    <span className="text-xs text-muted-foreground">Supports JPG, PNG, WEBP</span>
+                                </label>
+                            </div>
+                        )}
+                    </div>
+                </div>
             </div>
-            <div className="space-y-2">
-                {formData.options.map((option, index) => {
-                    const isCorrect = formData.answer.includes(option);
-                    return (
-                        <div key={index} className="flex gap-2 items-center">
-                            <button
-                                type="button"
-                                onClick={() => toggleCorrectAnswer(option)}
-                                className={`p-1 rounded-md transition-colors ${isCorrect ? 'text-green-500 hover:text-green-600' : 'text-muted-foreground hover:text-foreground'}`}
-                                title={isCorrect ? "Marked as correct" : "Mark as correct"}
-                            >
-                                {isCorrect ? <CheckSquare className="h-5 w-5" /> : <Square className="h-5 w-5" />}
-                            </button>
-                            <Input
-                                value={option}
-                                onChange={(e) => updateOption(index, e.target.value)}
-                                placeholder={`Option ${index + 1}`}
-                                className={isCorrect ? "border-green-500/50 bg-green-500/5 focus-visible:ring-green-500" : ""}
-                            />
-                            <Button type="button" variant="ghost" size="sm" onClick={() => removeOption(index)} className="text-destructive px-2">
-                                <Trash2 className="h-4 w-4" />
-                            </Button>
-                        </div>
-                    );
-                })}
-                <Button type="button" variant="outline" size="sm" onClick={addOption} className="w-full border-dashed">
-                    <Plus className="mr-2 h-4 w-4" /> Add Option
-                </Button>
+
+            {/* Right Column: Options & Metadata */}
+            <div className="space-y-6">
+                <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                        <label className="text-sm font-medium leading-none">
+                        Distractors / Options
+                        </label>
+                        <span className="text-xs text-muted-foreground bg-secondary px-2 py-1 rounded-md">Check the correct answer(s)</span>
+                    </div>
+                    <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                        {formData.options.map((option, index) => {
+                            const isCorrect = formData.answer.includes(option);
+                            return (
+                                <div key={index} className="flex gap-2 items-center group">
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleCorrectAnswer(option)}
+                                        className={`p-2 rounded-lg transition-all ${isCorrect ? 'bg-green-500 text-white shadow-sm' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}
+                                        title={isCorrect ? "Marked as correct" : "Mark as correct"}
+                                    >
+                                        {isCorrect ? <CheckSquare className="h-5 w-5" /> : <Square className="h-5 w-5" />}
+                                    </button>
+                                    <Input
+                                        value={option}
+                                        onChange={(e) => updateOption(index, e.target.value)}
+                                        placeholder={`Option ${index + 1}`}
+                                        className={`flex-1 ${isCorrect ? "border-green-500 ring-1 ring-green-500/20" : ""}`}
+                                    />
+                                    <Button type="button" variant="ghost" size="sm" onClick={() => removeOption(index)} className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 px-2">
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            );
+                        })}
+                        <Button type="button" variant="outline" onClick={addOption} className="w-full border-dashed py-6 hover:bg-muted/30 hover:border-primary/50 hover:text-primary transition-all">
+                            <Plus className="mr-2 h-4 w-4" /> Add Option
+                        </Button>
+                    </div>
+                </div>
+
+                <div className="space-y-2">
+                    <label className="text-sm font-medium leading-none">
+                    Rationale
+                    </label>
+                    <Textarea
+                    placeholder="Explain why the correct answer is right..."
+                    value={formData.rationale}
+                    onChange={(e) => setFormData({ ...formData, rationale: e.target.value })}
+                    className="min-h-[100px]"
+                    />
+                </div>
+
             </div>
-            <p className="text-xs text-muted-foreground">
-                Leaving options empty will create a standard flashcard.
-            </p>
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium leading-none">
-              Rationale / Explanation
-            </label>
-            <Textarea
-              placeholder="Explain why this answer is correct..."
-              value={formData.rationale}
-              onChange={(e) => setFormData({ ...formData, rationale: e.target.value })}
-            />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <label className="text-sm font-medium leading-none">Nursing Domain</label>
-                    <Button 
-                        type="button" 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-6 text-xs text-primary" 
-                        onClick={handleAutoClassify}
-                        title="Auto-detect domain and style based on content"
-                    >
-                        <Bot className="h-3 w-3 mr-1" /> Auto-Classify
-                    </Button>
-                  </div>
-                  <select
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                      value={formData.domain || ''}
-                      onChange={(e) => setFormData({ ...formData, domain: e.target.value })}
-                  >
-                      <option value="">Select Domain...</option>
-                      {NURSING_DOMAINS.map((domain) => (
-                          <option key={domain} value={domain}>
-                              {domain}
-                          </option>
-                      ))}
-                  </select>
-              </div>
-              <div className="space-y-2">
-                  <label className="text-sm font-medium leading-none">Question Style</label>
-                  <select
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                      value={formData.questionStyle || ''}
-                      onChange={(e) => setFormData({ ...formData, questionStyle: e.target.value })}
-                  >
-                      <option value="">Select Style...</option>
-                      {QUESTION_STYLES.map((style) => (
-                          <option key={style} value={style}>
-                              {style}
-                          </option>
-                      ))}
-                  </select>
-              </div>
-          </div>
           {!isSetBuilderMode && (
-          <div className="space-y-2">
-            <label className="text-sm font-medium leading-none">
-              Add to Set (Optional)
-            </label>
-            <select
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                value={selectedSetId}
-                onChange={(e) => setSelectedSetId(e.target.value)}
-            >
-                <option value="">None (Question Bank only)</option>
-                {sets.map((set) => (
-                    <option key={set.id} value={set.id}>
-                        {set.title}
-                    </option>
-                ))}
-            </select>
+          <div className="bg-muted/20 p-4 rounded-xl border border-border/50">
+            <div className="flex items-center gap-4">
+                <Folder className="h-5 w-5 text-muted-foreground" />
+                <div className="flex-1">
+                    <label className="text-sm font-medium leading-none block mb-1">
+                    Add to Set (Optional)
+                    </label>
+                    <select
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        value={selectedSetId}
+                        onChange={(e) => setSelectedSetId(e.target.value)}
+                    >
+                        <option value="">None (Question Bank only)</option>
+                        {sets.map((set) => (
+                            <option key={set.id} value={set.id}>
+                                {set.title}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            </div>
           </div>
           )}
-          <div className="flex justify-end pt-4 gap-2">
+
+          <div className="flex justify-end pt-6 gap-3 border-t border-border/50">
             {!editingQuestion && (
-                <Button type="button" variant="outline" onClick={handleSaveAndAddAnother}>
-                    {isSetBuilderMode ? 'Save & Add More' : 'Save & Add Another'}
+                <Button type="button" variant="outline" onClick={handleSaveAndAddAnother} className="h-11 px-6">
+                    {isSetBuilderMode ? 'Save Question & Add Another' : 'Save & Add Another'}
                 </Button>
             )}
-            <Button type="submit">
-              {isSetBuilderMode ? 'Save Set' : (editingQuestion ? 'Save Changes' : 'Create Question')}
+            <Button type="submit" className="h-11 px-8 shadow-lg shadow-primary/20">
+              {isSetBuilderMode ? 'Complete Set' : (editingQuestion ? 'Save Changes' : 'Create Question')}
             </Button>
           </div>
         </form>

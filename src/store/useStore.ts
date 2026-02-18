@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
+import { get, set as idbSet, del } from 'idb-keyval'; // IndexedDB for performance
 import { calculateSM2 } from '../utils/sm2';
 import { BlackboardCourse, BlackboardAssignment, BlackboardGrade, BlackboardToken } from '../types/blackboard';
 
@@ -354,19 +355,46 @@ const calculateLevel = (xp: number) => {
 
 const storage: StateStorage = {
   getItem: async (name: string): Promise<string | null> => {
-    // We need to handle the case where window.electron might not be available during SSR or initial render if not careful
-    // But in Electron renderer it should be fine.
-    if (typeof window === 'undefined' || !window.electron) return null;
-    const value = await window.electron.store.get(name);
-    return value ? JSON.stringify(value) : null;
+    // 1. Try IndexedDB first (Fastest, handles large datasets + images)
+    try {
+        const value = await get(name);
+        if (value) {
+            return value;
+        }
+    } catch (e) {
+        console.error('IDB Read Error:', e);
+    }
+
+    // 2. Fallback: Migration from Electron Store (Old data)
+    // If IDB is empty, check the old file-based store.
+    if (typeof window !== 'undefined' && window.electron) {
+        try {
+            const value = await window.electron.store.get(name);
+            if (value) {
+                // Found data in old store! Migrate to IDB immediately.
+                const jsonValue = JSON.stringify(value);
+                await idbSet(name, jsonValue);
+                return jsonValue;
+            }
+        } catch (e) {
+            console.error('Electron Store Read Error:', e);
+        }
+    }
+    return null;
   },
   setItem: async (name: string, value: string): Promise<void> => {
-    if (typeof window === 'undefined' || !window.electron) return;
-    window.electron.store.set(name, JSON.parse(value));
+    // Save to IndexedDB (Async, non-blocking UI)
+    await idbSet(name, value);
+    
+    // Optional: Sync to Electron Store as a backup in background (Debounced ideally)
+    // For now, let's skip syncing to file to avoid the "100k cards" JSON parse bottleneck.
+    // The file store is now considered legacy/backup only.
   },
   removeItem: async (name: string): Promise<void> => {
-    if (typeof window === 'undefined' || !window.electron) return;
-    window.electron.store.set(name, null);
+    await del(name);
+    if (typeof window !== 'undefined' && window.electron) {
+        window.electron.store.set(name, null);
+    }
   },
 };
 

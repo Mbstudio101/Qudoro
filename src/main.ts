@@ -1,33 +1,61 @@
 import path from 'path';
+import fs from 'fs';
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import started from 'electron-squirrel-startup';
 import Store from 'electron-store';
 import { UpdateService } from './services/UpdateService';
-import http from 'http';
-import url from 'url';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const store = new Store() as any;
 
-// OAuth Server State
-let authServer: http.Server | null = null;
+let mainWindow: BrowserWindow | null = null;
+let donationWindow: BrowserWindow | null = null;
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
   app.quit();
 }
 
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  app.quit();
+}
+
+app.on('second-instance', () => {
+  if (!mainWindow) return;
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore();
+  }
+  if (!mainWindow.isVisible()) {
+    mainWindow.show();
+  }
+  mainWindow.focus();
+});
+
 // Set App Name for Menu Bar (macOS)
 if (process.platform === 'darwin') {
     app.setName('Qudoro');
 }
 
+const resolveAppIconPath = (): string | undefined => {
+  const candidates = [
+    path.join(__dirname, '../renderer/main_window/icon.png'),
+    path.join(app.getAppPath(), 'dist/icon.png'),
+    path.join(process.cwd(), 'dist/icon.png'),
+    path.join(process.resourcesPath, 'icon.png'),
+    path.join(__dirname, '../../public/icon.png'),
+  ];
+  return candidates.find((candidate) => fs.existsSync(candidate));
+};
+
 const createWindow = () => {
+  const appIconPath = resolveAppIconPath();
+
   // Create the browser window.
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
-    icon: path.join(__dirname, '../../public/icon.png'), // For Windows/Linux
+    icon: appIconPath, // For Windows/Linux
     title: 'Qudoro',
     frame: false, // Frameless
     titleBarStyle: 'hidden', 
@@ -41,17 +69,112 @@ const createWindow = () => {
   // Initialize Update Service
   new UpdateService(mainWindow);
 
-  // and load the index.html of the app.
-  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-    mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
-  } else {
-    mainWindow.loadFile(
-      path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
-    );
-  }
+  const loadMainWindow = async () => {
+    const devServerUrl =
+      typeof MAIN_WINDOW_VITE_DEV_SERVER_URL === 'string'
+        ? MAIN_WINDOW_VITE_DEV_SERVER_URL
+        : undefined;
+    const viteRendererName =
+      typeof MAIN_WINDOW_VITE_NAME === 'string' ? MAIN_WINDOW_VITE_NAME : undefined;
+    const rendererName = viteRendererName || 'main_window';
+    const fallbackCandidates = [
+      path.join(__dirname, `../renderer/${rendererName}/index.html`),
+      path.join(app.getAppPath(), 'dist/index.html'),
+      path.join(process.cwd(), 'dist/index.html'),
+    ];
+
+    if (devServerUrl) {
+      try {
+        await mainWindow.loadURL(devServerUrl);
+        return;
+      } catch (error) {
+        console.warn(
+          `Failed to load dev server URL (${devServerUrl}), falling back to local renderer.`,
+          error,
+        );
+      }
+    }
+
+    const fallbackPath = fallbackCandidates.find((candidate) => fs.existsSync(candidate));
+    if (fallbackPath) {
+      await mainWindow.loadFile(fallbackPath);
+      return;
+    }
+
+    const errorHtml = `<!doctype html><html><head><meta charset="UTF-8"><title>Qudoro Launch Error</title></head><body style="font-family: -apple-system, sans-serif; background:#0f172a; color:#e2e8f0; padding:24px;"><h2>Qudoro could not load its UI</h2><p>No local renderer file was found.</p><p>Expected one of:</p><pre>${fallbackCandidates.join('\n')}</pre></body></html>`;
+    await mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(errorHtml)}`);
+  };
+
+  void loadMainWindow().catch((error) => {
+    console.error('Failed to load main window content', error);
+  });
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
 
   // Open the DevTools.
   // mainWindow.webContents.openDevTools();
+};
+
+const isDonationCompleteUrl = (rawUrl: string): boolean => {
+  const u = rawUrl.toLowerCase();
+  return (
+    u.includes('status=complete') ||
+    u.includes('payment=complete') ||
+    u.includes('payment-complete') ||
+    u.includes('/success') ||
+    u.includes('/receipt') ||
+    u.includes('/thank')
+  );
+};
+
+const openDonationWindow = (parent: BrowserWindow) => {
+  if (donationWindow && !donationWindow.isDestroyed()) {
+    donationWindow.focus();
+    return;
+  }
+
+  donationWindow = new BrowserWindow({
+    width: 460,
+    height: 760,
+    minWidth: 420,
+    minHeight: 640,
+    title: 'Donate via Cash App',
+    autoHideMenuBar: true,
+    parent,
+    modal: false,
+    show: false,
+    webPreferences: {
+      sandbox: true,
+    },
+  });
+
+  donationWindow.once('ready-to-show', () => {
+    donationWindow?.show();
+  });
+
+  donationWindow.on('closed', () => {
+    donationWindow = null;
+  });
+
+  const maybeAutoClose = (url: string) => {
+    if (isDonationCompleteUrl(url)) {
+      donationWindow?.close();
+    }
+  };
+
+  donationWindow.webContents.on('did-navigate', (_event, url) => {
+    maybeAutoClose(url);
+  });
+
+  donationWindow.webContents.on('did-redirect-navigation', (_event, url) => {
+    maybeAutoClose(url);
+  });
+
+  donationWindow.loadURL('https://cash.app/$marvensb').catch((err) => {
+    console.error('Failed to open donation window', err);
+  });
 };
 
 // IPC Handlers
@@ -88,176 +211,14 @@ ipcMain.on('close-window', (event) => {
   win?.close();
 });
 
+ipcMain.on('open-donation-window', (event) => {
+  const parent = BrowserWindow.fromWebContents(event.sender);
+  if (!parent) return;
+  openDonationWindow(parent);
+});
+
 ipcMain.handle('open-external-url', async (event, url) => {
     await shell.openExternal(url);
-});
-
-ipcMain.handle('start-auth-server', async () => {
-  return new Promise<{ success: boolean; port: number; error?: string }>((resolve) => {
-    if (authServer) {
-      authServer.close();
-      authServer = null;
-    }
-
-    const server = http.createServer();
-    // Use port 54321
-    server.listen(54321, '127.0.0.1', () => {
-      resolve({ success: true, port: 54321 });
-    });
-
-    server.on('error', (err) => {
-        resolve({ success: false, port: 0, error: err.message });
-    });
-
-    authServer = server;
-  });
-});
-
-ipcMain.handle('start-browser-login', async (event, schoolUrl: string) => {
-    return new Promise<{ success: boolean; token?: string; error?: string; authType?: 'Bearer' | 'Cookie' }>((resolve) => {
-        const loginWindow = new BrowserWindow({
-            width: 1000,
-            height: 800,
-            webPreferences: {
-                nodeIntegration: false,
-                contextIsolation: true
-            },
-            title: 'Login to Blackboard'
-        });
-
-        const cleanUrl = schoolUrl.replace(/\/$/, '');
-        loginWindow.loadURL(cleanUrl);
-
-        let tokenFound = false;
-
-        // Intercept requests to find Authorization header
-        const filter = {
-            urls: ['*://*/*']
-        };
-
-        // 1. Try to catch Bearer Token (Preferred)
-        loginWindow.webContents.session.webRequest.onBeforeSendHeaders(filter, (details, callback) => {
-            if (!tokenFound) {
-                // Check if request is to the school's API (roughly) or contains Bearer token
-                const authHeader = Object.entries(details.requestHeaders).find(
-                    ([key]) => key.toLowerCase() === 'authorization'
-                )?.[1];
-
-                if (authHeader && authHeader.match(/^Bearer /i)) {
-                    const token = authHeader.substring(7);
-                    tokenFound = true;
-                    console.log('Intercepted Bearer Token');
-                    loginWindow.close();
-                    resolve({ success: true, token, authType: 'Bearer' });
-                }
-            }
-            callback({ requestHeaders: details.requestHeaders });
-        });
-
-        // 2. Fallback: Catch Cookies on Navigation to Dashboard
-        loginWindow.webContents.on('did-navigate', async (event, url) => {
-            // Check if we are on a dashboard-like page (not login page)
-            // Common Blackboard dashboard paths: /ultra/, /webapps/portal/, /
-            if (!url.includes('login') && (url.includes('/ultra/') || url.includes('/webapps/portal/') || url === cleanUrl + '/')) {
-                
-                // Wait a moment for cookies to be set
-                setTimeout(async () => {
-                    if (tokenFound) return;
-
-                    try {
-                        const cookies = await loginWindow.webContents.session.cookies.get({ url });
-                        // Look for session cookies
-                        const sessionCookie = cookies.find(c => c.name === 'JSESSIONID' || c.name.includes('Session'));
-                        
-                        if (sessionCookie) {
-                             // Construct Cookie string
-                             const cookieString = cookies.map(c => `${c.name}=${c.value}`).join('; ');
-                             
-                             // If we haven't found a Bearer token yet, maybe this is enough?
-                             // Let's force a fetch to be sure
-                             const hasApiAccess = await loginWindow.webContents.executeJavaScript(`
-                                fetch('/learn/api/public/v1/users/me').then(r => r.ok).catch(() => false)
-                             `);
-
-                             if (hasApiAccess && !tokenFound) {
-                                 tokenFound = true;
-                                 console.log('Intercepted Session Cookies');
-                                 loginWindow.close();
-                                 resolve({ success: true, token: cookieString, authType: 'Cookie' });
-                             }
-                        }
-                    } catch (err) {
-                        console.error('Cookie check failed', err);
-                    }
-                }, 2000);
-            }
-        });
-        
-        // 3. Force API Check Injection
-        loginWindow.webContents.on('did-finish-load', () => {
-             const url = loginWindow.webContents.getURL();
-             if (url.includes('blackboard') && !url.includes('login')) {
-                 // Attempt to force a request that might trigger the token sniffer
-                 loginWindow.webContents.executeJavaScript(`
-                    fetch('/learn/api/public/v1/users/me').catch(e => console.error(e));
-                 `);
-             }
-        });
-
-        loginWindow.on('closed', () => {
-            if (!tokenFound) {
-                resolve({ success: false, error: 'Login window closed without capturing token.' });
-            }
-        });
-    });
-});
-
-ipcMain.handle('wait-for-auth-code', async () => {
-    if (!authServer) throw new Error('Auth server not started');
-    
-    return new Promise<string>((resolve, reject) => {
-        // Set a timeout of 5 minutes
-        const timeout = setTimeout(() => {
-            if (authServer) {
-                authServer.close();
-                authServer = null;
-            }
-            reject(new Error('Auth timed out'));
-        }, 300000);
-
-        authServer?.on('request', (req, res) => {
-            const parsedUrl = url.parse(req.url || '', true);
-            
-            if (parsedUrl.pathname === '/callback') {
-                const code = parsedUrl.query.code as string;
-                
-                if (code) {
-                    res.writeHead(200, { 'Content-Type': 'text/html' });
-                    res.end('<h1>Login Successful</h1><p>You can close this window and return to Qudoro.</p><script>window.close()</script>');
-                    
-                    if (authServer) {
-                        authServer.close();
-                        authServer = null;
-                    }
-                    clearTimeout(timeout);
-                    resolve(code);
-                    
-                    // Focus the app
-                    const wins = BrowserWindow.getAllWindows();
-                    if (wins.length > 0) {
-                        if (wins[0].isMinimized()) wins[0].restore();
-                        wins[0].focus();
-                    }
-                } else {
-                    res.writeHead(400);
-                    res.end('No code returned');
-                }
-            } else {
-                res.writeHead(404);
-                res.end('Not Found');
-            }
-        });
-    });
 });
 
 // Store IPC
@@ -269,12 +230,35 @@ ipcMain.on('set-store-value', (event, key, value) => {
   store.set(key, value);
 });
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { PDFParse } = require('pdf-parse');
+let PDFParseCtor: null | (new (data: Uint8Array) => { getText: () => Promise<{ text: string }> }) =
+  null;
+
+const getPDFParseCtor = async () => {
+  if (PDFParseCtor) return PDFParseCtor;
+  try {
+    const mod = await import('pdf-parse');
+    if (!mod?.PDFParse) {
+      throw new Error('pdf-parse did not export PDFParse');
+    }
+    PDFParseCtor = mod.PDFParse;
+    return PDFParseCtor;
+  } catch (error) {
+    console.error('Failed to load pdf-parse module:', error);
+    return null;
+  }
+};
 
 // Handle PDF parsing
 ipcMain.handle('parse-pdf', async (event, buffer) => {
   try {
+    const PDFParse = await getPDFParseCtor();
+    if (!PDFParse) {
+      return {
+        success: false,
+        error: 'PDF parser module is unavailable in this build.',
+      };
+    }
+
     const dataBuffer = Buffer.from(buffer);
     // pdf-parse expects a buffer, verify we have one
     if (!Buffer.isBuffer(dataBuffer)) {
@@ -365,8 +349,10 @@ ipcMain.handle('fetch-url', async (event, url) => {
 app.on('ready', () => {
     // Set Dock Icon for macOS (especially useful in dev)
     if (process.platform === 'darwin') {
-        const iconPath = path.join(__dirname, '../../public/icon.png');
-        app.dock.setIcon(iconPath);
+        const iconPath = resolveAppIconPath();
+        if (iconPath) {
+          app.dock.setIcon(iconPath);
+        }
     }
     createWindow();
 });

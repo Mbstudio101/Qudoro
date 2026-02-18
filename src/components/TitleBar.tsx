@@ -80,15 +80,14 @@ const TitleBar = () => {
 
       {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
       <div className="flex h-full items-center z-10 bg-background pl-4" style={{ WebkitAppRegion: 'no-drag' } as any}>
-        <a 
-          href="https://cash.app/$marvensb" 
-          target="_blank" 
-          rel="noopener noreferrer"
+        <button
+          type="button"
+          onClick={() => window.electron.openDonationWindow()}
           className="h-full px-4 flex items-center gap-2 text-sm font-medium text-emerald-500 hover:bg-emerald-500/10 transition-colors mr-2 rounded-md"
         >
           <Heart size={16} className="fill-current" />
           <span>Donate</span>
-        </a>
+        </button>
 
         <div className="h-4 w-px bg-border mx-1"></div>
 
