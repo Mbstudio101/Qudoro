@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Qudoro Features</title>
+    <meta name="description" content="Complete Qudoro feature overview organized by workflow." />
+    <link rel="icon" href="/icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700;800&family=Manrope:wght@400;500;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="bg-shape bg-shape-1"></div>
+    <div class="bg-shape bg-shape-2"></div>
+
+    <header class="container nav">
+      <a class="brand" href="/"><img src="/icon.png" alt="Qudoro logo" /><span>Qudoro</span></a>
+      <div class="nav-links">
+        <a href="/download">Download</a>
+        <a href="/features">Features</a>
+        <a href="/tour">Tour</a>
+        <a href="/why">Why Qudoro</a>
+        <a href="/forum">Forum</a>
+      </div>
+    </header>
+
+    <main class="container section">
+      <h1 class="page-title">Features</h1>
+      <p class="section-intro">Everything Qudoro offers, grouped by real study workflows.</p>
+
+      <section class="section compact">
+        <h2>Question Authoring</h2>
+        <div class="grid feature-grid">
+          <article class="card"><h3>Fast Set Creation</h3><p>Create sets quickly and keep editing open as content changes.</p></article>
+          <article class="card"><h3>Auto Structure Detection</h3><p>Paste question text and let the system infer question style and structure.</p></article>
+          <article class="card"><h3>Reusable Set Editing</h3><p>Return to any set to add, revise, or reorganize questions over time.</p></article>
+        </div>
+      </section>
+
+      <section class="section compact">
+        <h2>Exam & Practice</h2>
+        <div class="grid feature-grid">
+          <article class="card"><h3>Exam Simulation</h3><p>Practice with exam-like question flow and clean, readable layouts.</p></article>
+          <article class="card"><h3>Long-Stem Support</h3><p>Long questions stay readable without cutoffs in practice sessions.</p></article>
+          <article class="card"><h3>Rationale Review</h3><p>Review incorrect answers and explanations to reinforce weak concepts.</p></article>
+        </div>
+      </section>
+
+      <section class="section compact">
+        <h2>Retention & Organization</h2>
+        <div class="grid feature-grid">
+          <article class="card"><h3>Flashcards + Spaced Review</h3><p>Use spaced repetition-style loops to improve retention.</p></article>
+          <article class="card"><h3>Notes Workflow</h3><p>Create notes and turn note content into flashcards when needed.</p></article>
+          <article class="card"><h3>Profiles + Progress</h3><p>Use profile-based sessions with progress/streak visibility.</p></article>
+        </div>
+      </section>
+
+      <section class="section compact">
+        <h2>Community & Marketplace</h2>
+        <div class="grid feature-grid">
+          <article class="card"><h3>Discover Shared Sets</h3><p>Search and preview community sets before importing.</p></article>
+          <article class="card"><h3>Publish Local Sets</h3><p>Publish your own sets from your local library with author profile metadata.</p></article>
+          <article class="card"><h3>Update Imported Sets</h3><p>Re-import updates when a shared set has a newer version.</p></article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="container footer">
+      <p>&copy; <span id="year"></span> Qudoro. All rights reserved.</p>
+      <div class="footer-links">
+        <a href="/">Home</a>
+        <a href="/forum">Forum</a>
+        <a href="/terms">Terms</a>
+        <a href="/privacy">Privacy</a>
+      </div>
+    </footer>
+
+    <script>
+      document.getElementById('year').textContent = String(new Date().getFullYear());
+    </script>
+  </body>
+</html>

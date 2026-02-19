@@ -139,6 +139,26 @@
         font-size: 0.78rem;
         color: #64748b;
       }
+      .request-actions {
+        margin-top: 0.6rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      .vote-btn {
+        border: 1px solid rgba(15, 23, 42, 0.2);
+        background: #fff;
+        border-radius: 999px;
+        padding: 0.28rem 0.62rem;
+        font-size: 0.8rem;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .vote-btn.voted {
+        border-color: rgba(29, 78, 216, 0.35);
+        background: #dbeafe;
+        color: #1e40af;
+      }
       .empty { padding: 0.85rem; border: 1px dashed rgba(15, 23, 42, 0.2); border-radius: 12px; color: #64748b; }
       @media (max-width: 940px) {
         .layout { grid-template-columns: 1fr; }
@@ -150,6 +170,10 @@
       <a class="brand" href="/"><img src="/icon.png" alt="Qudoro logo" /><span>Qudoro</span></a>
       <nav class="nav-links">
         <a href="/">Home</a>
+        <a href="/download">Download</a>
+        <a href="/features">Features</a>
+        <a href="/tour">Tour</a>
+        <a href="/why">Why Qudoro</a>
         <a href="/terms">Terms</a>
         <a href="/privacy">Privacy</a>
       </nav>
@@ -256,6 +280,8 @@
       const reqDetails = document.getElementById('req-details');
 
       let currentUser = null;
+      let voteCountsByRequest = new Map();
+      let votedRequestIds = new Set();
 
       const setStatus = (el, text, isError = false) => {
         el.textContent = text || '';
@@ -284,6 +310,8 @@
             const safeCategory = String(row.category || 'general').replace(/</g, '&lt;');
             const safeStatus = String(row.status || 'open').replace(/</g, '&lt;');
             const safeAuthor = String(row.author_label || 'User').replace(/</g, '&lt;');
+            const votes = voteCountsByRequest.get(row.id) || 0;
+            const isVoted = votedRequestIds.has(row.id);
             return `
               <article class="request-card">
                 <div class="request-head">
@@ -297,6 +325,12 @@
                   <span>Category: ${safeCategory}</span>
                   <span>By: ${safeAuthor}</span>
                   <span>${formatDate(row.created_at)}</span>
+                </div>
+                <div class="request-actions">
+                  <button class="vote-btn ${isVoted ? 'voted' : ''}" data-request-id="${row.id}" type="button">
+                    ${isVoted ? 'Voted' : 'Vote'}
+                  </button>
+                  <span class="muted">${votes} vote${votes === 1 ? '' : 's'}</span>
                 </div>
               </article>
             `;
@@ -319,6 +353,25 @@
           setStatus(reqStatus, error.message || 'Could not load requests.', true);
           return;
         }
+        const requestIds = (data || []).map((row) => row.id);
+        voteCountsByRequest = new Map();
+        votedRequestIds = new Set();
+        if (requestIds.length > 0) {
+          const { data: votesData, error: votesError } = await supabase
+            .from('feature_request_votes')
+            .select('request_id,user_id')
+            .in('request_id', requestIds);
+          if (!votesError && Array.isArray(votesData)) {
+            for (const voteRow of votesData) {
+              const requestId = voteRow.request_id;
+              voteCountsByRequest.set(requestId, (voteCountsByRequest.get(requestId) || 0) + 1);
+              if (voteRow.user_id === currentUser.id) {
+                votedRequestIds.add(requestId);
+              }
+            }
+          }
+        }
+
         renderRequests(data || []);
       };
 
@@ -430,6 +483,43 @@
         reqDetails.value = '';
         reqCategory.value = 'general';
         setStatus(reqStatus, 'Request posted.');
+        await loadRequests();
+      });
+
+      requestList.addEventListener('click', async (event) => {
+        const target = event.target.closest('.vote-btn');
+        if (!target || !currentUser) return;
+        const requestId = target.getAttribute('data-request-id');
+        if (!requestId) return;
+
+        target.disabled = true;
+        setStatus(reqStatus, '');
+        const hasVoted = votedRequestIds.has(requestId);
+
+        if (hasVoted) {
+          const { error } = await supabase
+            .from('feature_request_votes')
+            .delete()
+            .eq('request_id', requestId)
+            .eq('user_id', currentUser.id);
+          if (error) {
+            setStatus(reqStatus, error.message || 'Could not remove vote.', true);
+            target.disabled = false;
+            return;
+          }
+          setStatus(reqStatus, 'Vote removed.');
+        } else {
+          const { error } = await supabase
+            .from('feature_request_votes')
+            .insert({ request_id: requestId, user_id: currentUser.id });
+          if (error) {
+            setStatus(reqStatus, error.message || 'Could not submit vote.', true);
+            target.disabled = false;
+            return;
+          }
+          setStatus(reqStatus, 'Vote added.');
+        }
+
         await loadRequests();
       });
 
