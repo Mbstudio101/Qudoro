@@ -7,6 +7,8 @@ import { Logo } from '../../components/ui/Logo';
 import AuthTitleBar from '../../components/AuthTitleBar';
 import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
+import { signUpWithSupabase } from '../../services/auth/supabaseAuth';
+import Toast, { type ToastVariant } from '../../components/ui/Toast';
 
 const COUNTRIES = [
   'USA', 'Canada', 'UK', 'Australia', 'Germany', 'France', 'India', 'China', 'Japan', 'Brazil', 'Other'
@@ -14,7 +16,7 @@ const COUNTRIES = [
 
 const Signup = () => {
   const navigate = useNavigate();
-  const { signup } = useStore();
+  const { authenticateWithSupabase } = useStore();
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     name: '',
@@ -24,14 +26,16 @@ const Signup = () => {
     field: '',
     country: 'USA'
   });
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [error, setError] = useState('');
+  const [toast, setToast] = useState<{ message: string; variant: ToastVariant } | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
     setError('');
   };
 
-  const handleNext = (e: React.FormEvent) => {
+  const handleNext = async (e: React.FormEvent) => {
     e.preventDefault();
     if (step === 1) {
       if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword) {
@@ -44,29 +48,56 @@ const Signup = () => {
       }
       setStep(2);
     } else {
-      handleSubmit();
+      await handleSubmit();
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!formData.field) {
       setError('Please enter your field of study');
       return;
     }
+    if (!acceptedTerms) {
+      setError('You must accept the Terms and Privacy Policy to continue');
+      return;
+    }
     
-    signup({
+    const supabaseResult = await signUpWithSupabase({
       name: formData.name,
       email: formData.email,
       password: formData.password,
       field: formData.field,
-      country: formData.country
+      country: formData.country,
     });
-    
-    navigate('/');
+
+    if (supabaseResult.ok) {
+      setToast(null);
+      authenticateWithSupabase({
+        email: supabaseResult.email,
+        name: supabaseResult.name || formData.name,
+        field: formData.field,
+        country: formData.country,
+      });
+      navigate('/');
+      return;
+    }
+
+    if (supabaseResult.needsEmailConfirmation) {
+      setError('');
+      setToast({
+        message: 'Account created. Check your email and confirm before signing in.',
+        variant: 'info',
+      });
+      setTimeout(() => navigate('/login'), 1800);
+      return;
+    }
+
+    setError(supabaseResult.error);
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      {toast && <Toast message={toast.message} variant={toast.variant} onClose={() => setToast(null)} />}
       <AuthTitleBar />
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
@@ -172,6 +203,28 @@ const Signup = () => {
                     We use this to customize your holiday calendar.
                   </p>
                 </div>
+                <label className="flex items-start gap-2 text-sm text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={acceptedTerms}
+                    onChange={(e) => {
+                      setAcceptedTerms(e.target.checked);
+                      setError('');
+                    }}
+                    className="mt-0.5"
+                  />
+                  <span>
+                    I agree to the{' '}
+                    <a href="https://qudoro.com/terms" target="_blank" rel="noreferrer" className="text-primary hover:underline">
+                      Terms of Service
+                    </a>{' '}
+                    and{' '}
+                    <a href="https://qudoro.com/privacy" target="_blank" rel="noreferrer" className="text-primary hover:underline">
+                      Privacy Policy
+                    </a>
+                    .
+                  </span>
+                </label>
               </motion.div>
             )}
 
