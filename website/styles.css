@@ -121,6 +121,22 @@ body {
   font-size: 1.03rem;
 }
 
+.hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0 0 1.1rem;
+}
+
+.hero-meta span {
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  background: rgba(255, 255, 255, 0.72);
+  padding: 0.28rem 0.58rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
 .hero-card {
   background: linear-gradient(145deg, rgba(255, 255, 255, 0.78), rgba(239, 246, 255, 0.72));
   border: 1px solid rgba(30, 41, 59, 0.12);
@@ -144,6 +160,30 @@ body {
 
 .hero-card li {
   margin-bottom: 0.5rem;
+}
+
+.hero-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.hero-stats div {
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 12px;
+  padding: 0.55rem;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.hero-stats strong {
+  display: block;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.08rem;
+}
+
+.hero-stats span {
+  color: #334155;
+  font-size: 0.86rem;
 }
 
 .hero-cta {
@@ -196,6 +236,11 @@ body {
   font-size: clamp(1.4rem, 3vw, 2.15rem);
 }
 
+.section-intro {
+  margin: 0 0 0.9rem;
+  color: var(--muted);
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -221,10 +266,103 @@ body {
   line-height: 1.5;
 }
 
+.feature-grid .card {
+  min-height: 135px;
+}
+
+.tour-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.tour-card {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.tour-card img {
+  width: 100%;
+  height: 190px;
+  object-fit: cover;
+  display: block;
+}
+
+.tour-card div {
+  padding: 0.85rem;
+}
+
+.tour-card h3 {
+  margin: 0 0 0.35rem;
+}
+
+.tour-card p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.flow-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.flow-item {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: linear-gradient(140deg, rgba(255, 255, 255, 0.88), rgba(236, 254, 255, 0.72));
+  padding: 0.9rem;
+}
+
+.flow-item span {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  color: #fff;
+  background: linear-gradient(120deg, #0ea5e9, #1d4ed8);
+}
+
+.flow-item h3 {
+  margin: 0.45rem 0 0.3rem;
+}
+
+.flow-item p {
+  margin: 0;
+  color: var(--muted);
+}
+
 .section-why p {
   margin: 0;
   color: var(--muted);
   max-width: 72ch;
+}
+
+.trust-grid {
+  margin-top: 1rem;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.trust-grid article {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.84);
+  padding: 0.85rem;
+}
+
+.trust-grid h3 {
+  margin: 0 0 0.35rem;
+}
+
+.trust-grid p {
+  margin: 0;
 }
 
 .download-sub {
@@ -304,6 +442,22 @@ body {
   }
 
   .download-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tour-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .flow-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .trust-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-stats {
     grid-template-columns: 1fr;
   }
 
