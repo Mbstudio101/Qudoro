@@ -27,6 +27,7 @@
         <span>Qudoro</span>
       </a>
       <div class="nav-links">
+        <a href="#download">Download</a>
         <a href="#features">Features</a>
         <a href="#why">Why Qudoro</a>
         <a href="/terms">Terms</a>
@@ -45,7 +46,7 @@
             faster and perform better.
           </p>
           <div class="hero-cta">
-            <a class="btn btn-primary" href="mailto:hello@qudoro.com?subject=Qudoro%20Early%20Access">Get Early Access</a>
+            <a class="btn btn-primary" href="#download">Download Now</a>
             <a class="btn btn-outline" href="#features">Explore Features</a>
           </div>
         </div>
@@ -58,6 +59,24 @@
             <li>Community discovery and set import</li>
           </ul>
         </div>
+      </section>
+
+      <section id="download" class="container section">
+        <h2>Download Qudoro</h2>
+        <p class="download-sub">Always linked to the latest GitHub release.</p>
+        <div class="download-grid">
+          <article class="download-card">
+            <h3>macOS</h3>
+            <p>Apple Silicon / Intel installer (.dmg)</p>
+            <a id="download-macos" class="btn btn-primary btn-block btn-disabled" href="https://github.com/Mbstudio101/Qudoro/releases/latest" target="_blank" rel="noreferrer">Fetching latest...</a>
+          </article>
+          <article class="download-card">
+            <h3>Windows</h3>
+            <p>Installer package (.exe)</p>
+            <a id="download-windows" class="btn btn-primary btn-block btn-disabled" href="https://github.com/Mbstudio101/Qudoro/releases/latest" target="_blank" rel="noreferrer">Fetching latest...</a>
+          </article>
+        </div>
+        <p id="download-version" class="download-version">Latest release: loading...</p>
       </section>
 
       <section id="features" class="container section">
@@ -98,6 +117,54 @@
 
     <script>
       document.getElementById('year').textContent = String(new Date().getFullYear());
+
+      (async function loadReleaseDownloads() {
+        const macBtn = document.getElementById('download-macos');
+        const winBtn = document.getElementById('download-windows');
+        const versionEl = document.getElementById('download-version');
+        const fallback = 'https://github.com/Mbstudio101/Qudoro/releases/latest';
+
+        const setFallbackState = () => {
+          macBtn.textContent = 'Download for macOS';
+          winBtn.textContent = 'Download for Windows';
+          macBtn.href = fallback;
+          winBtn.href = fallback;
+          macBtn.classList.remove('btn-disabled');
+          winBtn.classList.remove('btn-disabled');
+          versionEl.textContent = 'Latest release: open GitHub release page';
+        };
+
+        try {
+          const response = await fetch('https://api.github.com/repos/Mbstudio101/Qudoro/releases/latest', {
+            headers: { Accept: 'application/vnd.github+json' },
+          });
+          if (!response.ok) {
+            setFallbackState();
+            return;
+          }
+
+          const release = await response.json();
+          const assets = Array.isArray(release.assets) ? release.assets : [];
+
+          const findAsset = (matcher) => assets.find((a) => matcher(String(a.name || '').toLowerCase()));
+          const macAsset = findAsset((name) => name.endsWith('.dmg'));
+          const winAsset = findAsset((name) => name.endsWith('.exe'));
+
+          macBtn.textContent = macAsset ? 'Download for macOS (.dmg)' : 'Open macOS Release';
+          winBtn.textContent = winAsset ? 'Download for Windows (.exe)' : 'Open Windows Release';
+
+          macBtn.href = macAsset?.browser_download_url || release.html_url || fallback;
+          winBtn.href = winAsset?.browser_download_url || release.html_url || fallback;
+
+          macBtn.classList.remove('btn-disabled');
+          winBtn.classList.remove('btn-disabled');
+
+          const tag = release.tag_name || 'latest';
+          versionEl.textContent = `Latest release: ${tag}`;
+        } catch (_error) {
+          setFallbackState();
+        }
+      })();
     </script>
   </body>
 </html>
