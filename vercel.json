@@ -1,0 +1,5 @@
+{
+  "buildCommand": "rm -rf landing-dist && mkdir -p landing-dist && cp -R website/. landing-dist/ && cp public/icon.png landing-dist/icon.png",
+  "outputDirectory": "landing-dist",
+  "cleanUrls": true
+}
