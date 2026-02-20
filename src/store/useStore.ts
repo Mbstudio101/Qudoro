@@ -13,6 +13,8 @@ export interface Question {
   rationale: string;
   answer: string[];
   options?: string[];
+  selectionMode?: 'single' | 'multiple' | 'none';
+  correctOptionIndices?: number[];
   imageUrl?: string;
   tags: string[];
   domain?: string;
@@ -32,6 +34,7 @@ export interface ExamSet {
   profileId?: string;
   title: string;
   description: string;
+  cardGradient?: string;
   questionIds: string[];
   createdAt: number;
 }
@@ -63,7 +66,8 @@ export interface Account {
   id: string;
   name: string;
   email: string;
-  password: string;
+  passwordHash?: string;
+  password?: string; // Legacy field kept only for migration from older local data
   country: string;
   profiles: Profile[];
 }
@@ -143,8 +147,10 @@ interface AppState {
   activeProfileId: string | null;
 
   // Actions
-  signup: (data: { name: string; email: string; password: string; field: string; country: string }) => void;
-  login: (email: string, password: string) => boolean;
+  signup: (data: { name: string; email: string; password: string; field: string; country: string }) => Promise<void>;
+  login: (email: string, password: string) => Promise<boolean>;
+  authenticateWithSupabase: (data: { email: string; name?: string; country?: string; field?: string }) => string;
+  restoreSession: (accountId: string) => boolean;
   logout: () => void;
   createProfile: (name: string, studyField: string) => void;
   selectProfile: (profileId: string) => void;
@@ -353,13 +359,102 @@ const calculateLevel = (xp: number) => {
 };
 // const xpForNextLevel = (level: number) => 100 * Math.pow(level, 2);
 
+const PASSWORD_ITERATIONS = 210_000;
+const textEncoder = new TextEncoder();
+const ENCRYPTED_STATE_PREFIX = 'enc:v1:';
+
+const bytesToBase64 = (bytes: Uint8Array): string => btoa(String.fromCharCode(...bytes));
+const base64ToBytes = (b64: string): Uint8Array => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+
+const hashPassword = async (password: string): Promise<string> => {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    textEncoder.encode(password),
+    { name: 'PBKDF2' },
+    false,
+    ['deriveBits'],
+  );
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', hash: 'SHA-256', salt, iterations: PASSWORD_ITERATIONS },
+    keyMaterial,
+    256,
+  );
+  const hash = new Uint8Array(bits);
+  return `pbkdf2$${PASSWORD_ITERATIONS}$${bytesToBase64(salt)}$${bytesToBase64(hash)}`;
+};
+
+const verifyPassword = async (password: string, storedHash: string): Promise<boolean> => {
+  const [algo, iterationsRaw, saltB64, hashB64] = storedHash.split('$');
+  if (algo !== 'pbkdf2' || !iterationsRaw || !saltB64 || !hashB64) return false;
+  const iterations = Number(iterationsRaw);
+  if (!Number.isFinite(iterations) || iterations <= 0) return false;
+
+  const salt = base64ToBytes(saltB64);
+  const expectedHash = base64ToBytes(hashB64);
+
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    textEncoder.encode(password),
+    { name: 'PBKDF2' },
+    false,
+    ['deriveBits'],
+  );
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', hash: 'SHA-256', salt, iterations },
+    keyMaterial,
+    expectedHash.length * 8,
+  );
+  const actualHash = new Uint8Array(bits);
+  if (actualHash.length !== expectedHash.length) return false;
+
+  let mismatch = 0;
+  for (let i = 0; i < expectedHash.length; i++) {
+    mismatch |= actualHash[i] ^ expectedHash[i];
+  }
+  return mismatch === 0;
+};
+
+const hasSecureStorageBridge = (): boolean =>
+  typeof window !== 'undefined' &&
+  typeof window.electron !== 'undefined' &&
+  typeof window.electron.crypto !== 'undefined';
+
+const encryptPersistedValue = async (plainText: string): Promise<string> => {
+  if (!hasSecureStorageBridge()) return plainText;
+  try {
+    const encrypted = await window.electron.crypto.encrypt(plainText);
+    if (!encrypted) return plainText;
+    return `${ENCRYPTED_STATE_PREFIX}${encrypted}`;
+  } catch {
+    return plainText;
+  }
+};
+
+const decryptPersistedValue = async (storedValue: string): Promise<string | null> => {
+  if (!storedValue.startsWith(ENCRYPTED_STATE_PREFIX)) {
+    return storedValue;
+  }
+  if (!hasSecureStorageBridge()) return null;
+  try {
+    const encrypted = storedValue.slice(ENCRYPTED_STATE_PREFIX.length);
+    return await window.electron.crypto.decrypt(encrypted);
+  } catch {
+    return null;
+  }
+};
+
 const storage: StateStorage = {
   getItem: async (name: string): Promise<string | null> => {
     // 1. Try IndexedDB first (Fastest, handles large datasets + images)
     try {
         const value = await get(name);
-        if (value) {
-            return value;
+        if (typeof value === 'string' && value.length > 0) {
+            const decrypted = await decryptPersistedValue(value);
+            return decrypted;
+        }
+        if (value !== null && typeof value !== 'undefined') {
+            return JSON.stringify(value);
         }
     } catch (e) {
         console.error('IDB Read Error:', e);
@@ -372,8 +467,9 @@ const storage: StateStorage = {
             const value = await window.electron.store.get(name);
             if (value) {
                 // Found data in old store! Migrate to IDB immediately.
-                const jsonValue = JSON.stringify(value);
-                await idbSet(name, jsonValue);
+                const jsonValue = typeof value === 'string' ? value : JSON.stringify(value);
+                const encryptedValue = await encryptPersistedValue(jsonValue);
+                await idbSet(name, encryptedValue);
                 return jsonValue;
             }
         } catch (e) {
@@ -384,7 +480,8 @@ const storage: StateStorage = {
   },
   setItem: async (name: string, value: string): Promise<void> => {
     // Save to IndexedDB (Async, non-blocking UI)
-    await idbSet(name, value);
+    const encryptedValue = await encryptPersistedValue(value);
+    await idbSet(name, encryptedValue);
     
     // Optional: Sync to Electron Store as a backup in background (Debounced ideally)
     // For now, let's skip syncing to file to avoid the "100k cards" JSON parse bottleneck.
@@ -433,12 +530,13 @@ export const useStore = create<AppState>()(
         achievements: []
       } as UserProfile,
 
-      signup: (data) => {
+      signup: async (data) => {
+        const passwordHash = await hashPassword(data.password);
         const newAccount: Account = {
             id: uuidv4(),
             name: data.name,
             email: data.email,
-            password: data.password, 
+            passwordHash,
             country: data.country,
             profiles: []
         };
@@ -463,10 +561,34 @@ export const useStore = create<AppState>()(
         }));
       },
 
-      login: (email, password) => {
+      login: async (email, password) => {
         const state = get();
-        const account = state.accounts.find(a => a.email === email && a.password === password);
-        if (account) {
+        const account = state.accounts.find((a) => a.email === email);
+        if (!account) return false;
+
+        let isValid = false;
+        if (account.passwordHash) {
+          isValid = await verifyPassword(password, account.passwordHash);
+        } else if (account.password) {
+          // Legacy fallback migration path from plaintext password storage.
+          isValid = account.password === password;
+          if (isValid) {
+            const migratedHash = await hashPassword(password);
+            set((prev) => ({
+              accounts: prev.accounts.map((a) =>
+                a.id === account.id
+                  ? {
+                      ...a,
+                      passwordHash: migratedHash,
+                      password: undefined,
+                    }
+                  : a
+              ),
+            }));
+          }
+        }
+
+        if (isValid) {
             set({ 
                 isAuthenticated: true, 
                 currentAccountId: account.id,
@@ -475,6 +597,61 @@ export const useStore = create<AppState>()(
             return true;
         }
         return false;
+      },
+
+      authenticateWithSupabase: ({ email, name, country, field }) => {
+        const normalizedEmail = email.trim().toLowerCase();
+        const state = get();
+        const existing = state.accounts.find((a) => a.email.toLowerCase() === normalizedEmail);
+
+        if (existing) {
+          set({
+            isAuthenticated: true,
+            currentAccountId: existing.id,
+            activeProfileId: existing.profiles[0]?.id ?? null,
+            userProfile: existing.profiles[0] ?? state.userProfile,
+          });
+          return existing.id;
+        }
+
+        const initialProfile: Profile = {
+          id: uuidv4(),
+          name: name || normalizedEmail.split('@')[0] || 'Student',
+          studyField: field || 'General Studies',
+          theme: 'system',
+          lastVisit: Date.now(),
+          stats: { ...initialStats },
+          achievements: [],
+        };
+
+        const newAccount: Account = {
+          id: uuidv4(),
+          name: name || normalizedEmail.split('@')[0] || 'Student',
+          email: normalizedEmail,
+          country: country || 'USA',
+          profiles: [initialProfile],
+        };
+
+        set((prev) => ({
+          accounts: [...prev.accounts, newAccount],
+          isAuthenticated: true,
+          currentAccountId: newAccount.id,
+          activeProfileId: initialProfile.id,
+          userProfile: initialProfile,
+        }));
+        return newAccount.id;
+      },
+
+      restoreSession: (accountId) => {
+        const state = get();
+        const account = state.accounts.find((a) => a.id === accountId);
+        if (!account) return false;
+        set({
+          isAuthenticated: true,
+          currentAccountId: account.id,
+          activeProfileId: null,
+        });
+        return true;
       },
 
       logout: () => set({ 

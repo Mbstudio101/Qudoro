@@ -4,7 +4,7 @@ import { RefreshCw, Download, Check, AlertCircle, Package, User, Save, Upload, T
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
-import { useStore } from '../store/useStore';
+import { useStore, Question } from '../store/useStore';
 
 const Settings = () => {
   const { userProfile, setUserProfile, questions, sets, importData, resetData, addQuestion, addSet, addQuestionToSet } = useStore();
@@ -441,8 +441,104 @@ const Settings = () => {
     setTimeout(() => setIsSaved(false), 2000);
   };
 
+  const normalizeSelectionMode = (
+    value: unknown,
+    optionCount: number,
+    selectedCount: number,
+  ): 'single' | 'multiple' | 'none' => {
+    if (value === 'single' || value === 'multiple' || value === 'none') return value;
+    if (optionCount === 0) return 'none';
+    if (selectedCount > 1) return 'multiple';
+    return 'single';
+  };
+
+  const deriveCorrectOptionIndices = (options: string[], answers: string[]): number[] =>
+    options
+      .map((option, idx) => ({ option, idx }))
+      .filter(({ option }) => answers.includes(option))
+      .map(({ idx }) => idx);
+
+  const normalizeImportedQuestions = (rawQuestions: unknown[]): Question[] => {
+    return rawQuestions
+      .map((raw) => {
+        if (!raw || typeof raw !== 'object') return null;
+        const item = raw as Partial<Question> & {
+          selectionMode?: unknown;
+          correctOptionIndices?: unknown;
+          answer?: unknown;
+          options?: unknown;
+          tags?: unknown;
+        };
+
+        const options = Array.isArray(item.options)
+          ? item.options.filter((x): x is string => typeof x === 'string')
+          : [];
+
+        const answerStrings = Array.isArray(item.answer)
+          ? item.answer.filter((x): x is string => typeof x === 'string')
+          : typeof item.answer === 'string'
+            ? [item.answer]
+            : [];
+
+        const importedIndices = Array.isArray(item.correctOptionIndices)
+          ? item.correctOptionIndices.filter(
+              (x): x is number => Number.isInteger(x) && x >= 0 && x < options.length,
+            )
+          : [];
+
+        const answersFromIndices = importedIndices
+          .map((idx) => options[idx])
+          .filter((x): x is string => typeof x === 'string');
+
+        const answer = answersFromIndices.length > 0 ? answersFromIndices : answerStrings;
+        const correctOptionIndices =
+          importedIndices.length > 0 ? importedIndices : deriveCorrectOptionIndices(options, answer);
+        const selectionMode = normalizeSelectionMode(
+          item.selectionMode,
+          options.length,
+          correctOptionIndices.length,
+        );
+
+        if (!item.content || typeof item.content !== 'string') return null;
+        if (!item.id || typeof item.id !== 'string') return null;
+
+        return {
+          ...item,
+          id: item.id,
+          content: item.content,
+          rationale: typeof item.rationale === 'string' ? item.rationale : '',
+          answer,
+          options,
+          selectionMode,
+          correctOptionIndices,
+          tags: Array.isArray(item.tags) ? item.tags.filter((x): x is string => typeof x === 'string') : [],
+          createdAt: typeof item.createdAt === 'number' ? item.createdAt : Date.now(),
+          box: typeof item.box === 'number' ? item.box : 1,
+          nextReviewDate: typeof item.nextReviewDate === 'number' ? item.nextReviewDate : Date.now(),
+        } as Question;
+      })
+      .filter((x): x is Question => x !== null);
+  };
+
   const handleExport = () => {
-    const data = JSON.stringify({ questions, sets }, null, 2);
+    const exportedQuestions = questions.map((question) => {
+      const options = Array.isArray(question.options) ? question.options : [];
+      const answer = Array.isArray(question.answer) ? question.answer : [];
+      const correctOptionIndices = deriveCorrectOptionIndices(options, answer);
+      const selectionMode = normalizeSelectionMode(
+        question.selectionMode,
+        options.length,
+        correctOptionIndices.length,
+      );
+
+      return {
+        ...question,
+        selectionMode,
+        correctOptionIndices,
+      };
+    });
+
+    const data = JSON.stringify({ questions: exportedQuestions, sets }, null, 2);
     const blob = new Blob([data], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -466,8 +562,12 @@ const Settings = () => {
     reader.onload = (event) => {
       try {
         const data = JSON.parse(event.target?.result as string);
-        if (data.questions && data.sets) {
-            importData(data);
+        if (Array.isArray(data.questions) && Array.isArray(data.sets)) {
+            const normalizedQuestions = normalizeImportedQuestions(data.questions);
+            importData({
+              questions: normalizedQuestions,
+              sets: data.sets,
+            });
             alert('Data imported successfully!');
         } else {
             alert('Invalid file format');
