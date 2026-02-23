@@ -78,7 +78,6 @@ const Login = () => {
   const [toast, setToast] = useState<{ message: string; variant: ToastVariant } | null>(null);
   const [lockoutUntil, setLockoutUntil] = useState(0);
   const [nowMs, setNowMs] = useState(Date.now());
-  const [resetEmail, setResetEmail] = useState('');
   const [resetSending, setResetSending] = useState(false);
   const [resetError, setResetError] = useState('');
 
@@ -195,7 +194,7 @@ const Login = () => {
 
   const handlePasswordReset = async () => {
     setResetError('');
-    const email = resetEmail.trim() || formData.email.trim();
+    const email = formData.email.trim();
     if (!email) {
       setResetError('Enter your email to reset your password.');
       return;
@@ -293,17 +292,6 @@ const Login = () => {
                 Login temporarily locked ({remainingLockoutSeconds}s)
               </p>
             )}
-
-            <Input
-              name="resetEmail"
-              type="email"
-              placeholder="Email for password reset (optional)"
-              value={resetEmail}
-              onChange={(e) => {
-                setResetEmail(e.target.value);
-                setResetError('');
-              }}
-            />
 
             <Button type="submit" className="w-full" disabled={isLocked}>
               Sign In
