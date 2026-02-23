@@ -23,10 +23,10 @@ jobs:
           - runner: windows-latest
             platform: win32
             arch: ia32
-          - runner: macos-13
+          - runner: macos-latest
             platform: darwin
             arch: x64
-          - runner: macos-14
+          - runner: macos-latest
             platform: darwin
             arch: arm64
 
