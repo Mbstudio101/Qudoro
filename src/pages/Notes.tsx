@@ -44,7 +44,7 @@ const Notes = () => {
   const loadedNoteIdRef = useRef<string | null>(null);
   const autosaveTimerRef = useRef<number | null>(null);
   const [characterCount, setCharacterCount] = useState(0);
-  const [fontFamily, setFontFamily] = useState('Arial');
+  const [fontFamily, setFontFamily] = useState('Futura');
   const [fontSize, setFontSize] = useState('3');
   const [saveStatus, setSaveStatus] = useState<'saving' | 'saved'>('saved');
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
@@ -320,6 +320,7 @@ const Notes = () => {
                         }}
                         className="h-8 rounded-md border bg-card px-2 text-xs"
                     >
+                        <option value="Futura">Futura</option>
                         <option value="Arial">Arial</option>
                         <option value="Georgia">Georgia</option>
                         <option value="Times New Roman">Times New Roman</option>
@@ -393,7 +394,12 @@ const Notes = () => {
                         suppressContentEditableWarning
                         onInput={handleEditorInput}
                         className="mx-auto min-h-[700px] w-full max-w-[860px] rounded-md border bg-white p-10 text-[17px] leading-8 text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-                        style={{ fontFamily }}
+                        style={{
+                          fontFamily:
+                            fontFamily === 'Futura'
+                              ? 'Futura, Trebuchet MS, Arial, sans-serif'
+                              : fontFamily,
+                        }}
                         data-placeholder="Start typing your note here..."
                     />
                 </div>
