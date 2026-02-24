@@ -318,7 +318,7 @@ const Practice = () => {
   const isMCQ = currentQuestion.options && currentQuestion.options.length > 0;
 
   return (
-    <div className="flex flex-col h-full max-w-4xl mx-auto pb-10 px-4">
+    <div className="flex flex-col h-full max-w-4xl mx-auto pb-10 px-4 overflow-y-auto min-h-0">
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <Button variant="ghost" size="sm" onClick={() => navigate('/sets')} className="hover:bg-secondary/50 rounded-full h-10 w-10 p-0 flex items-center justify-center">
@@ -348,7 +348,7 @@ const Practice = () => {
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
-            className="flex-1 flex flex-col"
+            className="flex-1 flex flex-col min-h-0"
         >
             <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-2xl p-8 shadow-sm mb-6 min-h-[200px] flex flex-col items-center justify-center text-center">
                 {currentQuestion.imageUrl && (

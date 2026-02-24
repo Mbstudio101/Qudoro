@@ -5,6 +5,18 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { RotateCw, CheckCircle, AlertCircle, Layers, Play, ArrowLeft, Zap } from 'lucide-react';
 import Button from '../components/ui/Button';
 import RichText from '../components/ui/RichText';
+import { cleanMcqText, parseInlineLabeledMcq } from '../utils/mcqParser';
+
+const cleanOptionText = (value: string): string => cleanMcqText(value);
+
+const parsePackedMcqContent = (content: string): { stem: string; options: string[] } | null => {
+  const parsed = parseInlineLabeledMcq(content);
+  if (!parsed) return null;
+  return {
+    stem: cleanOptionText(parsed.stem) || 'Question',
+    options: parsed.options.map(cleanOptionText).filter(Boolean),
+  };
+};
 
 const Flashcards = () => {
   const { questions: allQuestions, sets: allSets, reviewQuestion, addSession, activeProfileId } = useStore();
@@ -21,23 +33,18 @@ const Flashcards = () => {
   const [incorrectIds, setIncorrectIds] = useState<string[]>([]);
   const [startTime, setStartTime] = useState(Date.now());
 
-  // Calculate due questions for all sets initially to show counts
-  const getDueQuestionsForSet = (setId: string | 'all') => {
+  const getDueQuestionsForSet = (setId: string) => {
     const now = Date.now();
-    let relevantQuestions = questions;
-    
-    if (setId !== 'all') {
-      const set = sets.find(s => s.id === setId);
-      if (!set) return [];
-      relevantQuestions = questions.filter(q => set.questionIds.includes(q.id));
-    }
+    const set = sets.find(s => s.id === setId);
+    if (!set) return [];
+    const relevantQuestions = questions.filter(q => set.questionIds.includes(q.id));
 
     return relevantQuestions.filter(
       (q) => !q.nextReviewDate || q.nextReviewDate <= now
     ).sort((a, b) => (a.nextReviewDate || 0) - (b.nextReviewDate || 0));
   };
 
-  const startSession = (setId: string | 'all') => {
+  const startSession = (setId: string) => {
     const due = getDueQuestionsForSet(setId);
     setDueQuestions(due);
     setSelectedSetId(setId);
@@ -50,6 +57,15 @@ const Flashcards = () => {
   };
 
   const currentQuestion = dueQuestions[currentIndex];
+  const parsedPackedFront = useMemo(
+    () => (currentQuestion ? parsePackedMcqContent(currentQuestion.content) : null),
+    [currentQuestion],
+  );
+  const frontStem = parsedPackedFront?.stem || currentQuestion?.content || '';
+  const frontOptions =
+    currentQuestion?.options && currentQuestion.options.length >= 2
+      ? currentQuestion.options
+      : parsedPackedFront?.options || [];
 
   const getIntervalLabel = (rating: 'again' | 'hard' | 'good' | 'easy') => {
     if (!currentQuestion) return '-';
@@ -87,7 +103,7 @@ const Flashcards = () => {
       // Note: real-time stats (streak, XP, time) are handled by reviewQuestion per card.
       // addSession here just logs the historical session record and ensures consistency.
       addSession({
-        setId: selectedSetId || 'all',
+        setId: selectedSetId || '',
         date: startTime, // Use start time as session date
         score: finalCorrectCount,
         totalQuestions: dueQuestions.length,
@@ -104,8 +120,6 @@ const Flashcards = () => {
 
   // If no set selected, show set selection screen
   if (!selectedSetId) {
-    const allDueCount = getDueQuestionsForSet('all').length;
-
     return (
         <div className="space-y-6 pb-20">
             <div className="flex items-center justify-between">
@@ -116,36 +130,6 @@ const Flashcards = () => {
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {/* All Questions Card */}
-                <motion.div
-                    whileHover={{ y: -4 }}
-                    className="group relative rounded-2xl border border-border/50 bg-card/50 backdrop-blur-sm p-6 shadow-sm transition-all duration-300 hover:shadow-xl flex flex-col justify-between cursor-pointer"
-                    onClick={() => startSession('all')}
-                >
-                    <div>
-                        <div className="flex items-start justify-between">
-                            <div className="space-y-1">
-                                <h3 className="font-semibold text-lg">All Decks</h3>
-                                <p className="text-sm text-muted-foreground">Review all due cards across all sets</p>
-                            </div>
-                            <div className="rounded-full bg-primary/10 p-2.5 text-primary">
-                                <Layers className="h-5 w-5" />
-                            </div>
-                        </div>
-                        <div className="mt-4">
-                            <span className={`text-2xl font-bold ${allDueCount > 0 ? 'text-primary' : 'text-muted-foreground'}`}>
-                                {allDueCount}
-                            </span>
-                            <span className="text-sm text-muted-foreground ml-2">cards due</span>
-                        </div>
-                    </div>
-                    <div className="mt-6 flex flex-wrap gap-2">
-                         <Button className="w-full min-w-[140px]" disabled={allDueCount === 0}>
-                            <Play className="mr-2 h-4 w-4 shrink-0" /> <span className="truncate">Start Review</span>
-                         </Button>
-                    </div>
-                </motion.div>
-
                 {/* Individual Sets */}
                 {sets.map(set => {
                     const dueCount = getDueQuestionsForSet(set.id).length;
@@ -279,9 +263,23 @@ const Flashcards = () => {
                   </div>
               )}
 
-              <div className="text-2xl font-medium leading-relaxed w-full">
-                <RichText content={currentQuestion.content} />
+              <div className="text-xl md:text-2xl font-medium leading-relaxed w-full text-left">
+                <RichText content={frontStem} />
               </div>
+              {frontOptions.length >= 2 && (
+                <div className="mt-6 w-full text-left space-y-3">
+                  {frontOptions.map((option, index) => (
+                    <div key={`${currentQuestion.id}-opt-${index}`} className="flex gap-2 text-base md:text-lg">
+                      <span className="font-semibold text-primary shrink-0">
+                        {String.fromCharCode(65 + (index % 26))}.
+                      </span>
+                      <div className="min-w-0">
+                        <RichText content={option} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
               <p className="absolute bottom-6 text-sm text-muted-foreground flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                 <RotateCw size={14} /> Click to flip
               </p>

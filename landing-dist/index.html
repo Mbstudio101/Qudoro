@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Qudoro | Intelligent Study Platform</title>
+    <meta
+      name="description"
+      content="Qudoro is an intelligent study platform for question-bank workflows, exam simulation, flashcards, notes, and community-driven feature development."
+    />
+    <link rel="icon" href="/icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700;800&family=Manrope:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="bg-shape bg-shape-1"></div>
+    <div class="bg-shape bg-shape-2"></div>
+
+    <header class="container nav">
+      <a class="brand" href="/">
+        <img src="/icon.png" alt="Qudoro logo" />
+        <span>Qudoro</span>
+      </a>
+      <div class="nav-links">
+        <a href="/download">Download</a>
+        <a href="/features">Features</a>
+        <a href="/tour">Tour</a>
+        <a href="/why">Why Qudoro</a>
+        <a href="/forum">Forum</a>
+        <a href="/terms">Terms</a>
+        <a href="/privacy">Privacy</a>
+      </div>
+    </header>
+
+    <main>
+      <section class="container hero">
+        <div class="hero-copy">
+          <p class="pill">Purpose-built for nursing and exam-heavy study tracks</p>
+          <h1>One platform. Separate focused pages for every workflow.</h1>
+          <p class="sub">
+            Qudoro gives you structured question prep, realistic exam simulation, flashcards, notes, and a community
+            forum for feature requests and voting.
+          </p>
+          <div class="hero-cta">
+            <a class="btn btn-primary" href="/download">Get Qudoro</a>
+            <a class="btn btn-outline" href="/features">Explore Platform</a>
+          </div>
+        </div>
+        <div class="hero-card">
+          <p class="hero-card-title">Navigate by intent</p>
+          <div class="hero-stats">
+            <div><strong>Download</strong><span>Always latest macOS/Windows release</span></div>
+            <div><strong>Features</strong><span>Clear platform capabilities by workflow</span></div>
+            <div><strong>Tour</strong><span>Visual walkthrough of real app screens</span></div>
+            <div><strong>Forum</strong><span>Submit and vote on feature requests</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="container section">
+        <h2>Platform Pages</h2>
+        <p class="section-intro">Each section has its own dedicated page so information stays organized and easy to scan.</p>
+        <div class="grid feature-grid">
+          <article class="card nav-card">
+            <h3>Download</h3>
+            <p>Installers for macOS (.dmg) and Windows (.exe), auto-linked to latest GitHub release.</p>
+            <a class="btn btn-outline" href="/download">Open Download</a>
+          </article>
+          <article class="card nav-card">
+            <h3>Features</h3>
+            <p>Question bank, exam mode, flashcards, notes, discover marketplace, and profile-based progress.</p>
+            <a class="btn btn-outline" href="/features">Open Features</a>
+          </article>
+          <article class="card nav-card">
+            <h3>Product Tour</h3>
+            <p>Real screenshots that show create-set flow, exam practice mode, and notes-to-flashcards workflow.</p>
+            <a class="btn btn-outline" href="/tour">Open Tour</a>
+          </article>
+          <article class="card nav-card">
+            <h3>Why Qudoro</h3>
+            <p>How students use Qudoro end-to-end plus trust and security design decisions.</p>
+            <a class="btn btn-outline" href="/why">Open Why</a>
+          </article>
+          <article class="card nav-card">
+            <h3>Feature Forum</h3>
+            <p>Same Supabase auth, request posting, and user voting on ideas that matter most.</p>
+            <a class="btn btn-outline" href="/forum">Open Forum</a>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="container footer">
+      <p>&copy; <span id="year"></span> Qudoro. All rights reserved.</p>
+      <div class="footer-links">
+        <a href="mailto:hello@qudoro.com">hello@qudoro.com</a>
+        <a href="/forum">Forum</a>
+        <a href="/terms">Terms</a>
+        <a href="/privacy">Privacy</a>
+      </div>
+    </footer>
+
+    <script>
+      document.getElementById('year').textContent = String(new Date().getFullYear());
+    </script>
+  </body>
+</html>

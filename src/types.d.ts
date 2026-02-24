@@ -34,6 +34,10 @@ declare global {
       };
       fetchUrl: (url: string) => Promise<{ success: boolean; data?: string; error?: string }>;
       openExternal: (url: string) => Promise<void>;
+      crypto: {
+        encrypt: (plaintext: string) => Promise<string | null>;
+        decrypt: (encryptedBase64: string) => Promise<string | null>;
+      };
       parsePdf: (buffer: number[]) => Promise<{ success: boolean; text?: string; error?: string }>;
       updater: {
         checkForUpdates: () => Promise<UpdateInfo | null>;

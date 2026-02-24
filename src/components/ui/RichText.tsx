@@ -18,10 +18,18 @@ const RichText: React.FC<RichTextProps> = ({ content, className }) => {
       {parts.map((part, i) => {
         // Block Math
         if (part.startsWith('$$') && part.endsWith('$$')) {
-          return <BlockMath key={i} math={part.slice(2, -2)} />;
+          try {
+            return <BlockMath key={i} math={part.slice(2, -2)} />;
+          } catch {
+            return <span key={i}>{part}</span>;
+          }
         }
         if (part.startsWith('\\[') && part.endsWith('\\]')) {
-             return <BlockMath key={i} math={part.slice(2, -2)} />;
+          try {
+            return <BlockMath key={i} math={part.slice(2, -2)} />;
+          } catch {
+            return <span key={i}>{part}</span>;
+          }
         }
         
         // Inline Math splitting
@@ -31,10 +39,18 @@ const RichText: React.FC<RichTextProps> = ({ content, className }) => {
             <span key={i}>
                 {inlineParts.map((subPart, j) => {
                     if (subPart.startsWith('$') && subPart.endsWith('$')) {
-                        return <InlineMath key={j} math={subPart.slice(1, -1)} />;
+                        try {
+                          return <InlineMath key={j} math={subPart.slice(1, -1)} />;
+                        } catch {
+                          return <span key={j}>{subPart}</span>;
+                        }
                     }
                     if (subPart.startsWith('\\(') && subPart.endsWith('\\)')) {
-                        return <InlineMath key={j} math={subPart.slice(2, -2)} />;
+                        try {
+                          return <InlineMath key={j} math={subPart.slice(2, -2)} />;
+                        } catch {
+                          return <span key={j}>{subPart}</span>;
+                        }
                     }
                     return <span key={j}>{subPart}</span>;
                 })}

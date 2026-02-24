@@ -7,6 +7,7 @@ import AuthTitleBar from '../../components/AuthTitleBar';
 import { motion } from 'framer-motion';
 import { User, Plus, GraduationCap } from 'lucide-react';
 import { getAvatarUrl } from '../../utils/avatar';
+import { signOutSupabase } from '../../services/auth/supabaseAuth';
 
 const ProfileSelect = () => {
   const navigate = useNavigate();
@@ -31,7 +32,8 @@ const ProfileSelect = () => {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await signOutSupabase();
     const { logout } = useStore.getState();
     logout();
     navigate('/login');

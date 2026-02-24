@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useStore, Question } from '../store/useStore';
-import { Plus, Trash2, Edit2, Search, Save, Check, ChevronDown, ChevronRight, Folder, List, CheckSquare, Square } from 'lucide-react';
+import { Plus, Trash2, Edit2, Search, Save, Check, ChevronLeft, Folder, List, CheckSquare, Square, Layers } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
@@ -8,6 +8,8 @@ import Textarea from '../components/ui/Textarea';
 import RichText from '../components/ui/RichText';
 import { motion } from 'framer-motion';
 import { classifyQuestion } from '../utils/nursingConstants';
+import { CARD_GRADIENT_OPTIONS, getCardGradientClasses } from '../utils/cardGradients';
+import { cleanMcqText, parseInlineLabeledMcq } from '../utils/mcqParser';
 
 const Questions = () => {
   const {
@@ -48,7 +50,7 @@ const Questions = () => {
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [selectedSetId, setSelectedSetId] = useState<string>('');
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
-  const [collapsedSets, setCollapsedSets] = useState<Record<string, boolean>>({});
+  const [activeSetViewId, setActiveSetViewId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     content: '',
@@ -62,10 +64,12 @@ const Questions = () => {
   const [setCreationData, setSetCreationData] = useState({
     title: '',
     description: '',
+    cardGradient: 'default',
   });
   const [setEditData, setSetEditData] = useState({
     title: '',
     description: '',
+    cardGradient: 'default',
   });
 
   const filteredQuestions = questions.filter(
@@ -73,10 +77,6 @@ const Questions = () => {
       q.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
       q.tags.some((t) => t.toLowerCase().includes(searchQuery.toLowerCase()))
   );
-
-  const toggleSetCollapse = (setId: string) => {
-    setCollapsedSets(prev => ({ ...prev, [setId]: !prev[setId] }));
-  };
 
   // Group questions by set
   const questionsBySet = sets.map(set => ({
@@ -93,6 +93,89 @@ const Questions = () => {
   // Actually, unassigned means questions that are NOT in any set at all.
   const assignedQuestionIds = new Set(sets.flatMap(s => s.questionIds));
   const unassignedQuestions = filteredQuestions.filter(q => !assignedQuestionIds.has(q.id));
+  const activeSet = activeSetViewId ? sets.find((set) => set.id === activeSetViewId) || null : null;
+  const activeSetQuestions = useMemo(() => {
+    if (!activeSet) return [];
+    return questions
+      .filter((q) => activeSet.questionIds.includes(q.id))
+      .filter(
+        (q) =>
+          !searchQuery ||
+          q.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          q.tags.some((t) => t.toLowerCase().includes(searchQuery.toLowerCase())),
+      );
+  }, [activeSet, questions, searchQuery]);
+
+  const cleanOptionText = (value: string): string => cleanMcqText(value);
+
+  const parseInlinePackedOptions = (text: string): { stem: string; options: string[] } | null => {
+    const parsed = parseInlineLabeledMcq(text);
+    if (!parsed) return null;
+    return { stem: parsed.stem, options: parsed.options };
+  };
+
+  const extractOptionsFromBlock = (text: string): string[] => {
+    const lines = text.split('\n').map((line) => line.trim()).filter(Boolean);
+    if (lines.length === 0) return [];
+
+    const optionPrefixRegex =
+      /^(?:\(?([A-Za-z])\)|([A-Za-z])[).:-]|([0-9]{1,2})[).:-]|[•\-*])\s*(.+)$/;
+    const prefixed = lines
+      .map((line) => line.match(optionPrefixRegex))
+      .filter((m): m is RegExpMatchArray => Boolean(m))
+      .map((m) => cleanOptionText(m[4]));
+
+    if (prefixed.length >= 2) {
+      return prefixed.filter(Boolean);
+    }
+
+    const packed = parseInlinePackedOptions(text);
+    if (packed && packed.options.length >= 2) {
+      return packed.options;
+    }
+
+    if (lines.length >= 2) {
+      return lines.map(cleanOptionText).filter(Boolean);
+    }
+
+    return [];
+  };
+
+  const parseQuestionAndOptions = (text: string): { content: string; options: string[] } | null => {
+    const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+    if (lines.length === 0) return null;
+
+    const optionPrefixRegex =
+      /^(?:\(?([A-Za-z])\)|([A-Za-z])[).:-]|([0-9]{1,2})[).:-]|[•\-*])\s*(.+)$/;
+
+    const questionLines: string[] = [];
+    const optionLines: string[] = [];
+    let foundOptions = false;
+
+    for (const line of lines) {
+      const match = line.match(optionPrefixRegex);
+      if (match) {
+        foundOptions = true;
+        optionLines.push(cleanOptionText(match[4]));
+      } else if (foundOptions) {
+        optionLines.push(cleanOptionText(line));
+      } else {
+        questionLines.push(line);
+      }
+    }
+
+    const optionCandidates = optionLines.filter(Boolean);
+    if (optionCandidates.length >= 2 && questionLines.length > 0) {
+      return { content: questionLines.join('\n'), options: optionCandidates };
+    }
+
+    const packed = parseInlinePackedOptions(text);
+    if (packed && packed.options.length >= 2) {
+      return { content: packed.stem, options: packed.options };
+    }
+
+    return null;
+  };
 
   const toggleQuestionSelection = (id: string) => {
     setSelectedQuestionIds(prev => 
@@ -120,6 +203,7 @@ const Questions = () => {
     setSetEditData({
       title: setToEdit.title,
       description: setToEdit.description || '',
+      cardGradient: setToEdit.cardGradient || 'default',
     });
     setIsEditSetModalOpen(true);
   };
@@ -130,6 +214,7 @@ const Questions = () => {
     updateSet(editingSetId, {
       title: setEditData.title.trim(),
       description: setEditData.description.trim(),
+      cardGradient: setEditData.cardGradient || 'default',
     });
     setIsEditSetModalOpen(false);
     setEditingSetId('');
@@ -152,12 +237,13 @@ const Questions = () => {
     addSet({
         title: setCreationData.title,
         description: setCreationData.description,
+        cardGradient: setCreationData.cardGradient || 'default',
         questionIds: selectedQuestionIds
     });
 
     // Reset selection and close modal
     setSelectedQuestionIds([]);
-    setSetCreationData({ title: '', description: '' });
+    setSetCreationData({ title: '', description: '', cardGradient: 'default' });
     setIsSetModalOpen(false);
   };
 
@@ -166,7 +252,7 @@ const Questions = () => {
     setIsSetBuilderMode(true);
     setEditingQuestion(null);
     setFormData({ content: '', rationale: '', answer: [], options: [], tags: '', imageUrl: '' });
-    setSetCreationData({ title: '', description: '' });
+    setSetCreationData({ title: '', description: '', cardGradient: 'default' });
     setDraftQuestions([]);
     setIsModalOpen(true);
   };
@@ -174,12 +260,15 @@ const Questions = () => {
   const handleOpenModal = (question?: Question) => {
     setIsSetBuilderMode(false);
     if (question) {
+      const parsed = (!question.options || question.options.length === 0)
+        ? parseQuestionAndOptions(question.content)
+        : null;
       setEditingQuestion(question);
       setFormData({
-        content: question.content,
+        content: parsed?.content || question.content,
         rationale: question.rationale,
         answer: Array.isArray(question.answer) ? question.answer : [question.answer],
-        options: question.options || [],
+        options: parsed?.options || question.options || [],
         tags: question.tags.join(', '),
         imageUrl: question.imageUrl || '',
       });
@@ -228,6 +317,7 @@ const Questions = () => {
     addSet({
         title: setCreationData.title,
         description: setCreationData.description,
+        cardGradient: setCreationData.cardGradient || 'default',
         questionIds: newQuestionIds
     });
 
@@ -343,37 +433,9 @@ const Questions = () => {
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     e.preventDefault();
     const text = e.clipboardData.getData('text');
-    
-    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-    if (lines.length === 0) return;
 
-    const optionPatterns = [
-        /^\(?[A-Z]\)?[.)]\s+/i, // A. Option / A) Option / (A) Option
-        /^[0-9]+[.)]\s+/,       // 1. Option / 1) Option
-        /^[•\-*]\s+/,           // Bullet points
-        /^\[\s*\]\s+/           // [ ] Checkbox
-    ];
-
-    const questionLines: string[] = [];
-    const options: string[] = [];
-    let foundOptions = false;
-
-    for (const line of lines) {
-        const pattern = optionPatterns.find(p => p.test(line));
-        if (pattern) {
-            foundOptions = true;
-            const cleanLine = line.replace(pattern, '').trim();
-            options.push(cleanLine);
-        } else if (foundOptions) {
-             // If we already found options, assume subsequent lines are options
-             // unless they are empty (filtered out)
-             options.push(line);
-        } else {
-            questionLines.push(line);
-        }
-    }
-
-    if (options.length === 0) {
+    const parsed = parseQuestionAndOptions(text);
+    if (!parsed || parsed.options.length === 0) {
         // Fallback: Check if the last few lines are short, might be options without prefixes?
         // For now, just paste as content
         const startPos = e.currentTarget.selectionStart;
@@ -386,9 +448,36 @@ const Questions = () => {
 
     setFormData(prev => ({
         ...prev,
-        content: questionLines.join('\n'),
-        options: options
+        content: parsed.content,
+        options: parsed.options
     }));
+  };
+
+  const handleOptionPaste = (index: number, e: React.ClipboardEvent<HTMLInputElement>) => {
+    const text = e.clipboardData.getData('text');
+    const parsedOptions = extractOptionsFromBlock(text);
+    if (parsedOptions.length < 2) return;
+    e.preventDefault();
+
+    setFormData((prev) => {
+      const oldOption = prev.options[index] || '';
+      const nextOptions = [...prev.options];
+      nextOptions.splice(index, 1, ...parsedOptions);
+
+      let nextAnswers = [...prev.answer];
+      if (oldOption && nextAnswers.includes(oldOption)) {
+        nextAnswers = nextAnswers.filter((a) => a !== oldOption);
+        if (parsedOptions[0]) {
+          nextAnswers.push(parsedOptions[0]);
+        }
+      }
+
+      return {
+        ...prev,
+        options: nextOptions,
+        answer: Array.from(new Set(nextAnswers)),
+      };
+    });
   };
 
   const addOption = () => {
@@ -482,139 +571,199 @@ const Questions = () => {
         </div>
       </div>
 
-      <div className="space-y-8">
-        {questionsBySet.map((set) => {
-            const isCollapsed = collapsedSets[set.id];
-            return (
-                <div key={set.id} className="space-y-4">
-                    <div 
-                        className="flex items-center gap-2 cursor-pointer group select-none"
-                        onClick={() => toggleSetCollapse(set.id)}
-                    >
-                        <div className="p-1 rounded-md hover:bg-muted transition-colors">
-                            {isCollapsed ? <ChevronRight className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Folder className="h-5 w-5 text-primary" />
-                            <h3 className="text-xl font-semibold">{set.title}</h3>
-                            <span className="text-sm text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-                                {set.questions.length}
-                            </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                             <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 px-2 text-xs"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleAddQuestionToSet(set.id);
-                                }}
-                             >
-                                <Plus className="h-3.5 w-3.5 mr-1" />
-                                Add Question
-                             </Button>
-                             <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={(e) => {
-                                 e.stopPropagation();
-                                 handleDeleteSet(set.id, set.title);
-                             }}>
-                                 <Trash2 className="h-4 w-4" />
-                             </Button>
-                        </div>
-                        <div className="flex-1 h-px bg-border/50 ml-4" />
-                    </div>
-
-                    {!isCollapsed && (
-                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 pl-0 md:pl-4">
-                            {set.questions.map((question) => {
-                                const isSelected = selectedQuestionIds.includes(question.id);
-                                return (
-                                <motion.div
-                                    layout
-                                    initial={{ opacity: 0, scale: 0.9 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    exit={{ opacity: 0, scale: 0.9 }}
-                                    key={`${set.id}-${question.id}`} // Use composite key to avoid duplicates issues if in multiple sets
-                                    className={`group relative rounded-2xl border ${isSelected ? 'border-primary ring-1 ring-primary bg-primary/5' : 'border-border/50 bg-card/50'} backdrop-blur-sm p-6 shadow-sm transition-all duration-300 hover:shadow-xl hover:-translate-y-1 flex flex-col justify-between cursor-pointer`}
-                                    onClick={(e) => {
-                                        if ((e.target as HTMLElement).closest('button')) return;
-                                        toggleQuestionSelection(question.id);
-                                    }}
-                                >
-                                    <div className="absolute top-4 right-4 z-10">
-                                        <div className={`h-5 w-5 rounded-md border flex items-center justify-center transition-colors ${isSelected ? 'bg-primary border-primary text-primary-foreground' : 'border-muted-foreground/50 bg-background/50'}`}>
-                                            {isSelected && <Check className="h-3 w-3" />}
-                                        </div>
-                                    </div>
-                                    <div>
-                                    <div className="mb-4 pr-6">
-                                        <div className="font-semibold line-clamp-3 mb-2">
-                                            <RichText content={question.content} />
-                                        </div>
-                                        {question.imageUrl && (
-                                            <div className="mb-2 relative rounded-md overflow-hidden bg-muted/20 h-32 w-full">
-                                                <img 
-                                                    src={question.imageUrl} 
-                                                    alt="Question Reference" 
-                                                    className="w-full h-full object-cover"
-                                                    loading="lazy"
-                                                />
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div className="text-sm text-muted-foreground line-clamp-3 mb-4">
-                                        <span className="font-medium text-foreground">Answer: </span>
-                                        {Array.isArray(question.answer) 
-                                            ? question.answer.map((a, i) => <span key={i}><RichText content={a} />{i < question.answer.length - 1 ? ', ' : ''}</span>)
-                                            : <RichText content={question.answer} />
-                                        }
-                                    </div>
-                                    </div>
-                                    <div className="flex justify-end gap-2 opacity-0 transition-opacity group-hover:opacity-100">
-                                    <Button variant="ghost" size="sm" onClick={() => handleOpenModal(question)}>
-                                        <Edit2 className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="text-destructive hover:text-destructive"
-                                        onClick={() => deleteQuestion(question.id)}
-                                    >
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                    </div>
-                                </motion.div>
-                                )
-                            })}
-                            {set.questions.length === 0 && (
-                                <div className="col-span-full py-8 text-center text-muted-foreground border border-dashed rounded-lg">
-                                    No questions in this set match your search.
-                                </div>
-                            )}
-                        </div>
-                    )}
+      {!activeSet && (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {questionsBySet.map((set) => (
+            <motion.div
+              key={set.id}
+              layout
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className={`group relative rounded-2xl border backdrop-blur-sm p-6 shadow-sm transition-all duration-300 hover:shadow-xl hover:-translate-y-1 cursor-pointer ${getCardGradientClasses(set.cardGradient)}`}
+              onClick={() => setActiveSetViewId(set.id)}
+            >
+              <div>
+                <div className="flex items-start justify-between">
+                  <div className="space-y-1">
+                    <h3 className="font-semibold text-lg">{set.title}</h3>
+                    <p className="text-sm text-muted-foreground line-clamp-2">
+                      {set.description || 'No description'}
+                    </p>
+                  </div>
+                  <div className="rounded-full bg-primary/10 p-2.5 text-primary">
+                    <Layers className="h-5 w-5" />
+                  </div>
                 </div>
-            );
-        })}
+                <div className="mt-4">
+                  <span className="text-sm font-medium">{set.questions.length} Questions</span>
+                </div>
+              </div>
+              <div className="mt-6 flex items-center justify-between gap-2 flex-wrap">
+                <Button type="button" variant="outline" size="sm">
+                  View Questions
+                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-2 text-xs"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleAddQuestionToSet(set.id);
+                    }}
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1" />
+                    Add Question
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenEditSet(set.id);
+                    }}
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteSet(set.id, set.title);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      )}
 
-        {/* Unassigned Questions Section */}
-        {unassignedQuestions.length > 0 && (
-            <div className="space-y-4">
-                 <div className="flex items-center gap-2">
-                    <div className="p-1">
-                        <List className="h-5 w-5 text-muted-foreground" />
+      {activeSet && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <Button type="button" variant="outline" onClick={() => setActiveSetViewId(null)}>
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              Back to Sets
+            </Button>
+            <div className="flex gap-2">
+              <Button type="button" variant="secondary" onClick={() => handleAddQuestionToSet(activeSet.id)}>
+                <Plus className="h-4 w-4 mr-1" />
+                Add Question
+              </Button>
+              <Button type="button" variant="ghost" size="icon" onClick={() => handleOpenEditSet(activeSet.id)}>
+                <Edit2 className="h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="text-destructive hover:text-destructive"
+                onClick={() => handleDeleteSet(activeSet.id, activeSet.title)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          <div className={`rounded-2xl border p-5 ${getCardGradientClasses(activeSet.cardGradient)}`}>
+            <h3 className="text-xl font-semibold">{activeSet.title}</h3>
+            <p className="text-sm text-muted-foreground mt-1">{activeSet.description || 'No description'}</p>
+            <p className="text-sm font-medium mt-3">{activeSetQuestions.length} Questions</p>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {activeSetQuestions.map((question) => {
+              const isSelected = selectedQuestionIds.includes(question.id);
+              return (
+                <motion.div
+                  layout
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  key={`${activeSet.id}-${question.id}`}
+                  className={`group relative rounded-2xl border ${isSelected ? 'border-primary ring-1 ring-primary bg-primary/5' : 'border-border/50 bg-card/50'} backdrop-blur-sm p-6 shadow-sm transition-all duration-300 hover:shadow-xl hover:-translate-y-1 flex flex-col justify-between cursor-pointer`}
+                  onClick={(e) => {
+                    if ((e.target as HTMLElement).closest('button')) return;
+                    toggleQuestionSelection(question.id);
+                  }}
+                >
+                  <div className="absolute top-4 right-4 z-10">
+                    <div className={`h-5 w-5 rounded-md border flex items-center justify-center transition-colors ${isSelected ? 'bg-primary border-primary text-primary-foreground' : 'border-muted-foreground/50 bg-background/50'}`}>
+                      {isSelected && <Check className="h-3 w-3" />}
                     </div>
-                    <h3 className="text-xl font-semibold text-muted-foreground">Unassigned Questions</h3>
-                    <span className="text-sm text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-                        {unassignedQuestions.length}
-                    </span>
-                    <Button variant="destructive" size="sm" onClick={handleDeleteAllUnassigned} className="ml-4 h-7 text-xs">
-                        Delete All ({unassignedQuestions.length})
+                  </div>
+                  <div>
+                    <div className="mb-4 pr-6">
+                      <div className="font-semibold line-clamp-3 mb-2">
+                        <RichText content={question.content} />
+                      </div>
+                      {question.imageUrl && (
+                        <div className="mb-2 relative rounded-md overflow-hidden bg-muted/20 h-32 w-full">
+                          <img
+                            src={question.imageUrl}
+                            alt="Question Reference"
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-sm text-muted-foreground line-clamp-3 mb-4">
+                      <span className="font-medium text-foreground">Answer: </span>
+                      {Array.isArray(question.answer)
+                        ? question.answer.map((a, i) => <span key={i}><RichText content={a} />{i < question.answer.length - 1 ? ', ' : ''}</span>)
+                        : <RichText content={question.answer} />}
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+                    <Button variant="ghost" size="sm" onClick={() => handleOpenModal(question)}>
+                      <Edit2 className="h-4 w-4" />
                     </Button>
-                    <div className="flex-1 h-px bg-border/50 ml-4" />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => deleteQuestion(question.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </motion.div>
+              );
+            })}
+            {activeSetQuestions.length === 0 && (
+              <div className="col-span-full py-8 text-center text-muted-foreground border border-dashed rounded-lg">
+                No questions in this set match your search.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Unassigned Questions Section */}
+      {unassignedQuestions.length > 0 && (
+            <div className="space-y-4 mt-8">
+                <div className="flex items-center gap-2">
+                <div className="p-1">
+                    <List className="h-5 w-5 text-muted-foreground" />
                 </div>
-                
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 pl-0 md:pl-4">
+                <h3 className="text-xl font-semibold text-muted-foreground">Unassigned Questions</h3>
+                <span className="text-sm text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                    {unassignedQuestions.length}
+                </span>
+                <Button variant="destructive" size="sm" onClick={handleDeleteAllUnassigned} className="ml-4 h-7 text-xs">
+                    Delete All ({unassignedQuestions.length})
+                </Button>
+                <div className="flex-1 h-px bg-border/50 ml-4" />
+            </div>
+            
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 pl-0 md:pl-4">
                     {unassignedQuestions.map((question) => {
                         const isSelected = selectedQuestionIds.includes(question.id);
                         return (
@@ -675,16 +824,15 @@ const Questions = () => {
                         </motion.div>
                         )
                     })}
-                </div>
+            </div>
             </div>
         )}
 
-        {questionsBySet.length === 0 && unassignedQuestions.length === 0 && (
-          <div className="col-span-full flex flex-col items-center justify-center py-12 text-muted-foreground">
-            <p>No questions found.</p>
-          </div>
-        )}
-      </div>
+      {questionsBySet.length === 0 && unassignedQuestions.length === 0 && (
+        <div className="col-span-full flex flex-col items-center justify-center py-12 text-muted-foreground">
+          <p>No questions found.</p>
+        </div>
+      )}
 
       {/* Set Creation Modal */}
       <Modal
@@ -710,6 +858,20 @@ const Questions = () => {
                     value={setCreationData.description}
                     onChange={(e) => setSetCreationData({ ...setCreationData, description: e.target.value })}
                 />
+            </div>
+            <div className="space-y-2">
+                <label className="text-sm font-medium leading-none">Card Color</label>
+                <select
+                    value={setCreationData.cardGradient}
+                    onChange={(e) => setSetCreationData({ ...setCreationData, cardGradient: e.target.value })}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                    {CARD_GRADIENT_OPTIONS.map((option) => (
+                        <option key={option.id} value={option.id}>
+                            {option.label}
+                        </option>
+                    ))}
+                </select>
             </div>
             
             <div className="space-y-2">
@@ -760,6 +922,20 @@ const Questions = () => {
                     onChange={(e) => setSetEditData({ ...setEditData, description: e.target.value })}
                 />
             </div>
+            <div className="space-y-2">
+                <label className="text-sm font-medium leading-none">Card Color</label>
+                <select
+                    value={setEditData.cardGradient}
+                    onChange={(e) => setSetEditData({ ...setEditData, cardGradient: e.target.value })}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                    {CARD_GRADIENT_OPTIONS.map((option) => (
+                        <option key={option.id} value={option.id}>
+                            {option.label}
+                        </option>
+                    ))}
+                </select>
+            </div>
             <div className="pt-4 flex justify-end items-center">
                 <Button type="submit">Save Changes</Button>
             </div>
@@ -798,6 +974,20 @@ const Questions = () => {
                              value={setCreationData.description}
                              onChange={(e) => setSetCreationData({ ...setCreationData, description: e.target.value })}
                          />
+                    </div>
+                    <div className="space-y-2">
+                         <label className="text-sm font-medium leading-none">Card Color</label>
+                         <select
+                            value={setCreationData.cardGradient}
+                            onChange={(e) => setSetCreationData({ ...setCreationData, cardGradient: e.target.value })}
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                         >
+                            {CARD_GRADIENT_OPTIONS.map((option) => (
+                                <option key={option.id} value={option.id}>
+                                    {option.label}
+                                </option>
+                            ))}
+                         </select>
                     </div>
                 </div>
                 <div className="h-px bg-border/50 my-2" />
@@ -891,6 +1081,7 @@ const Questions = () => {
                                     <Input
                                         value={option}
                                         onChange={(e) => updateOption(index, e.target.value)}
+                                        onPaste={(e) => handleOptionPaste(index, e)}
                                         placeholder={`Option ${index + 1}`}
                                         className={`flex-1 ${isCorrect ? "border-green-500 ring-1 ring-green-500/20" : ""}`}
                                     />

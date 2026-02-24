@@ -12,10 +12,13 @@ import Practice from './pages/Practice';
 import Profile from './pages/Profile';
 import Calendar from './pages/Calendar';
 import Notes from './pages/Notes';
+import Discover from './pages/Discover';
 import Login from './pages/Auth/Login';
 import Signup from './pages/Auth/Signup';
 import ProfileSelect from './pages/Auth/ProfileSelect';
 import { Logo } from './components/ui/Logo';
+import ErrorBoundary from './components/ErrorBoundary';
+import { getSupabaseClient } from './services/marketplace/supabaseClient';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, activeProfileId } = useStore();
@@ -42,6 +45,7 @@ const AnimatedRoutes = () => {
         <Route path="calendar" element={<Calendar />} />
         <Route path="notes" element={<Notes />} />
         <Route path="questions" element={<Questions />} />
+        <Route path="discover" element={<Discover />} />
         <Route path="sets" element={<ExamSets />} />
         <Route path="practice/:setId" element={<Practice />} />
         <Route path="flashcards" element={<Flashcards />} />
@@ -53,10 +57,31 @@ const AnimatedRoutes = () => {
 };
 
 const App = () => {
-  const { userProfile } = useStore();
+  const { userProfile, isAuthenticated, authenticateWithSupabase } = useStore();
   
   // Initialize notification scheduler
   useNotificationScheduler();
+
+  useEffect(() => {
+    const supabase = getSupabaseClient();
+    if (!supabase || isAuthenticated) return;
+
+    void supabase.auth.getSession().then(({ data }) => {
+      const user = data.session?.user;
+      if (!user?.email) return;
+      const name =
+        (user.user_metadata?.full_name as string | undefined) ||
+        (user.user_metadata?.name as string | undefined);
+      const field = (user.user_metadata?.field as string | undefined) || undefined;
+      const country = (user.user_metadata?.country as string | undefined) || undefined;
+      authenticateWithSupabase({
+        email: user.email,
+        name,
+        field,
+        country,
+      });
+    });
+  }, [authenticateWithSupabase, isAuthenticated]);
 
   useEffect(() => {
     // Global Keyboard Shortcuts
@@ -133,7 +158,9 @@ const App = () => {
 
   return (
     <HashRouter>
-      <AnimatedRoutes />
+      <ErrorBoundary>
+        <AnimatedRoutes />
+      </ErrorBoundary>
     </HashRouter>
   );
 };

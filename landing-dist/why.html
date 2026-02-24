@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Why Qudoro</title>
+    <meta name="description" content="Why Qudoro exists and how students use it effectively." />
+    <link rel="icon" href="/icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700;800&family=Manrope:wght@400;500;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="bg-shape bg-shape-1"></div>
+    <div class="bg-shape bg-shape-2"></div>
+
+    <header class="container nav">
+      <a class="brand" href="/"><img src="/icon.png" alt="Qudoro logo" /><span>Qudoro</span></a>
+      <div class="nav-links">
+        <a href="/download">Download</a>
+        <a href="/features">Features</a>
+        <a href="/tour">Tour</a>
+        <a href="/why">Why Qudoro</a>
+        <a href="/forum">Forum</a>
+      </div>
+    </header>
+
+    <main class="container section">
+      <h1 class="page-title">Why Qudoro</h1>
+      <p class="section-intro">Qudoro was designed to reduce tool-switching and keep serious exam prep structured.</p>
+
+      <section class="section compact">
+        <h2>Student Workflow</h2>
+        <div class="flow-grid">
+          <article class="flow-item"><span>1</span><h3>Build</h3><p>Create or import question sets.</p></article>
+          <article class="flow-item"><span>2</span><h3>Practice</h3><p>Run exams and identify weak areas.</p></article>
+          <article class="flow-item"><span>3</span><h3>Reinforce</h3><p>Use flashcards and notes for retention.</p></article>
+          <article class="flow-item"><span>4</span><h3>Improve</h3><p>Return to sets and iterate continuously.</p></article>
+        </div>
+      </section>
+
+      <section class="section compact section-why">
+        <h2>Trust & Reliability</h2>
+        <div class="trust-grid">
+          <article><h3>Secure Auth</h3><p>Supabase auth with confirmation and password reset flows.</p></article>
+          <article><h3>RLS-Protected Data</h3><p>Marketplace and forum tables are governed by row-level security policies.</p></article>
+          <article><h3>Community-Driven Roadmap</h3><p>Forum requests and voting prioritize features users actually need.</p></article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="container footer">
+      <p>&copy; <span id="year"></span> Qudoro. All rights reserved.</p>
+      <div class="footer-links">
+        <a href="/">Home</a>
+        <a href="/forum">Forum</a>
+        <a href="/terms">Terms</a>
+        <a href="/privacy">Privacy</a>
+      </div>
+    </footer>
+
+    <script>
+      document.getElementById('year').textContent = String(new Date().getFullYear());
+    </script>
+  </body>
+</html>

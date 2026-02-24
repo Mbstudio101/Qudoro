@@ -35,6 +35,10 @@ export interface ExamSet {
   title: string;
   description: string;
   cardGradient?: string;
+  sourceProvider?: 'quizlet';
+  sourceId?: string;
+  sourceUrl?: string;
+  lastSyncedAt?: number;
   questionIds: string[];
   createdAt: number;
 }
@@ -838,9 +842,24 @@ export const useStore = create<AppState>()(
           sets: state.sets.map((item) => (item.id === id ? { ...item, ...s } : item)),
         })),
       deleteSet: (id) =>
-        set((state) => ({
-          sets: state.sets.filter((item) => item.id !== id),
-        })),
+        set((state) => {
+          const setToDelete = state.sets.find((item) => item.id === id);
+          if (!setToDelete) {
+            return state;
+          }
+
+          const questionIdsToDelete = new Set(setToDelete.questionIds);
+
+          return {
+            questions: state.questions.filter((q) => !questionIdsToDelete.has(q.id)),
+            sets: state.sets
+              .filter((item) => item.id !== id)
+              .map((item) => ({
+                ...item,
+                questionIds: item.questionIds.filter((qid) => !questionIdsToDelete.has(qid)),
+              })),
+          };
+        }),
       addQuestionToSet: (setId, questionId) =>
         set((state) => ({
           sets: state.sets.map((s) =>

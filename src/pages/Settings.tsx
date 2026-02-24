@@ -5,9 +5,21 @@ import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
 import { useStore, Question } from '../store/useStore';
+import { cleanMcqText, parseInlineLabeledMcq } from '../utils/mcqParser';
 
 const Settings = () => {
-  const { userProfile, setUserProfile, questions, sets, importData, resetData, addQuestion, addSet, addQuestionToSet } = useStore();
+  const {
+    userProfile,
+    setUserProfile,
+    questions,
+    sets,
+    importData,
+    resetData,
+    addQuestion,
+    addSet,
+    updateSet,
+    deleteQuestion,
+  } = useStore();
   
   // Update State
   const [status, setStatus] = useState<string>('idle'); 
@@ -60,15 +72,26 @@ const Settings = () => {
     return 'Failed to import. Please check the URL.';
   };
 
+  const extractQuizletSetId = (url: string): string | null => {
+    const match = url.match(/quizlet\.com\/(\d+)(?:\/|$)/i);
+    return match?.[1] || null;
+  };
+
   const normalizeText = (value: string): string =>
     value.toLowerCase().replace(/[\s\W_]+/g, '');
 
-  const parseFrontAsMcq = (frontText: string): { stem: string; options: string[]; labels: string[] } | null => {
-    const text = frontText.replace(/\r\n/g, '\n').trim();
-    if (!text) return null;
+  const cleanOptionText = (value: string): string => cleanMcqText(value);
 
-    const optionLineRegex = /^\s*(?:[-*•]\s*)?(?:\(?([A-Za-z])\)|([A-Za-z])[).:-]|([0-9]{1,2})[).:-])\s*(.+)\s*$/;
-    const lines = text.split('\n').map((line) => line.trim()).filter(Boolean);
+  const parseFrontAsMcq = (frontText: string): { stem: string; options: string[]; labels: string[] } | null => {
+    const rawText = frontText
+      .replace(/\r\n/g, '\n')
+      .replace(/\u00a0/g, ' ');
+    const compactText = rawText.replace(/\s+/g, ' ').trim();
+    if (!compactText) return null;
+
+    const optionLineRegex =
+      /^\s*(?:[-*•]\s*)?(?:\(?([A-Za-z])\)|([A-Za-z])[).:-]|([0-9]{1,2})[).:-])\s*(.+)\s*$/;
+    const lines = rawText.split('\n').map((line) => line.trim()).filter(Boolean);
     const lineMatches = lines
       .map((line, index) => ({ line, index, match: line.match(optionLineRegex) }))
       .filter((entry): entry is { line: string; index: number; match: RegExpMatchArray } => Boolean(entry.match));
@@ -76,7 +99,7 @@ const Settings = () => {
     if (lineMatches.length >= 2) {
       const firstOptionLine = lineMatches[0].index;
       const stem = lines.slice(0, firstOptionLine).join(' ').trim();
-      const options = lineMatches.map((entry) => entry.match[4].trim()).filter(Boolean);
+      const options = lineMatches.map((entry) => cleanOptionText(entry.match[4])).filter(Boolean);
       const labels = lineMatches.map((entry) =>
         String(entry.match[1] || entry.match[2] || entry.match[3] || '').toLowerCase()
       );
@@ -85,32 +108,10 @@ const Settings = () => {
       }
     }
 
-    const inlineRegex = /(?:^|\s)(?:\(?([A-Za-z])\)|([A-Za-z])[).:-]|([0-9]{1,2})[).:-])\s+/g;
-    const matches = [...text.matchAll(inlineRegex)];
-    if (matches.length < 2) return null;
-
-    const firstIndex = matches[0].index;
-    if (firstIndex === undefined) return null;
-
-    const stem = text.slice(0, firstIndex).trim() || 'Question';
-    const labels = matches.map((m) => String(m[1] || m[2] || m[3] || '').toLowerCase());
-    const options: string[] = [];
-
-    matches.forEach((match, index) => {
-      const currentIndex = match.index;
-      if (currentIndex === undefined) return;
-      const start = currentIndex + match[0].length;
-      const nextIndex = matches[index + 1]?.index;
-      const end = nextIndex === undefined ? text.length : nextIndex;
-      const option = text.slice(start, end).trim();
-      if (option) options.push(option);
-    });
-
-    if (options.length >= 2) {
-      return { stem, options, labels };
-    }
-
-    return null;
+    // Handles packed formats like "...needed?A. ...B. ...C. ...D..." including jammed labels.
+    const parsedInline = parseInlineLabeledMcq(compactText);
+    if (!parsedInline) return null;
+    return { stem: parsedInline.stem || 'Question', options: parsedInline.options, labels: parsedInline.labels };
   };
 
   const resolveMcqAnswer = (backText: string, options: string[], labels: string[]): string => {
@@ -146,6 +147,84 @@ const Settings = () => {
     if (partialMatch) return partialMatch;
 
     return cleaned || trimmed;
+  };
+
+  const deriveMcqRationale = (
+    backText: string,
+    answerText: string,
+    options: string[],
+    labels: string[],
+  ): string => {
+    const trimmed = backText.trim();
+    if (!trimmed) return '';
+
+    const withoutPrefix = trimmed
+      .replace(/^(?:answer|ans|correct answer|correct)\s*[:-]?\s*/i, '')
+      .replace(/^["'“”‘’]+|["'“”‘’]+$/g, '')
+      .trim();
+
+    if (!withoutPrefix) return '';
+
+    const asSingleToken = withoutPrefix.match(/^\(?([A-Za-z0-9]{1,2})\)?[).:-]?\s*$/);
+    if (asSingleToken) {
+      const token = asSingleToken[1].toLowerCase();
+      if (labels.includes(token)) return '';
+      if (/^\d+$/.test(token)) {
+        const numericIndex = Number.parseInt(token, 10) - 1;
+        if (numericIndex >= 0 && numericIndex < options.length) return '';
+      }
+    }
+
+    if (normalizeText(withoutPrefix) === normalizeText(answerText)) return '';
+
+    const answerPrefixRegex = new RegExp(`^${answerText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*[:\\-]?\\s*`, 'i');
+    if (answerPrefixRegex.test(withoutPrefix)) {
+      const trailing = withoutPrefix.replace(answerPrefixRegex, '').trim();
+      return trailing && normalizeText(trailing) !== normalizeText(answerText) ? trailing : '';
+    }
+
+    const labeledWithExplanation = withoutPrefix.match(/^\(?([A-Za-z0-9]{1,2})\)?[).:-]\s*(.+)$/);
+    if (labeledWithExplanation) {
+      const token = labeledWithExplanation[1].toLowerCase();
+      const trailing = labeledWithExplanation[2].trim();
+      const labelIndex = labels.findIndex((label) => label === token);
+      if (labelIndex >= 0 && options[labelIndex] && normalizeText(options[labelIndex]) === normalizeText(answerText)) {
+        return trailing && normalizeText(trailing) !== normalizeText(answerText) ? trailing : '';
+      }
+      if (/^\d+$/.test(token)) {
+        const numericIndex = Number.parseInt(token, 10) - 1;
+        if (
+          numericIndex >= 0 &&
+          numericIndex < options.length &&
+          normalizeText(options[numericIndex]) === normalizeText(answerText)
+        ) {
+          return trailing && normalizeText(trailing) !== normalizeText(answerText) ? trailing : '';
+        }
+      }
+    }
+
+    return withoutPrefix;
+  };
+
+  const deriveCorrectOptionIndicesFromAnswer = (options: string[], answers: string[]): number[] => {
+    if (!options.length || !answers.length) return [];
+    const matches = answers
+      .map((ans) =>
+        options.findIndex((option) => normalizeText(option) === normalizeText(ans)),
+      )
+      .filter((index) => index >= 0);
+    if (matches.length > 0) return Array.from(new Set(matches));
+
+    const partialMatches = answers
+      .map((ans) =>
+        options.findIndex((option) => {
+          const a = normalizeText(ans);
+          const o = normalizeText(option);
+          return Boolean(a) && Boolean(o) && (o.includes(a) || a.includes(o));
+        }),
+      )
+      .filter((index) => index >= 0);
+    return Array.from(new Set(partialMatches));
   };
 
   const handleQuizletImport = async () => {
@@ -314,13 +393,43 @@ const Settings = () => {
 
         if (terms.length === 0) throw new Error('No flashcards found. The set might be private or the structure has changed.');
 
-        // Create Set first (empty) to ensure we have a container
-        const newSetId = addSet({
-            profileId: userProfile.id,
-            title: title,
-            description: `Imported from Quizlet (${terms.length} terms)`,
-            questionIds: []
-        });
+        const quizletSetId = extractQuizletSetId(quizletUrl);
+        const existingQuizletSet =
+          (quizletSetId
+            ? sets.find(
+                (set) =>
+                  set.profileId === userProfile.id &&
+                  set.sourceProvider === 'quizlet' &&
+                  set.sourceId === quizletSetId,
+              )
+            : null) ||
+          sets.find(
+            (set) =>
+              set.profileId === userProfile.id &&
+              set.sourceUrl === quizletUrl &&
+              set.description.toLowerCase().startsWith('imported from quizlet'),
+          ) ||
+          sets.find(
+            (set) =>
+              set.profileId === userProfile.id &&
+              set.title === title &&
+              set.description.toLowerCase().startsWith('imported from quizlet'),
+          ) ||
+          null;
+
+        // Create Set first (empty) when this is a new import.
+        const targetSetId = existingQuizletSet
+          ? existingQuizletSet.id
+          : addSet({
+              profileId: userProfile.id,
+              title: title,
+              description: `Imported from Quizlet (${terms.length} terms)`,
+              sourceProvider: quizletSetId ? 'quizlet' : undefined,
+              sourceId: quizletSetId || undefined,
+              sourceUrl: quizletUrl,
+              lastSyncedAt: Date.now(),
+              questionIds: [],
+            });
 
         const questionIds: string[] = [];
         
@@ -330,21 +439,32 @@ const Settings = () => {
             let options: string[] = [];
             let questionStyle = 'Flashcard';
             let answer = [t.def];
+            let selectionMode: 'single' | 'multiple' | 'none' = 'none';
+            let correctOptionIndices: number[] = [];
 
             const parsedMcq = parseFrontAsMcq(t.term);
             if (parsedMcq) {
                 content = parsedMcq.stem;
                 options = parsedMcq.options;
                 questionStyle = 'Multiple Choice';
-                answer = [resolveMcqAnswer(t.def, parsedMcq.options, parsedMcq.labels)];
+                const resolvedAnswer = resolveMcqAnswer(t.def, parsedMcq.options, parsedMcq.labels);
+                answer = [resolvedAnswer];
+                selectionMode = 'single';
+                correctOptionIndices = deriveCorrectOptionIndicesFromAnswer(options, answer);
             }
+
+            const rationale = parsedMcq
+              ? deriveMcqRationale(t.def, answer[0] || '', options, parsedMcq.labels)
+              : t.def;
 
             const newQ = {
                 profileId: userProfile.id,
                 content: content,
-                rationale: t.def, // Keep original definition as rationale
+                rationale,
                 answer: answer, // Store definition as the "answer" for flashcard mode
                 options: options, 
+                selectionMode,
+                correctOptionIndices,
                 tags: ['quizlet-import'],
                 domain: 'General',
                 questionStyle: questionStyle,
@@ -358,13 +478,40 @@ const Settings = () => {
             // The store generates the ID and returns it
             const realId = addQuestion(newQ);
             questionIds.push(realId);
-            addQuestionToSet(newSetId, realId);
         });
-        
-        console.log(`Imported Set ${newSetId} with questions:`, questionIds);
+
+        // Keep same set id for updates so every view that references this set stays in sync.
+        updateSet(targetSetId, {
+          title,
+          description: `Imported from Quizlet (${terms.length} terms)`,
+          sourceProvider: quizletSetId ? 'quizlet' : undefined,
+          sourceId: quizletSetId || undefined,
+          sourceUrl: quizletUrl,
+          lastSyncedAt: Date.now(),
+          questionIds,
+        });
+
+        if (existingQuizletSet) {
+          // Remove replaced questions only when they are not linked by any other set.
+          const staleQuestionIds = existingQuizletSet.questionIds.filter((id) => !questionIds.includes(id));
+          staleQuestionIds.forEach((oldQuestionId) => {
+            const usedInAnotherSet = sets.some(
+              (set) => set.id !== existingQuizletSet.id && set.questionIds.includes(oldQuestionId),
+            );
+            if (!usedInAnotherSet) {
+              deleteQuestion(oldQuestionId);
+            }
+          });
+        }
+
+        console.log(`Imported/updated Quizlet Set ${targetSetId} with questions:`, questionIds);
 
         setImportStatus('success');
-        setImportMsg(`Successfully imported "${title}" with ${terms.length} cards!`);
+        setImportMsg(
+          existingQuizletSet
+            ? `Successfully synced "${title}" with ${terms.length} cards.`
+            : `Successfully imported "${title}" with ${terms.length} cards!`,
+        );
         setQuizletUrl(''); // Reset input
 
     } catch (error: unknown) {

@@ -39,4 +39,8 @@ contextBridge.exposeInMainWorld('electron', {
     }
   },
   openExternal: (url: string) => ipcRenderer.invoke('open-external-url', url),
+  crypto: {
+    encrypt: (plaintext: string) => ipcRenderer.invoke('encrypt-sensitive', plaintext),
+    decrypt: (encryptedBase64: string) => ipcRenderer.invoke('decrypt-sensitive', encryptedBase64),
+  },
 });

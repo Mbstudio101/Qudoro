@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Feature Forum | Qudoro</title>
+    <meta name="description" content="Submit and track requested features for Qudoro." />
+    <link rel="icon" href="/icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700;800&family=Manrope:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --text: #0f172a;
+        --muted: #475569;
+        --border: rgba(15, 23, 42, 0.12);
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--text);
+        font-family: 'Manrope', system-ui, -apple-system, Segoe UI, sans-serif;
+        background:
+          radial-gradient(circle at 12% 12%, rgba(56, 189, 248, 0.24), transparent 38%),
+          radial-gradient(circle at 90% 10%, rgba(99, 102, 241, 0.2), transparent 34%),
+          linear-gradient(180deg, #f8fafc, #eef2ff 60%, #f8fafc);
+      }
+      .container { width: min(1080px, 94vw); margin-inline: auto; }
+      .nav {
+        padding: 1rem 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+      }
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.55rem;
+        font-family: 'Space Grotesk', sans-serif;
+        font-weight: 800;
+        text-decoration: none;
+        color: inherit;
+      }
+      .brand img { width: 34px; height: 34px; border-radius: 10px; }
+      .nav-links { display: flex; align-items: center; gap: 0.85rem; flex-wrap: wrap; }
+      .nav-links a { text-decoration: none; color: #334155; font-weight: 700; }
+      .hero {
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.84);
+        backdrop-filter: blur(8px);
+        padding: 1.1rem;
+      }
+      h1 {
+        margin: 0;
+        font-family: 'Space Grotesk', sans-serif;
+        font-size: clamp(1.4rem, 4vw, 2.2rem);
+      }
+      .hero p { margin: 0.6rem 0 0; color: var(--muted); max-width: 80ch; }
+      .layout {
+        display: grid;
+        grid-template-columns: 340px 1fr;
+        gap: 0.9rem;
+        padding: 0.9rem 0 2rem;
+      }
+      .panel {
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.86);
+        padding: 0.9rem;
+      }
+      .panel h2 { margin: 0 0 0.55rem; font-size: 1.1rem; }
+      .muted { color: var(--muted); }
+      label { display: block; margin-bottom: 0.35rem; font-size: 0.88rem; font-weight: 700; color: #334155; }
+      input, textarea, select {
+        width: 100%;
+        border: 1px solid rgba(15, 23, 42, 0.16);
+        border-radius: 10px;
+        padding: 0.6rem 0.65rem;
+        font: inherit;
+        background: rgba(255, 255, 255, 0.95);
+      }
+      textarea { min-height: 110px; resize: vertical; }
+      .field { margin-bottom: 0.65rem; }
+      .row { display: grid; gap: 0.55rem; grid-template-columns: 1fr 1fr; }
+      .btn {
+        border: 1px solid transparent;
+        border-radius: 10px;
+        padding: 0.6rem 0.72rem;
+        cursor: pointer;
+        font-weight: 700;
+      }
+      .btn-primary { color: #fff; background: linear-gradient(120deg, #0ea5e9, #1d4ed8); }
+      .btn-outline { color: #0f172a; background: #fff; border-color: rgba(15, 23, 42, 0.2); }
+      .btn:disabled { opacity: 0.6; cursor: default; }
+      .btn-row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+      .status {
+        margin-top: 0.55rem;
+        font-size: 0.86rem;
+        font-weight: 700;
+      }
+      .status.ok { color: #0f766e; }
+      .status.err { color: #991b1b; }
+      .request-list { display: grid; gap: 0.7rem; }
+      .request-card {
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.82);
+        padding: 0.85rem;
+      }
+      .request-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 0.8rem;
+      }
+      .request-card h3 { margin: 0 0 0.35rem; font-size: 1.04rem; }
+      .request-card p { margin: 0; color: #334155; white-space: pre-wrap; }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 0.24rem 0.58rem;
+        font-size: 0.75rem;
+        font-weight: 700;
+        background: #dbeafe;
+        color: #1e3a8a;
+      }
+      .request-meta {
+        margin-top: 0.55rem;
+        display: flex;
+        gap: 0.55rem;
+        flex-wrap: wrap;
+        font-size: 0.78rem;
+        color: #64748b;
+      }
+      .request-actions {
+        margin-top: 0.6rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      .vote-btn {
+        border: 1px solid rgba(15, 23, 42, 0.2);
+        background: #fff;
+        border-radius: 999px;
+        padding: 0.28rem 0.62rem;
+        font-size: 0.8rem;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .vote-btn.voted {
+        border-color: rgba(29, 78, 216, 0.35);
+        background: #dbeafe;
+        color: #1e40af;
+      }
+      .empty { padding: 0.85rem; border: 1px dashed rgba(15, 23, 42, 0.2); border-radius: 12px; color: #64748b; }
+      @media (max-width: 940px) {
+        .layout { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="container nav">
+      <a class="brand" href="/"><img src="/icon.png" alt="Qudoro logo" /><span>Qudoro</span></a>
+      <nav class="nav-links">
+        <a href="/">Home</a>
+        <a href="/download">Download</a>
+        <a href="/features">Features</a>
+        <a href="/tour">Tour</a>
+        <a href="/why">Why Qudoro</a>
+        <a href="/terms">Terms</a>
+        <a href="/privacy">Privacy</a>
+      </nav>
+    </header>
+
+    <main class="container">
+      <section class="hero">
+        <h1>Feature Request Forum</h1>
+        <p>
+          Sign in with the same Qudoro account and submit feature requests. Requests are visible to signed-in users so
+          everyone can align on what should be built next.
+        </p>
+      </section>
+
+      <section class="layout">
+        <aside class="panel">
+          <h2>Account</h2>
+          <p class="muted" id="auth-summary">Not signed in.</p>
+
+          <div id="auth-forms">
+            <div class="field">
+              <label for="auth-email">Email</label>
+              <input id="auth-email" type="email" placeholder="you@example.com" />
+            </div>
+            <div class="field">
+              <label for="auth-password">Password</label>
+              <input id="auth-password" type="password" placeholder="••••••••" />
+            </div>
+            <div class="btn-row">
+              <button id="sign-in" class="btn btn-primary">Sign in</button>
+              <button id="sign-up" class="btn btn-outline">Sign up</button>
+            </div>
+            <div class="status" id="auth-status"></div>
+          </div>
+
+          <div id="auth-actions" style="display:none">
+            <div class="btn-row">
+              <button id="sign-out" class="btn btn-outline">Sign out</button>
+            </div>
+          </div>
+
+          <hr style="border:none;border-top:1px solid var(--border); margin: 0.95rem 0;" />
+
+          <h2>Submit Request</h2>
+          <div id="composer-locked" class="muted">Sign in to submit a feature request.</div>
+          <form id="composer" style="display:none">
+            <div class="field">
+              <label for="req-title">Title</label>
+              <input id="req-title" maxlength="120" placeholder="Example: Add filter presets in Discover" required />
+            </div>
+            <div class="row">
+              <div class="field" style="margin:0">
+                <label for="req-category">Category</label>
+                <select id="req-category">
+                  <option value="general">General</option>
+                  <option value="ui-ux">UI/UX</option>
+                  <option value="study-flow">Study Flow</option>
+                  <option value="marketplace">Marketplace</option>
+                  <option value="security">Security</option>
+                </select>
+              </div>
+            </div>
+            <div class="field">
+              <label for="req-details">Details</label>
+              <textarea id="req-details" maxlength="2000" placeholder="Describe the feature, user need, and expected behavior..." required></textarea>
+            </div>
+            <button id="req-submit" class="btn btn-primary" type="submit">Post Request</button>
+            <div class="status" id="req-status"></div>
+          </form>
+        </aside>
+
+        <section class="panel">
+          <h2>Latest Requests</h2>
+          <p class="muted">Only signed-in users can view and post requests.</p>
+          <div id="request-list" class="request-list"></div>
+        </section>
+      </section>
+    </main>
+
+    <script type="module">
+      import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+      const SUPABASE_URL = 'https://oquvnagftccilrhdfifk.supabase.co';
+      const SUPABASE_ANON_KEY =
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9xdXZuYWdmdGNjaWxyaGRmaWZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0NTQyMjIsImV4cCI6MjA4NzAzMDIyMn0._76GurMKzN2roKM_BVYSHbT0sM4yt1_qtJsYbyQW8Ks';
+      const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+      const authSummary = document.getElementById('auth-summary');
+      const authForms = document.getElementById('auth-forms');
+      const authActions = document.getElementById('auth-actions');
+      const authStatus = document.getElementById('auth-status');
+      const composer = document.getElementById('composer');
+      const composerLocked = document.getElementById('composer-locked');
+      const reqStatus = document.getElementById('req-status');
+      const requestList = document.getElementById('request-list');
+
+      const authEmail = document.getElementById('auth-email');
+      const authPassword = document.getElementById('auth-password');
+      const signInBtn = document.getElementById('sign-in');
+      const signUpBtn = document.getElementById('sign-up');
+      const signOutBtn = document.getElementById('sign-out');
+      const reqTitle = document.getElementById('req-title');
+      const reqCategory = document.getElementById('req-category');
+      const reqDetails = document.getElementById('req-details');
+
+      let currentUser = null;
+      let voteCountsByRequest = new Map();
+      let votedRequestIds = new Set();
+
+      const setStatus = (el, text, isError = false) => {
+        el.textContent = text || '';
+        el.className = `status ${text ? (isError ? 'err' : 'ok') : ''}`;
+      };
+
+      const formatDate = (iso) => {
+        const dt = new Date(iso);
+        if (Number.isNaN(dt.getTime())) return '';
+        return dt.toLocaleString();
+      };
+
+      const renderRequests = (rows) => {
+        if (!currentUser) {
+          requestList.innerHTML = '<div class="empty">Sign in to view feature requests.</div>';
+          return;
+        }
+        if (!rows.length) {
+          requestList.innerHTML = '<div class="empty">No requests yet. Be the first to post one.</div>';
+          return;
+        }
+        requestList.innerHTML = rows
+          .map((row) => {
+            const safeTitle = String(row.title || '').replace(/</g, '&lt;');
+            const safeDetails = String(row.details || '').replace(/</g, '&lt;');
+            const safeCategory = String(row.category || 'general').replace(/</g, '&lt;');
+            const safeStatus = String(row.status || 'open').replace(/</g, '&lt;');
+            const safeAuthor = String(row.author_label || 'User').replace(/</g, '&lt;');
+            const votes = voteCountsByRequest.get(row.id) || 0;
+            const isVoted = votedRequestIds.has(row.id);
+            return `
+              <article class="request-card">
+                <div class="request-head">
+                  <div>
+                    <h3>${safeTitle}</h3>
+                    <p>${safeDetails}</p>
+                  </div>
+                  <span class="pill">${safeStatus}</span>
+                </div>
+                <div class="request-meta">
+                  <span>Category: ${safeCategory}</span>
+                  <span>By: ${safeAuthor}</span>
+                  <span>${formatDate(row.created_at)}</span>
+                </div>
+                <div class="request-actions">
+                  <button class="vote-btn ${isVoted ? 'voted' : ''}" data-request-id="${row.id}" type="button">
+                    ${isVoted ? 'Voted' : 'Vote'}
+                  </button>
+                  <span class="muted">${votes} vote${votes === 1 ? '' : 's'}</span>
+                </div>
+              </article>
+            `;
+          })
+          .join('');
+      };
+
+      const loadRequests = async () => {
+        if (!currentUser) {
+          renderRequests([]);
+          return;
+        }
+        const { data, error } = await supabase
+          .from('feature_requests')
+          .select('id,title,details,category,status,author_label,created_at')
+          .order('created_at', { ascending: false })
+          .limit(100);
+        if (error) {
+          renderRequests([]);
+          setStatus(reqStatus, error.message || 'Could not load requests.', true);
+          return;
+        }
+        const requestIds = (data || []).map((row) => row.id);
+        voteCountsByRequest = new Map();
+        votedRequestIds = new Set();
+        if (requestIds.length > 0) {
+          const { data: votesData, error: votesError } = await supabase
+            .from('feature_request_votes')
+            .select('request_id,user_id')
+            .in('request_id', requestIds);
+          if (!votesError && Array.isArray(votesData)) {
+            for (const voteRow of votesData) {
+              const requestId = voteRow.request_id;
+              voteCountsByRequest.set(requestId, (voteCountsByRequest.get(requestId) || 0) + 1);
+              if (voteRow.user_id === currentUser.id) {
+                votedRequestIds.add(requestId);
+              }
+            }
+          }
+        }
+
+        renderRequests(data || []);
+      };
+
+      const updateAuthUi = async () => {
+        const { data } = await supabase.auth.getSession();
+        currentUser = data.session?.user || null;
+
+        if (!currentUser) {
+          authSummary.textContent = 'Not signed in.';
+          authForms.style.display = '';
+          authActions.style.display = 'none';
+          composer.style.display = 'none';
+          composerLocked.style.display = '';
+          renderRequests([]);
+          return;
+        }
+
+        authSummary.textContent = `Signed in as ${currentUser.email}`;
+        authForms.style.display = 'none';
+        authActions.style.display = '';
+        composer.style.display = '';
+        composerLocked.style.display = 'none';
+        setStatus(authStatus, '');
+        await loadRequests();
+      };
+
+      signInBtn.addEventListener('click', async () => {
+        setStatus(authStatus, '');
+        const email = authEmail.value.trim();
+        const password = authPassword.value;
+        if (!email || !password) {
+          setStatus(authStatus, 'Enter email and password.', true);
+          return;
+        }
+        signInBtn.disabled = true;
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        signInBtn.disabled = false;
+        if (error) {
+          setStatus(authStatus, error.message || 'Sign in failed.', true);
+          return;
+        }
+        setStatus(authStatus, 'Signed in.');
+        await updateAuthUi();
+      });
+
+      signUpBtn.addEventListener('click', async () => {
+        setStatus(authStatus, '');
+        const email = authEmail.value.trim();
+        const password = authPassword.value;
+        if (!email || !password) {
+          setStatus(authStatus, 'Enter email and password.', true);
+          return;
+        }
+        signUpBtn.disabled = true;
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { emailRedirectTo: 'https://qudoro.com/confirm-email' },
+        });
+        signUpBtn.disabled = false;
+        if (error) {
+          setStatus(authStatus, error.message || 'Sign up failed.', true);
+          return;
+        }
+        setStatus(authStatus, 'Account created. Check your email to confirm, then sign in.');
+      });
+
+      signOutBtn.addEventListener('click', async () => {
+        await supabase.auth.signOut();
+        await updateAuthUi();
+      });
+
+      composer.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!currentUser) {
+          setStatus(reqStatus, 'Sign in first.', true);
+          return;
+        }
+        const title = reqTitle.value.trim();
+        const details = reqDetails.value.trim();
+        const category = reqCategory.value;
+        if (!title || !details) {
+          setStatus(reqStatus, 'Title and details are required.', true);
+          return;
+        }
+
+        const authorLabel =
+          currentUser.user_metadata?.full_name ||
+          currentUser.user_metadata?.name ||
+          currentUser.email ||
+          'Qudoro User';
+
+        const submitBtn = document.getElementById('req-submit');
+        submitBtn.disabled = true;
+        const { error } = await supabase.from('feature_requests').insert({
+          title,
+          details,
+          category,
+          created_by: currentUser.id,
+          author_label: authorLabel,
+        });
+        submitBtn.disabled = false;
+
+        if (error) {
+          setStatus(reqStatus, error.message || 'Could not submit request.', true);
+          return;
+        }
+        reqTitle.value = '';
+        reqDetails.value = '';
+        reqCategory.value = 'general';
+        setStatus(reqStatus, 'Request posted.');
+        await loadRequests();
+      });
+
+      requestList.addEventListener('click', async (event) => {
+        const target = event.target.closest('.vote-btn');
+        if (!target || !currentUser) return;
+        const requestId = target.getAttribute('data-request-id');
+        if (!requestId) return;
+
+        target.disabled = true;
+        setStatus(reqStatus, '');
+        const hasVoted = votedRequestIds.has(requestId);
+
+        if (hasVoted) {
+          const { error } = await supabase
+            .from('feature_request_votes')
+            .delete()
+            .eq('request_id', requestId)
+            .eq('user_id', currentUser.id);
+          if (error) {
+            setStatus(reqStatus, error.message || 'Could not remove vote.', true);
+            target.disabled = false;
+            return;
+          }
+          setStatus(reqStatus, 'Vote removed.');
+        } else {
+          const { error } = await supabase
+            .from('feature_request_votes')
+            .insert({ request_id: requestId, user_id: currentUser.id });
+          if (error) {
+            setStatus(reqStatus, error.message || 'Could not submit vote.', true);
+            target.disabled = false;
+            return;
+          }
+          setStatus(reqStatus, 'Vote added.');
+        }
+
+        await loadRequests();
+      });
+
+      supabase.auth.onAuthStateChange(async () => {
+        await updateAuthUi();
+      });
+
+      await updateAuthUi();
+    </script>
+  </body>
+</html>

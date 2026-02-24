@@ -1,6 +1,6 @@
 import path from 'path';
 import fs from 'fs';
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, shell, session, safeStorage } from 'electron';
 import started from 'electron-squirrel-startup';
 import Store from 'electron-store';
 import { UpdateService } from './services/UpdateService';
@@ -20,6 +20,14 @@ const gotSingleInstanceLock = app.requestSingleInstanceLock();
 if (!gotSingleInstanceLock) {
   app.quit();
 }
+
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught exception in main process:', error);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled rejection in main process:', reason);
+});
 
 app.on('second-instance', () => {
   if (!mainWindow) return;
@@ -48,6 +56,25 @@ const resolveAppIconPath = (): string | undefined => {
   return candidates.find((candidate) => fs.existsSync(candidate));
 };
 
+const isSafeExternalUrl = (rawUrl: string): boolean => {
+  try {
+    const parsed = new URL(rawUrl);
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+  } catch {
+    return false;
+  }
+};
+
+const isAllowedAppNavigation = (rawUrl: string): boolean => {
+  if (rawUrl.startsWith('file://')) return true;
+  const devServerUrl =
+    typeof MAIN_WINDOW_VITE_DEV_SERVER_URL === 'string'
+      ? MAIN_WINDOW_VITE_DEV_SERVER_URL
+      : undefined;
+  if (devServerUrl && rawUrl.startsWith(devServerUrl)) return true;
+  return false;
+};
+
 const createWindow = () => {
   const appIconPath = resolveAppIconPath();
 
@@ -63,7 +90,58 @@ const createWindow = () => {
     trafficLightPosition: { x: -100, y: -100 }, // Hide macOS controls
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
+      sandbox: true,
+      contextIsolation: true,
+      nodeIntegration: false,
+      webSecurity: true,
+      allowRunningInsecureContent: false,
+      devTools: !app.isPackaged,
     },
+  });
+
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (isSafeExternalUrl(url)) {
+      void shell.openExternal(url);
+    }
+    return { action: 'deny' };
+  });
+
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (!isAllowedAppNavigation(url)) {
+      event.preventDefault();
+      if (isSafeExternalUrl(url)) {
+        void shell.openExternal(url);
+      }
+    }
+  });
+
+  // Block common DevTools shortcuts in packaged app.
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (!app.isPackaged) return;
+    const isToggleDevTools =
+      (input.meta && input.alt && input.key.toLowerCase() === 'i') ||
+      (input.ctrl && input.shift && input.key.toLowerCase() === 'i') ||
+      input.key === 'F12';
+    if (isToggleDevTools) {
+      event.preventDefault();
+    }
+  });
+
+  if (app.isPackaged) {
+    mainWindow.webContents.on('devtools-opened', () => {
+      mainWindow?.webContents.closeDevTools();
+    });
+  }
+
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    console.error('Renderer process gone:', details.reason, details.exitCode);
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    // Reload once to recover from transient renderer crashes.
+    mainWindow.reload();
+  });
+
+  mainWindow.webContents.on('unresponsive', () => {
+    console.error('Main window renderer became unresponsive.');
   });
 
   // Initialize Update Service
@@ -218,7 +296,26 @@ ipcMain.on('open-donation-window', (event) => {
 });
 
 ipcMain.handle('open-external-url', async (event, url) => {
+    if (!isSafeExternalUrl(url)) {
+      throw new Error('Blocked unsafe external URL.');
+    }
     await shell.openExternal(url);
+});
+
+ipcMain.handle('encrypt-sensitive', async (_event, plaintext: string) => {
+  if (!safeStorage.isEncryptionAvailable()) {
+    return null;
+  }
+  const encrypted = safeStorage.encryptString(plaintext);
+  return encrypted.toString('base64');
+});
+
+ipcMain.handle('decrypt-sensitive', async (_event, encryptedBase64: string) => {
+  if (!safeStorage.isEncryptionAvailable()) {
+    return null;
+  }
+  const encryptedBuffer = Buffer.from(encryptedBase64, 'base64');
+  return safeStorage.decryptString(encryptedBuffer);
 });
 
 // Store IPC
@@ -347,6 +444,11 @@ ipcMain.handle('fetch-url', async (event, url) => {
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.on('ready', () => {
+    session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
+      callback(false);
+    });
+    session.defaultSession.setPermissionCheckHandler(() => false);
+
     // Set Dock Icon for macOS (especially useful in dev)
     if (process.platform === 'darwin') {
         const iconPath = resolveAppIconPath();

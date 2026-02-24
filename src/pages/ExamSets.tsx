@@ -7,6 +7,7 @@ import Modal from '../components/ui/Modal';
 import Textarea from '../components/ui/Textarea';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { CARD_GRADIENT_OPTIONS, getCardGradientClasses } from '../utils/cardGradients';
 
 const ExamSets = () => {
   const navigate = useNavigate();
@@ -24,6 +25,7 @@ const ExamSets = () => {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
+    cardGradient: 'default',
     questionIds: [] as string[],
   });
 
@@ -32,6 +34,7 @@ const ExamSets = () => {
     setFormData({
       title: set.title,
       description: set.description,
+      cardGradient: set.cardGradient || 'default',
       questionIds: set.questionIds,
     });
     setIsModalOpen(true);
@@ -75,7 +78,7 @@ const ExamSets = () => {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
             key={set.id}
-            className="group relative rounded-2xl border border-border/50 bg-card/50 backdrop-blur-sm p-6 shadow-sm transition-all duration-300 hover:shadow-xl hover:-translate-y-1 flex flex-col justify-between"
+            className={`group relative rounded-2xl border backdrop-blur-sm p-6 shadow-sm transition-all duration-300 hover:shadow-xl hover:-translate-y-1 flex flex-col justify-between ${getCardGradientClasses(set.cardGradient)}`}
           >
             <div>
               <div className="flex items-start justify-between">
@@ -147,6 +150,20 @@ const ExamSets = () => {
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
             />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium leading-none">Card Color</label>
+            <select
+              value={formData.cardGradient}
+              onChange={(e) => setFormData({ ...formData, cardGradient: e.target.value })}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            >
+              {CARD_GRADIENT_OPTIONS.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </div>
           
           <div className="flex justify-end pt-4">

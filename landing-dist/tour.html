@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Qudoro Product Tour</title>
+    <meta name="description" content="Visual tour of Qudoro workflows." />
+    <link rel="icon" href="/icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700;800&family=Manrope:wght@400;500;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="bg-shape bg-shape-1"></div>
+    <div class="bg-shape bg-shape-2"></div>
+
+    <header class="container nav">
+      <a class="brand" href="/"><img src="/icon.png" alt="Qudoro logo" /><span>Qudoro</span></a>
+      <div class="nav-links">
+        <a href="/download">Download</a>
+        <a href="/features">Features</a>
+        <a href="/tour">Tour</a>
+        <a href="/why">Why Qudoro</a>
+        <a href="/forum">Forum</a>
+      </div>
+    </header>
+
+    <main class="container section">
+      <h1 class="page-title">Product Tour</h1>
+      <p class="section-intro">Core screens and workflows you can expect inside the app.</p>
+
+      <div class="tour-grid">
+        <article class="tour-card">
+          <img src="/screenshots/create-set.png" alt="Create set workflow" loading="lazy" />
+          <div>
+            <h3>Create and Expand Sets</h3>
+            <p>Build sets quickly and keep adding questions as your content grows.</p>
+          </div>
+        </article>
+        <article class="tour-card">
+          <img src="/screenshots/practice-mode.png" alt="Practice mode screen" loading="lazy" />
+          <div>
+            <h3>Exam Simulation Mode</h3>
+            <p>Practice with exam-style formatting and focused review flow.</p>
+          </div>
+        </article>
+        <article class="tour-card">
+          <img src="/screenshots/notes-flashcards.png" alt="Notes to flashcards" loading="lazy" />
+          <div>
+            <h3>Notes to Flashcards</h3>
+            <p>Convert note content into active-recall flashcards in one workflow.</p>
+          </div>
+        </article>
+      </div>
+    </main>
+
+    <footer class="container footer">
+      <p>&copy; <span id="year"></span> Qudoro. All rights reserved.</p>
+      <div class="footer-links">
+        <a href="/">Home</a>
+        <a href="/forum">Forum</a>
+        <a href="/terms">Terms</a>
+        <a href="/privacy">Privacy</a>
+      </div>
+    </footer>
+
+    <script>
+      document.getElementById('year').textContent = String(new Date().getFullYear());
+    </script>
+  </body>
+</html>

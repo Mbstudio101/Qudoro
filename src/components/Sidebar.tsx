@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { BookOpen, Layers, Settings, Brain, LayoutDashboard, User, ChevronLeft, ChevronRight, Calendar, FileText, Users } from 'lucide-react';
+import { BookOpen, Layers, Settings, Brain, LayoutDashboard, User, ChevronLeft, ChevronRight, Calendar, FileText, Users, Compass } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Logo } from './ui/Logo';
 import { useStore } from '../store/useStore';
@@ -24,6 +24,7 @@ const Sidebar = () => {
     { to: '/calendar', icon: Calendar, label: 'Calendar' },
     { to: '/notes', icon: FileText, label: 'Notes' },
     { to: '/questions', icon: BookOpen, label: 'Questions' },
+    { to: '/discover', icon: Compass, label: 'Discover' },
     { to: '/sets', icon: Layers, label: 'Exams' },
     { to: '/flashcards', icon: Brain, label: 'Flashcards' },
   ];
