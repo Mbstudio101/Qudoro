@@ -5,7 +5,8 @@ import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
 import { useStore, Question } from '../store/useStore';
-import { cleanMcqText, parseInlineLabeledMcq } from '../utils/mcqParser';
+import { cleanMcqText, parseLabeledMcq } from '../utils/mcqParser';
+import { sanitizeImportedTerms, type ImportedTerm } from '../utils/importSanitizer';
 
 const Settings = () => {
   const {
@@ -54,6 +55,38 @@ const Settings = () => {
     def?: string;
     cardSides?: Array<LooseRecord>;
   };
+  type SanitizerWorkerResponse = { terms: ImportedTerm[] };
+
+  const sanitizeWithWorker = async (rawTerms: ImportedTerm[]): Promise<ImportedTerm[]> => {
+    if (typeof Worker === 'undefined') return sanitizeImportedTerms(rawTerms);
+    try {
+      const worker = new Worker(new URL('../workers/importSanitizer.worker.ts', import.meta.url), { type: 'module' });
+      const sanitized = await new Promise<ImportedTerm[]>((resolve) => {
+        const timeout = window.setTimeout(() => {
+          worker.terminate();
+          resolve(sanitizeImportedTerms(rawTerms));
+        }, 4000);
+
+        worker.onmessage = (event: MessageEvent<SanitizerWorkerResponse>) => {
+          window.clearTimeout(timeout);
+          worker.terminate();
+          const terms = Array.isArray(event.data?.terms) ? event.data.terms : [];
+          resolve(terms.length === rawTerms.length ? terms : sanitizeImportedTerms(rawTerms));
+        };
+
+        worker.onerror = () => {
+          window.clearTimeout(timeout);
+          worker.terminate();
+          resolve(sanitizeImportedTerms(rawTerms));
+        };
+
+        worker.postMessage({ terms: rawTerms });
+      });
+      return sanitized;
+    } catch {
+      return sanitizeImportedTerms(rawTerms);
+    }
+  };
 
   const asRecord = (value: unknown): LooseRecord | null => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
@@ -83,38 +116,24 @@ const Settings = () => {
   const cleanOptionText = (value: string): string => cleanMcqText(value);
 
   const parseFrontAsMcq = (frontText: string): { stem: string; options: string[]; labels: string[] } | null => {
-    const rawText = frontText
-      .replace(/\r\n/g, '\n')
-      .replace(/\u00a0/g, ' ');
-    const compactText = rawText.replace(/\s+/g, ' ').trim();
-    if (!compactText) return null;
-
-    const optionLineRegex =
-      /^\s*(?:[-*•]\s*)?(?:\(?([A-Za-z])\)|([A-Za-z])[).:-]|([0-9]{1,2})[).:-])\s*(.+)\s*$/;
-    const lines = rawText.split('\n').map((line) => line.trim()).filter(Boolean);
-    const lineMatches = lines
-      .map((line, index) => ({ line, index, match: line.match(optionLineRegex) }))
-      .filter((entry): entry is { line: string; index: number; match: RegExpMatchArray } => Boolean(entry.match));
-
-    if (lineMatches.length >= 2) {
-      const firstOptionLine = lineMatches[0].index;
-      const stem = lines.slice(0, firstOptionLine).join(' ').trim();
-      const options = lineMatches.map((entry) => cleanOptionText(entry.match[4])).filter(Boolean);
-      const labels = lineMatches.map((entry) =>
-        String(entry.match[1] || entry.match[2] || entry.match[3] || '').toLowerCase()
-      );
-      if (options.length >= 2) {
-        return { stem: stem || 'Question', options, labels };
-      }
-    }
-
-    // Handles packed formats like "...needed?A. ...B. ...C. ...D..." including jammed labels.
-    const parsedInline = parseInlineLabeledMcq(compactText);
-    if (!parsedInline) return null;
-    return { stem: parsedInline.stem || 'Question', options: parsedInline.options, labels: parsedInline.labels };
+    const parsed = parseLabeledMcq(frontText);
+    if (!parsed) return null;
+    return { stem: cleanOptionText(parsed.stem) || 'Question', options: parsed.options.map(cleanOptionText), labels: parsed.labels };
   };
 
-  const resolveMcqAnswer = (backText: string, options: string[], labels: string[]): string => {
+  const resolveLabelTokenToOption = (token: string, options: string[], labels: string[]): string | null => {
+    const normalized = token.trim().toLowerCase();
+    if (!normalized) return null;
+    const labelIndex = labels.findIndex((label) => label === normalized);
+    if (labelIndex >= 0 && options[labelIndex]) return options[labelIndex];
+    if (/^\d+$/.test(normalized)) {
+      const numericIndex = Number.parseInt(normalized, 10) - 1;
+      if (numericIndex >= 0 && numericIndex < options.length) return options[numericIndex];
+    }
+    return null;
+  };
+
+  const resolveMcqAnswers = (backText: string, options: string[], labels: string[]): string[] => {
     const trimmed = backText.trim();
     const labelByPrefix = trimmed.match(/^(?:answer|ans|correct answer|correct)\s*[:-]?\s*\(?([A-Za-z0-9]{1,2})\)?/i);
     const standaloneLabel = trimmed.match(/^\(?([A-Za-z])\)?[).:-]?\s*$/);
@@ -122,14 +141,8 @@ const Settings = () => {
     const labelToken = labelByPrefix?.[1] || standaloneLabel?.[1] || standaloneNumber?.[1] || '';
 
     if (labelToken) {
-      const normalized = labelToken.toLowerCase();
-      const labelIndex = labels.findIndex((label) => label === normalized);
-      if (labelIndex >= 0 && options[labelIndex]) return options[labelIndex];
-
-      if (/^\d+$/.test(normalized)) {
-        const numericIndex = Number.parseInt(normalized, 10) - 1;
-        if (numericIndex >= 0 && numericIndex < options.length) return options[numericIndex];
-      }
+      const resolved = resolveLabelTokenToOption(labelToken, options, labels);
+      if (resolved) return [resolved];
     }
 
     const cleaned = trimmed
@@ -137,21 +150,35 @@ const Settings = () => {
       .replace(/^["']|["']$/g, '')
       .trim();
 
+    const multiTokens = cleaned
+      .replace(/\band\b/gi, ',')
+      .split(/[,\s;/|&+]+/)
+      .map((token) => token.replace(/[().:-]/g, '').trim())
+      .filter(Boolean);
+    const resolvedFromTokens = multiTokens
+      .map((token) => resolveLabelTokenToOption(token, options, labels))
+      .filter((value): value is string => Boolean(value));
+    if (resolvedFromTokens.length > 0) {
+      return Array.from(new Set(resolvedFromTokens));
+    }
+
     const exactMatch = options.find((option) => normalizeText(option) === normalizeText(cleaned));
-    if (exactMatch) return exactMatch;
+    if (exactMatch) return [exactMatch];
 
     const partialMatch = options.find((option) =>
       normalizeText(option).includes(normalizeText(cleaned)) ||
       normalizeText(cleaned).includes(normalizeText(option))
     );
-    if (partialMatch) return partialMatch;
+    if (partialMatch) return [partialMatch];
 
-    return cleaned || trimmed;
+    // No match found — return empty so the question is imported without a
+    // pre-set answer rather than silently storing an arbitrary string.
+    return [];
   };
 
   const deriveMcqRationale = (
     backText: string,
-    answerText: string,
+    answerTexts: string[],
     options: string[],
     labels: string[],
   ): string => {
@@ -175,12 +202,27 @@ const Settings = () => {
       }
     }
 
-    if (normalizeText(withoutPrefix) === normalizeText(answerText)) return '';
+    const multiOnlyTokens = withoutPrefix
+      .replace(/\band\b/gi, ',')
+      .split(/[,\s;/|&+]+/)
+      .map((token) => token.replace(/[().:-]/g, '').trim().toLowerCase())
+      .filter(Boolean);
+    if (
+      multiOnlyTokens.length > 1 &&
+      multiOnlyTokens.every((token) => labels.includes(token) || (/^\d+$/.test(token) && Number.parseInt(token, 10) >= 1))
+    ) {
+      return '';
+    }
 
-    const answerPrefixRegex = new RegExp(`^${answerText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*[:\\-]?\\s*`, 'i');
-    if (answerPrefixRegex.test(withoutPrefix)) {
-      const trailing = withoutPrefix.replace(answerPrefixRegex, '').trim();
-      return trailing && normalizeText(trailing) !== normalizeText(answerText) ? trailing : '';
+    const matchedAnswer = answerTexts.find((ans) => normalizeText(withoutPrefix) === normalizeText(ans));
+    if (matchedAnswer) return '';
+
+    for (const answerText of answerTexts) {
+      const answerPrefixRegex = new RegExp(`^${answerText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*[:\\-]?\\s*`, 'i');
+      if (answerPrefixRegex.test(withoutPrefix)) {
+        const trailing = withoutPrefix.replace(answerPrefixRegex, '').trim();
+        return trailing && normalizeText(trailing) !== normalizeText(answerText) ? trailing : '';
+      }
     }
 
     const labeledWithExplanation = withoutPrefix.match(/^\(?([A-Za-z0-9]{1,2})\)?[).:-]\s*(.+)$/);
@@ -188,23 +230,26 @@ const Settings = () => {
       const token = labeledWithExplanation[1].toLowerCase();
       const trailing = labeledWithExplanation[2].trim();
       const labelIndex = labels.findIndex((label) => label === token);
-      if (labelIndex >= 0 && options[labelIndex] && normalizeText(options[labelIndex]) === normalizeText(answerText)) {
-        return trailing && normalizeText(trailing) !== normalizeText(answerText) ? trailing : '';
+      if (labelIndex >= 0 && options[labelIndex] && answerTexts.some((ans) => normalizeText(options[labelIndex]) === normalizeText(ans))) {
+        return trailing && !answerTexts.some((ans) => normalizeText(trailing) === normalizeText(ans)) ? trailing : '';
       }
       if (/^\d+$/.test(token)) {
         const numericIndex = Number.parseInt(token, 10) - 1;
         if (
           numericIndex >= 0 &&
           numericIndex < options.length &&
-          normalizeText(options[numericIndex]) === normalizeText(answerText)
+          answerTexts.some((ans) => normalizeText(options[numericIndex]) === normalizeText(ans))
         ) {
-          return trailing && normalizeText(trailing) !== normalizeText(answerText) ? trailing : '';
+          return trailing && !answerTexts.some((ans) => normalizeText(trailing) === normalizeText(ans)) ? trailing : '';
         }
       }
     }
 
     return withoutPrefix;
   };
+
+  const isLikelyMultiSelect = (stem: string, answers: string[]): boolean =>
+    answers.length > 1 || /select all that apply|sata|choose all that apply/i.test(stem);
 
   const deriveCorrectOptionIndicesFromAnswer = (options: string[], answers: string[]): number[] => {
     if (!options.length || !answers.length) return [];
@@ -431,10 +476,12 @@ const Settings = () => {
               questionIds: [],
             });
 
+        setImportMsg('Sanitizing imported cards...');
+        const sanitizedTerms = await sanitizeWithWorker(terms);
         const questionIds: string[] = [];
         
         // Add Questions to Store
-        terms.forEach(t => {
+        sanitizedTerms.forEach(t => {
             let content = t.term;
             let options: string[] = [];
             let questionStyle = 'Flashcard';
@@ -447,14 +494,13 @@ const Settings = () => {
                 content = parsedMcq.stem;
                 options = parsedMcq.options;
                 questionStyle = 'Multiple Choice';
-                const resolvedAnswer = resolveMcqAnswer(t.def, parsedMcq.options, parsedMcq.labels);
-                answer = [resolvedAnswer];
-                selectionMode = 'single';
+                answer = resolveMcqAnswers(t.def, parsedMcq.options, parsedMcq.labels);
+                selectionMode = isLikelyMultiSelect(content, answer) ? 'multiple' : 'single';
                 correctOptionIndices = deriveCorrectOptionIndicesFromAnswer(options, answer);
             }
 
             const rationale = parsedMcq
-              ? deriveMcqRationale(t.def, answer[0] || '', options, parsedMcq.labels)
+              ? deriveMcqRationale(t.def, answer, options, parsedMcq.labels)
               : t.def;
 
             const newQ = {

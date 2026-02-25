@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useStore, ExamSet } from '../store/useStore';
-import { Trash2, Edit2, Play, Layers, Zap, Brain } from 'lucide-react';
+import { Trash2, Edit2, Play, Layers, Zap, Brain, Clock3 } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
@@ -53,6 +53,27 @@ const ExamSets = () => {
     }
   };
 
+  const handleStartTimedExam = (minutes: number) => {
+    if (selectedSetForExam) {
+      navigate(`/practice/${selectedSetForExam.id}?mode=timed&minutes=${minutes}`);
+      setIsStudyModeModalOpen(false);
+      setSelectedSetForExam(null);
+    }
+  };
+
+  const handleDeleteSet = (set: ExamSet) => {
+    const msg =
+      `Are you sure you want to delete "${set.title}"?\n\n` +
+      `This will permanently delete the set and all ${set.questionIds.length} question(s) inside it. This cannot be undone.`;
+    if (window.confirm(msg)) {
+      deleteSet(set.id);
+    }
+  };
+
+  const handleQuickColorChange = (setId: string, cardGradient: string) => {
+    updateSet(setId, { cardGradient });
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (editingSet) {
@@ -95,6 +116,20 @@ const ExamSets = () => {
               <div className="mt-4">
                 <span className="text-sm font-medium">{set.questionIds.length} Questions</span>
               </div>
+              <div className="mt-3 space-y-1">
+                <label className="text-[11px] font-medium text-muted-foreground">Card Color</label>
+                <select
+                  value={set.cardGradient || 'default'}
+                  onChange={(e) => handleQuickColorChange(set.id, e.target.value)}
+                  className="h-8 w-full rounded-md border border-input/70 bg-background/80 px-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {CARD_GRADIENT_OPTIONS.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
             
             <div className="mt-6 flex items-center justify-between">
@@ -113,7 +148,7 @@ const ExamSets = () => {
                   variant="ghost"
                   size="sm"
                   className="text-destructive hover:text-destructive"
-                  onClick={() => deleteSet(set.id)}
+                  onClick={() => handleDeleteSet(set)}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -211,6 +246,21 @@ const ExamSets = () => {
                         </p>
                     </div>
                 </button>
+            </div>
+            <div className="pt-2">
+              <h4 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">Timed Exam</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {[30, 60, 90].map((minutes) => (
+                  <button
+                    key={minutes}
+                    onClick={() => handleStartTimedExam(minutes)}
+                    className="flex items-center justify-center gap-2 rounded-xl border border-border px-4 py-3 hover:border-primary/50 hover:bg-primary/5 transition-all text-sm font-medium"
+                  >
+                    <Clock3 className="h-4 w-4 text-primary" />
+                    {minutes} min
+                  </button>
+                ))}
+              </div>
             </div>
         </div>
       </Modal>

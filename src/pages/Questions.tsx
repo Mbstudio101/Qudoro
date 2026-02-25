@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useStore, Question } from '../store/useStore';
-import { Plus, Trash2, Edit2, Search, Save, Check, ChevronLeft, Folder, List, CheckSquare, Square, Layers } from 'lucide-react';
+import { Plus, Trash2, Edit2, Search, Save, Check, ChevronLeft, Folder, List, CheckSquare, Square, Layers, ImagePlus, X } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
@@ -9,7 +9,7 @@ import RichText from '../components/ui/RichText';
 import { motion } from 'framer-motion';
 import { classifyQuestion } from '../utils/nursingConstants';
 import { CARD_GRADIENT_OPTIONS, getCardGradientClasses } from '../utils/cardGradients';
-import { cleanMcqText, parseInlineLabeledMcq } from '../utils/mcqParser';
+import { cleanMcqText, parseLabeledMcq } from '../utils/mcqParser';
 
 const Questions = () => {
   const {
@@ -66,6 +66,53 @@ const Questions = () => {
     description: '',
     cardGradient: 'default',
   });
+
+  // ── Draft auto-save ───────────────────────────────────────────────────────
+  // Key is profile-scoped so switching profiles never shows the wrong draft.
+  const draftKey = `qudoro-draft-sb-${activeProfileId || 'default'}`;
+
+  type SetBuilderDraft = {
+    draftQuestions: DraftQuestion[];
+    formData: { content: string; rationale: string; answer: string[]; options: string[]; tags: string; imageUrl: string };
+    setCreationData: { title: string; description: string; cardGradient: string };
+    savedAt: number;
+  };
+
+  const [savedDraft, setSavedDraft] = useState<SetBuilderDraft | null>(null);
+
+  // Load any existing draft when the page (or active profile) loads
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(draftKey);
+      if (!raw) return;
+      const parsed: SetBuilderDraft = JSON.parse(raw);
+      const count =
+        (parsed.draftQuestions?.length || 0) + (parsed.formData?.content ? 1 : 0);
+      if (count > 0) {
+        setSavedDraft(parsed);
+      } else {
+        localStorage.removeItem(draftKey);
+      }
+    } catch {
+      localStorage.removeItem(draftKey);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftKey]);
+
+  // Auto-save the set builder state whenever something changes
+  useEffect(() => {
+    if (!isSetBuilderMode || !isModalOpen) return;
+    const totalCount = draftQuestions.length + (formData.content.trim() ? 1 : 0);
+    if (totalCount === 0 && !setCreationData.title) return; // nothing worth saving yet
+    try {
+      localStorage.setItem(
+        draftKey,
+        JSON.stringify({ draftQuestions, formData, setCreationData, savedAt: Date.now() }),
+      );
+    } catch {
+      // Storage quota — silent fail
+    }
+  }, [draftQuestions, formData, setCreationData, isSetBuilderMode, isModalOpen, draftKey]);
   const [setEditData, setSetEditData] = useState({
     title: '',
     description: '',
@@ -109,9 +156,9 @@ const Questions = () => {
   const cleanOptionText = (value: string): string => cleanMcqText(value);
 
   const parseInlinePackedOptions = (text: string): { stem: string; options: string[] } | null => {
-    const parsed = parseInlineLabeledMcq(text);
+    const parsed = parseLabeledMcq(text, { allowMissingStem: true });
     if (!parsed) return null;
-    return { stem: parsed.stem, options: parsed.options };
+    return { stem: parsed.stem || '', options: parsed.options };
   };
 
   const extractOptionsFromBlock = (text: string): string[] => {
@@ -186,8 +233,13 @@ const Questions = () => {
   };
 
   const handleDeleteSet = (setId: string, title: string) => {
-    if (window.confirm(`Are you sure you want to delete the set "${title}"? The questions will remain in your library as Unassigned.`)) {
-        deleteSet(setId);
+    const set = sets.find((s) => s.id === setId);
+    const count = set?.questionIds.length ?? 0;
+    const msg =
+      `Are you sure you want to delete "${title}"?\n\n` +
+      `This will permanently delete the set and all ${count} question(s) inside it. This cannot be undone.`;
+    if (window.confirm(msg)) {
+      deleteSet(setId);
     }
   };
 
@@ -247,6 +299,28 @@ const Questions = () => {
     setIsSetModalOpen(false);
   };
 
+
+  const clearDraft = () => {
+    localStorage.removeItem(draftKey);
+    setSavedDraft(null);
+  };
+
+  const handleRestoreDraft = () => {
+    if (!savedDraft) return;
+    setIsSetBuilderMode(true);
+    setEditingQuestion(null);
+    setDraftQuestions(savedDraft.draftQuestions);
+    setFormData(savedDraft.formData);
+    setSetCreationData(savedDraft.setCreationData);
+    setIsModalOpen(true);
+    setSavedDraft(null); // hide banner — draft is now active in the form
+  };
+
+  const handleDismissDraft = () => {
+    if (window.confirm('Discard the saved draft? This cannot be undone.')) {
+      clearDraft();
+    }
+  };
 
   const handleOpenSetBuilder = () => {
     setIsSetBuilderMode(true);
@@ -321,6 +395,7 @@ const Questions = () => {
         questionIds: newQuestionIds
     });
 
+    clearDraft(); // set successfully saved — remove draft
     setIsModalOpen(false);
     setIsSetBuilderMode(false);
     setDraftQuestions([]);
@@ -558,6 +633,26 @@ const Questions = () => {
             </Button> */}
         </div>
       </div>
+
+      {/* Draft restore banner */}
+      {savedDraft && (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm">
+          <span className="text-amber-700 dark:text-amber-300 font-medium flex-1">
+            You have an unsaved set draft
+            {savedDraft.setCreationData.title ? ` — "${savedDraft.setCreationData.title}"` : ''} with{' '}
+            {savedDraft.draftQuestions.length + (savedDraft.formData.content ? 1 : 0)} question(s)
+            {' '}saved {new Date(savedDraft.savedAt).toLocaleString()}.
+          </span>
+          <div className="flex gap-2 shrink-0">
+            <Button size="sm" onClick={handleRestoreDraft}>
+              Restore Draft
+            </Button>
+            <Button size="sm" variant="ghost" onClick={handleDismissDraft}>
+              Dismiss
+            </Button>
+          </div>
+        </div>
+      )}
 
       <div className="flex items-center space-x-2 bg-card/30 p-1 rounded-xl border border-border/50 backdrop-blur-sm">
         <div className="relative flex-1">
@@ -975,20 +1070,6 @@ const Questions = () => {
                              onChange={(e) => setSetCreationData({ ...setCreationData, description: e.target.value })}
                          />
                     </div>
-                    <div className="space-y-2">
-                         <label className="text-sm font-medium leading-none">Card Color</label>
-                         <select
-                            value={setCreationData.cardGradient}
-                            onChange={(e) => setSetCreationData({ ...setCreationData, cardGradient: e.target.value })}
-                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                         >
-                            {CARD_GRADIENT_OPTIONS.map((option) => (
-                                <option key={option.id} value={option.id}>
-                                    {option.label}
-                                </option>
-                            ))}
-                         </select>
-                    </div>
                 </div>
                 <div className="h-px bg-border/50 my-2" />
                 <h3 className="font-semibold text-base">Add Question {draftQuestions.length + 1}</h3>
@@ -1012,47 +1093,51 @@ const Questions = () => {
                     />
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-3">
                     <label className="text-sm font-medium leading-none">
                     Reference Image (Optional)
                     </label>
-                    <div className="space-y-4">
-                        {formData.imageUrl ? (
-                            <div className="relative w-full h-64 bg-muted/20 rounded-xl overflow-hidden border border-border/50 group">
-                                <img 
-                                    src={formData.imageUrl} 
-                                    alt="Preview" 
-                                    className="w-full h-full object-contain"
-                                />
-                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                    <button
-                                        type="button"
-                                        onClick={() => setFormData(prev => ({ ...prev, imageUrl: '' }))}
-                                        className="bg-destructive text-white px-4 py-2 rounded-lg hover:bg-destructive/90 transition-colors flex items-center gap-2"
-                                    >
-                                        <Trash2 size={16} /> Remove Image
-                                    </button>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="border-2 border-dashed border-border rounded-xl p-8 text-center hover:bg-muted/30 transition-colors">
-                                <Input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handleImageUpload}
-                                    className="hidden"
-                                    id="image-upload"
-                                />
-                                <label htmlFor="image-upload" className="cursor-pointer flex flex-col items-center gap-2">
-                                    <div className="p-3 bg-primary/10 text-primary rounded-full">
-                                        <Plus className="h-6 w-6" />
-                                    </div>
-                                    <span className="text-sm font-medium">Click to upload an image</span>
-                                    <span className="text-xs text-muted-foreground">Supports JPG, PNG, WEBP</span>
+                    <div className="rounded-2xl border border-border/60 bg-linear-to-r from-secondary/20 via-secondary/10 to-transparent px-3 py-2">
+                        <Input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleImageUpload}
+                            className="hidden"
+                            id="image-upload"
+                        />
+                        <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2">
+                                <label
+                                    htmlFor="image-upload"
+                                    className="cursor-pointer inline-flex items-center gap-2 rounded-xl bg-primary/15 px-3 py-2 text-primary hover:bg-primary/25 transition-colors"
+                                    title="Attach image"
+                                >
+                                    <ImagePlus className="h-4 w-4" />
+                                    <span className="text-sm font-medium">Media</span>
                                 </label>
+                                <span className="text-xs text-muted-foreground">JPG, PNG, WEBP</span>
                             </div>
-                        )}
+                            {formData.imageUrl && (
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData(prev => ({ ...prev, imageUrl: '' }))}
+                                    className="inline-flex items-center gap-1 rounded-lg border border-destructive/30 px-2 py-1 text-xs text-destructive hover:bg-destructive/10 transition-colors"
+                                >
+                                    <X className="h-3.5 w-3.5" />
+                                    Remove
+                                </button>
+                            )}
+                        </div>
                     </div>
+                    {formData.imageUrl && (
+                        <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-background/60 shadow-sm">
+                            <img
+                                src={formData.imageUrl}
+                                alt="Reference preview"
+                                className="w-full max-h-64 object-contain"
+                            />
+                        </div>
+                    )}
                 </div>
             </div>
 

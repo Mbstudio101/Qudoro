@@ -761,12 +761,8 @@ export const useStore = create<AppState>()(
             newStats.totalCorrectAnswers += 1;
           }
           
-          // XP Gain
-          let xpGain = 10;
-          if (performance === 'good') xpGain = 20;
-          if (performance === 'easy') xpGain = 30;
-          newStats.xp += xpGain;
-          newStats.level = calculateLevel(newStats.xp);
+          // No per-card XP here — XP is granted at session end via addSession so
+          // both flashcard and practice modes are on the same scale.
           
           // Streak Logic (Real-time update)
           const now = new Date();
@@ -826,7 +822,8 @@ export const useStore = create<AppState>()(
             accounts: updatedAccounts
           };
         });
-        get().checkAchievements();
+        // checkAchievements intentionally NOT called here — it runs after every
+        // addSession instead, avoiding O(n) scans on every single card flip.
       },
       addSet: (s) => {
         const id = uuidv4();
@@ -894,7 +891,9 @@ export const useStore = create<AppState>()(
             const currentTotalTime = isNaN(newStats.totalStudyTime) ? 0 : (newStats.totalStudyTime || 0);
             newStats.totalStudyTime = currentTotalTime + extraTime;
 
-            newStats.xp += session.score * 5;
+            // 20 XP per correct answer + 5 XP per question attempted (participation)
+            // Both flashcard and practice modes go through addSession, so XP is balanced.
+            newStats.xp += session.score * 20 + session.totalQuestions * 5;
             newStats.level = calculateLevel(newStats.xp);
             
             // Note: Streak Logic is now handled in reviewQuestion for real-time updates.

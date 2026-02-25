@@ -1,16 +1,16 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useStore, Question } from '../store/useStore';
 import { calculateSM2 } from '../utils/sm2';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RotateCw, CheckCircle, AlertCircle, Layers, Play, ArrowLeft, Zap } from 'lucide-react';
 import Button from '../components/ui/Button';
 import RichText from '../components/ui/RichText';
-import { cleanMcqText, parseInlineLabeledMcq } from '../utils/mcqParser';
+import { cleanMcqText, parseLabeledMcq } from '../utils/mcqParser';
 
 const cleanOptionText = (value: string): string => cleanMcqText(value);
 
 const parsePackedMcqContent = (content: string): { stem: string; options: string[] } | null => {
-  const parsed = parseInlineLabeledMcq(content);
+  const parsed = parseLabeledMcq(content);
   if (!parsed) return null;
   return {
     stem: cleanOptionText(parsed.stem) || 'Question',
@@ -32,6 +32,7 @@ const Flashcards = () => {
   const [correctCount, setCorrectCount] = useState(0);
   const [incorrectIds, setIncorrectIds] = useState<string[]>([]);
   const [startTime, setStartTime] = useState(Date.now());
+  const [isDrillMode, setIsDrillMode] = useState(false);
 
   const getDueQuestionsForSet = (setId: string) => {
     const now = Date.now();
@@ -54,6 +55,7 @@ const Flashcards = () => {
     setCorrectCount(0);
     setIncorrectIds([]);
     setStartTime(Date.now());
+    setIsDrillMode(false);
   };
 
   const currentQuestion = dueQuestions[currentIndex];
@@ -117,6 +119,52 @@ const Flashcards = () => {
   const handleFlip = () => {
     setIsFlipped(!isFlipped);
   };
+
+  const handleDrillMissed = () => {
+    const missedQuestions = dueQuestions.filter((q) => incorrectIds.includes(q.id));
+    if (missedQuestions.length === 0) return;
+    setDueQuestions(missedQuestions);
+    setCurrentIndex(0);
+    setIsFlipped(false);
+    setSessionComplete(false);
+    setCorrectCount(0);
+    setIncorrectIds([]);
+    setStartTime(Date.now());
+    setIsDrillMode(true);
+  };
+
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if (!selectedSetId || sessionComplete || dueQuestions.length === 0) return;
+      const target = event.target as HTMLElement | null;
+      const tag = target?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || target?.isContentEditable) return;
+
+      if (event.code === 'Space') {
+        event.preventDefault();
+        handleFlip();
+        return;
+      }
+
+      if (!isFlipped) return;
+      if (event.key === '1') {
+        event.preventDefault();
+        handleRate('again');
+      } else if (event.key === '2') {
+        event.preventDefault();
+        handleRate('hard');
+      } else if (event.key === '3') {
+        event.preventDefault();
+        handleRate('good');
+      } else if (event.key === '4') {
+        event.preventDefault();
+        handleRate('easy');
+      }
+    };
+
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [selectedSetId, sessionComplete, dueQuestions.length, isFlipped, currentQuestion, currentIndex, correctCount, incorrectIds]);
 
   // If no set selected, show set selection screen
   if (!selectedSetId) {
@@ -193,7 +241,7 @@ const Flashcards = () => {
             You've reviewed all cards due for this deck. Great job!
           </p>
         </div>
-        <div className="grid grid-cols-2 gap-4 text-left max-w-sm w-full mt-4">
+          <div className="grid grid-cols-2 gap-4 text-left max-w-sm w-full mt-4">
           <div className="bg-card p-4 rounded-lg border">
             <p className="text-sm text-muted-foreground">Cards Reviewed</p>
             <p className="text-2xl font-bold">{dueQuestions.length}</p>
@@ -202,17 +250,24 @@ const Flashcards = () => {
             <p className="text-sm text-muted-foreground">Remaining Today</p>
             <p className="text-2xl font-bold">0</p>
           </div>
+          </div>
+        <div className="flex flex-col sm:flex-row gap-3 mt-4">
+          {isDrillMode ? null : (
+            <Button onClick={handleDrillMissed} disabled={incorrectIds.length === 0}>
+              Drill Missed Cards
+            </Button>
+          )}
+          <Button onClick={() => setSelectedSetId(null)} variant="outline">
+              Back to Decks
+          </Button>
         </div>
-        <Button onClick={() => setSelectedSetId(null)} variant="outline" className="mt-4">
-            Back to Decks
-        </Button>
       </div>
     );
   }
 
   return (
     <div className="flex flex-col h-full max-w-3xl mx-auto pb-10">
-      <div className="mb-6 space-y-4">
+	      <div className="mb-6 space-y-4">
         <div className="flex items-center justify-between">
            <Button variant="ghost" size="sm" onClick={() => setSelectedSetId(null)} className="-ml-2 text-muted-foreground hover:text-foreground">
              <ArrowLeft size={16} className="mr-1" /> Back
@@ -233,11 +288,19 @@ const Flashcards = () => {
                 transition={{ duration: 0.5 }}
             />
         </div>
-        <div className="flex justify-between text-xs text-muted-foreground px-1">
-            <span>{currentIndex} reviewed</span>
-            <span>{dueQuestions.length - currentIndex} remaining</span>
-        </div>
-      </div>
+	        <div className="flex justify-between text-xs text-muted-foreground px-1">
+	            <span>{currentIndex} reviewed</span>
+	            <span>{dueQuestions.length - currentIndex} remaining</span>
+	        </div>
+          <div className="text-[11px] text-muted-foreground text-center">
+            Space: flip card, 1-4: Again/Hard/Good/Easy
+          </div>
+          {isDrillMode && (
+            <div className="inline-flex w-fit rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+              Drill Missed Cards
+            </div>
+          )}
+	      </div>
 
       <div className="flex-1 flex flex-col items-center justify-center perspective-1000 min-h-[400px]">
         <div className="relative w-full max-w-xl aspect-3/2 group">

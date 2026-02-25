@@ -218,7 +218,7 @@ const openDonationWindow = (parent: BrowserWindow) => {
     height: 760,
     minWidth: 420,
     minHeight: 640,
-    title: 'Donate via Cash App',
+    title: 'Support Qudoro — Cash App',
     autoHideMenuBar: true,
     parent,
     modal: false,
@@ -250,7 +250,7 @@ const openDonationWindow = (parent: BrowserWindow) => {
     maybeAutoClose(url);
   });
 
-  donationWindow.loadURL('https://cash.app/$marvensb').catch((err) => {
+  donationWindow.loadURL('https://cash.app/$Marveyy2x').catch((err) => {
     console.error('Failed to open donation window', err);
   });
 };

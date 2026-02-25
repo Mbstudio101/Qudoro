@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useStore, Question } from '../store/useStore';
-import { ArrowLeft, CheckCircle2, XCircle, BookOpen, Target, Brain, ArrowRight, AlertCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, XCircle, BookOpen, Target, Brain, ArrowRight, AlertCircle, Clock3 } from 'lucide-react';
 
 import Button from '../components/ui/Button';
 import RichText from '../components/ui/RichText';
@@ -22,7 +22,13 @@ const Practice = () => {
   const [showResults, setShowResults] = useState(false);
   const [score, setScore] = useState(0);
   const [incorrectQuestionIds, setIncorrectQuestionIds] = useState<string[]>([]);
-  const [startTime] = useState(Date.now());
+  const [userSelections, setUserSelections] = useState<Record<string, string[]>>({});
+  const [startTime, setStartTime] = useState(Date.now());
+  const [isDrillMode, setIsDrillMode] = useState(false);
+  const timedMinutesParam = Number.parseInt(searchParams.get('minutes') || '', 10);
+  const isTimedMode = mode === 'timed';
+  const timedDurationSeconds = isTimedMode ? ((Number.isFinite(timedMinutesParam) && timedMinutesParam > 0 ? timedMinutesParam : 60) * 60) : null;
+  const [timeRemainingSec, setTimeRemainingSec] = useState<number | null>(timedDurationSeconds);
   const sessionSaved = useRef(false);
   
   const currentSet = sets.find((s) => s.id === setId);
@@ -44,8 +50,19 @@ const Practice = () => {
         }
         
         setSetQuestions(qs);
+        setCurrentQuestionIndex(0);
+        setSelectedOptions([]);
+        setIsChecked(false);
+        setShowResults(false);
+        setScore(0);
+        setIncorrectQuestionIds([]);
+        setUserSelections({});
+        setStartTime(Date.now());
+        setIsDrillMode(false);
+        setTimeRemainingSec(timedDurationSeconds);
+        sessionSaved.current = false;
     }
-  }, [currentSet, questions, mode]);
+  }, [currentSet, questions, mode, timedDurationSeconds]);
 
   const currentQuestion = setQuestions[currentQuestionIndex];
 
@@ -60,6 +77,23 @@ const Practice = () => {
     setSelectedOptions([]);
     setIsChecked(false);
   }, [currentQuestionIndex]);
+
+  useEffect(() => {
+    if (!isTimedMode || showResults || !setQuestions.length) return;
+    setTimeRemainingSec((prev) => (prev === null ? timedDurationSeconds : prev));
+    const timer = window.setInterval(() => {
+      setTimeRemainingSec((prev) => {
+        if (prev === null) return null;
+        if (prev <= 1) {
+          window.clearInterval(timer);
+          setShowResults(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [isTimedMode, showResults, setQuestions.length, timedDurationSeconds]);
 
   // Save session when results are shown
   useEffect(() => {
@@ -117,6 +151,7 @@ const Practice = () => {
     if (selectedOptions.length === 0) return;
     
     setIsChecked(true);
+    setUserSelections((prev) => ({ ...prev, [currentQuestion.id]: [...selectedOptions] }));
     
     // Check correctness
     const correctAnswers = Array.isArray(currentQuestion.answer) ? currentQuestion.answer : [currentQuestion.answer];
@@ -142,8 +177,31 @@ const Practice = () => {
     }
   };
 
+  const handleDrillMissed = () => {
+    const missedQuestions = setQuestions.filter((q) => incorrectQuestionIds.includes(q.id));
+    if (missedQuestions.length === 0) return;
+    setSetQuestions(missedQuestions);
+    setCurrentQuestionIndex(0);
+    setSelectedOptions([]);
+    setIsChecked(false);
+    setShowResults(false);
+    setScore(0);
+    setIncorrectQuestionIds([]);
+    setUserSelections({});
+    setStartTime(Date.now());
+    setIsDrillMode(true);
+    setTimeRemainingSec(isTimedMode ? timedDurationSeconds : null);
+    sessionSaved.current = false;
+  };
+
+  const formatRemaining = (seconds: number): string => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
+
   // Calculate progress
-  const progress = ((currentQuestionIndex) / setQuestions.length) * 100;
+  const progress = ((currentQuestionIndex + 1) / setQuestions.length) * 100;
 
   if (showResults) {
     const percentage = Math.round((score / setQuestions.length) * 100);
@@ -268,6 +326,18 @@ const Practice = () => {
                                             </div>
                                             
                                             <div className="grid md:grid-cols-2 gap-4 text-sm">
+                                                <div className="p-3 rounded-xl bg-red-500/5 border border-red-500/10">
+                                                    <span className="text-red-600 font-semibold block mb-1">Your Answer</span>
+                                                    {(userSelections[q.id] && userSelections[q.id].length > 0) ? (
+                                                      userSelections[q.id].map((a, i) => (
+                                                        <div key={`${q.id}-ua-${i}`}>
+                                                          <RichText content={a} className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]" />
+                                                        </div>
+                                                      ))
+                                                    ) : (
+                                                      <span className="text-muted-foreground">No answer selected</span>
+                                                    )}
+                                                </div>
                                                 <div className="p-3 rounded-xl bg-green-500/5 border border-green-500/10">
                                                     <span className="text-green-600 font-semibold block mb-1">Correct Answer</span>
                                                     {Array.isArray(q.answer) 
@@ -304,7 +374,12 @@ const Practice = () => {
                     </div>
                 )}
                 
-                <div className="flex justify-center pt-8 pb-12">
+                <div className="flex flex-col sm:flex-row gap-3 justify-center pt-8 pb-12">
+                    {incorrectQuestions.length > 0 && (
+                      <Button onClick={handleDrillMissed} size="lg" className="min-w-[220px]">
+                        Drill Missed Cards
+                      </Button>
+                    )}
                     <Button onClick={() => navigate('/sets')} size="lg" className="min-w-[200px] gap-2">
                         Back to Sets <ArrowRight size={18} />
                     </Button>
@@ -327,7 +402,15 @@ const Practice = () => {
         <div className="flex-1 mx-8">
             <div className="flex justify-between text-xs text-muted-foreground mb-2">
                 <span>Question {currentQuestionIndex + 1} of {setQuestions.length}</span>
-                <span>{Math.round(progress)}% completed</span>
+                <div className="flex items-center gap-3">
+                  {isTimedMode && timeRemainingSec !== null && (
+                    <span className={`${timeRemainingSec <= 30 ? 'text-red-500 font-semibold' : ''}`}>
+                      <Clock3 className="inline h-3.5 w-3.5 mr-1" />
+                      {formatRemaining(timeRemainingSec)}
+                    </span>
+                  )}
+                  <span>{Math.round(progress)}% completed</span>
+                </div>
             </div>
             <div className="h-2 w-full bg-secondary/50 rounded-full overflow-hidden">
                 <motion.div 
@@ -340,6 +423,11 @@ const Practice = () => {
         </div>
         <div className="w-10" /> {/* Spacer */}
       </div>
+      {isDrillMode && (
+        <div className="mb-3 inline-flex items-center w-fit rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+          Drill Missed Cards
+        </div>
+      )}
 
       {/* Question Card */}
       <AnimatePresence mode="wait">
