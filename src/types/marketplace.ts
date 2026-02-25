@@ -1,4 +1,5 @@
 export type SharedSetVisibility = 'public' | 'private';
+export type DiscoverTab = 'all' | 'trending' | 'new' | 'saved' | 'following';
 
 export const NURSING_SUBJECTS = [
   'Fundamentals of Nursing',
@@ -19,6 +20,10 @@ export type NursingSubject = typeof NURSING_SUBJECTS[number];
 export interface MarketplaceAuthor {
   id: string;
   displayName: string;
+  avatarUrl?: string;
+  country?: string;
+  bio?: string;
+  studyField?: string;
 }
 
 export interface SharedQuestion {
