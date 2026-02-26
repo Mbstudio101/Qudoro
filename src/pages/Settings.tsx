@@ -862,482 +862,509 @@ const Settings = () => {
     }
   };
 
-  return (
-    <div className="max-w-4xl mx-auto p-8 space-y-8 pb-20">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="space-y-6"
-      >
-        <div className="flex flex-col gap-2">
-            <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-            <p className="text-muted-foreground">Manage application preferences, data, and updates.</p>
-        </div>
+  const tabs = [
+    { id: 'general', label: 'General', icon: <User className="h-4 w-4" /> },
+    { id: 'data', label: 'Data', icon: <Database className="h-4 w-4" /> },
+    { id: 'about', label: 'About', icon: <Shield className="h-4 w-4" /> },
+  ];
 
-        {/* Tab Navigation */}
-        <div className="flex space-x-1 bg-secondary/20 p-1 rounded-lg w-full max-w-md">
-            {['general', 'data', 'about'].map((tab) => (
-                <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-all ${
-                        activeTab === tab 
-                        ? 'bg-background shadow text-foreground' 
-                        : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
-                    }`}
-                >
-                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                </button>
-            ))}
-        </div>
+  return (
+    <div className="max-w-3xl mx-auto px-6 py-8 pb-24 space-y-8">
+      {/* Header */}
+      <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+        <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
+        <p className="text-sm text-muted-foreground mt-1">Manage application preferences, data, and updates.</p>
       </motion.div>
 
-      <div className="grid gap-6">
-      {/* General Tab */}
+      {/* Tab Navigation */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1, duration: 0.35 }}
+        className="flex gap-1 p-1 rounded-xl bg-secondary/30 border border-border/40 w-fit"
+      >
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+              activeTab === tab.id
+                ? 'bg-background shadow-sm text-foreground border border-border/50'
+                : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
+            }`}
+          >
+            {tab.icon}
+            {tab.label}
+          </button>
+        ))}
+      </motion.div>
+
+      {/* ── GENERAL TAB ── */}
       {activeTab === 'general' && (
-        <motion.div 
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="space-y-6"
+        <motion.div
+          key="general"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="space-y-5"
         >
-            {/* Appearance Section */}
-            <div className="bg-card border rounded-xl p-6 space-y-6">
-                <div className="flex items-center gap-4">
-                    <div className="p-3 bg-primary/10 rounded-full text-primary">
-                        <Sun className="h-6 w-6" />
-                    </div>
-                    <div>
-                        <h2 className="text-xl font-semibold">Appearance</h2>
-                        <p className="text-sm text-muted-foreground">Customize how Qudoro looks on your device.</p>
-                    </div>
-                </div>
-                
-                <div className="grid grid-cols-3 gap-4 max-w-lg">
-                    <button
-                        onClick={() => setUserProfile({ theme: 'light' })}
-                        className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
-                            currentTheme === 'light' 
-                            ? 'border-primary bg-primary/5 text-primary' 
-                            : 'border-transparent bg-secondary/50 hover:bg-secondary text-muted-foreground'
-                        }`}
-                    >
-                        <Sun className="h-6 w-6 mb-2" />
-                        <span className="text-sm font-medium">Light</span>
-                    </button>
-                    <button
-                        onClick={() => setUserProfile({ theme: 'dark' })}
-                        className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
-                            currentTheme === 'dark' 
-                            ? 'border-primary bg-primary/5 text-primary' 
-                            : 'border-transparent bg-secondary/50 hover:bg-secondary text-muted-foreground'
-                        }`}
-                    >
-                        <Moon className="h-6 w-6 mb-2" />
-                        <span className="text-sm font-medium">Dark</span>
-                    </button>
-                    <button
-                        onClick={() => setUserProfile({ theme: 'system' })}
-                        className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
-                            currentTheme === 'system' 
-                            ? 'border-primary bg-primary/5 text-primary' 
-                            : 'border-transparent bg-secondary/50 hover:bg-secondary text-muted-foreground'
-                        }`}
-                    >
-                        <Laptop className="h-6 w-6 mb-2" />
-                        <span className="text-sm font-medium">System</span>
-                    </button>
-                </div>
+          {/* Appearance */}
+          <div className="rounded-2xl border border-border/50 bg-card overflow-hidden">
+            <div className="flex items-center gap-3 px-6 py-4 border-b border-border/40 bg-linear-to-r from-violet-500/8 via-blue-500/5 to-transparent">
+              <div className="p-2 rounded-lg bg-violet-500/15 text-violet-500">
+                <Sun className="h-4 w-4" />
+              </div>
+              <div>
+                <h2 className="font-semibold text-sm">Appearance</h2>
+                <p className="text-xs text-muted-foreground">Choose how Qudoro looks on your device.</p>
+              </div>
             </div>
+            <div className="p-6">
+              <div className="grid grid-cols-3 gap-3 max-w-sm">
+                {([
+                  { id: 'light', label: 'Light', icon: <Sun className="h-5 w-5" />, accent: 'text-amber-500 bg-amber-500/12' },
+                  { id: 'dark', label: 'Dark', icon: <Moon className="h-5 w-5" />, accent: 'text-indigo-400 bg-indigo-500/12' },
+                  { id: 'system', label: 'System', icon: <Laptop className="h-5 w-5" />, accent: 'text-emerald-500 bg-emerald-500/12' },
+                ] as const).map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => setUserProfile({ theme: t.id })}
+                    className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all duration-200 ${
+                      currentTheme === t.id
+                        ? 'border-primary bg-primary/5 shadow-sm'
+                        : 'border-border/40 bg-secondary/30 hover:bg-secondary/60 hover:border-border'
+                    }`}
+                  >
+                    <div className={`p-2 rounded-lg ${currentTheme === t.id ? 'text-primary bg-primary/12' : t.accent}`}>
+                      {t.icon}
+                    </div>
+                    <span className={`text-xs font-medium ${currentTheme === t.id ? 'text-primary' : 'text-muted-foreground'}`}>
+                      {t.label}
+                    </span>
+                    {currentTheme === t.id && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
 
-            {/* User Profile Section */}
-            <div className="bg-card border rounded-xl p-6 space-y-6">
-                <div className="flex items-center gap-4">
-                    <div className="p-3 bg-primary/10 rounded-full text-primary">
-                        <User className="h-6 w-6" />
-                    </div>
-                    <div>
-                        <h2 className="text-xl font-semibold">User Profile</h2>
-                        <p className="text-sm text-muted-foreground">Customize your personal details and study preferences.</p>
-                    </div>
-                </div>
-                
-                <form onSubmit={handleSaveProfile} className="space-y-4 max-w-lg">
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium">Display Name</label>
-                        <Input 
-                            value={name} 
-                            onChange={(e) => setName(e.target.value)} 
-                            placeholder="Enter your name"
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium">Field of Study</label>
-                        <Input 
-                            value={studyField} 
-                            onChange={(e) => setStudyField(e.target.value)} 
-                            placeholder="e.g. Nursing, Law, Computer Science"
-                        />
-                        <p className="text-xs text-muted-foreground">This helps us provide more relevant feedback.</p>
-                    </div>
-                    <Button type="submit" className="w-full sm:w-auto">
-                        {isSaved ? <Check className="mr-2 h-4 w-4" /> : <Save className="mr-2 h-4 w-4" />}
-                        {isSaved ? 'Saved' : 'Save Changes'}
-                    </Button>
-                </form>
+          {/* User Profile */}
+          <div className="rounded-2xl border border-border/50 bg-card overflow-hidden">
+            <div className="flex items-center gap-3 px-6 py-4 border-b border-border/40 bg-linear-to-r from-emerald-500/8 via-teal-500/5 to-transparent">
+              <div className="p-2 rounded-lg bg-emerald-500/15 text-emerald-500">
+                <User className="h-4 w-4" />
+              </div>
+              <div>
+                <h2 className="font-semibold text-sm">User Profile</h2>
+                <p className="text-xs text-muted-foreground">Your personal details and study preferences.</p>
+              </div>
             </div>
+            <div className="p-6">
+              <form onSubmit={handleSaveProfile} className="space-y-4 max-w-md">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Display Name</label>
+                  <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter your name" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Field of Study</label>
+                  <Input value={studyField} onChange={(e) => setStudyField(e.target.value)} placeholder="e.g. Nursing, Law, Computer Science" />
+                  <p className="text-xs text-muted-foreground">Helps us provide more relevant feedback.</p>
+                </div>
+                <Button type="submit" className={`gap-2 transition-all ${isSaved ? 'bg-emerald-600 hover:bg-emerald-700' : ''}`}>
+                  {isSaved ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
+                  {isSaved ? 'Saved!' : 'Save Changes'}
+                </Button>
+              </form>
+            </div>
+          </div>
         </motion.div>
       )}
 
-      {/* Data Tab */}
+      {/* ── DATA TAB ── */}
       {activeTab === 'data' && (
-        <motion.div 
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="space-y-6"
+        <motion.div
+          key="data"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="space-y-5"
         >
-            {/* Data Management Section */}
-            <div className="bg-card border rounded-xl p-6 space-y-6">
-                <div className="flex items-center gap-4">
-                    <div className="p-3 bg-primary/10 rounded-full text-primary">
-                        <Database className="h-6 w-6" />
-                    </div>
-                    <div>
-                        <h2 className="text-xl font-semibold">Data Management</h2>
-                        <p className="text-sm text-muted-foreground">Import, export, or reset your study data.</p>
-                    </div>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-3">
-                    <Button variant="outline" onClick={handleExport} className="h-auto py-4 flex flex-col gap-2 items-center justify-center">
-                        <Download className="h-6 w-6" />
-                        <span>Export Data</span>
-                    </Button>
-                    
-                    <Button variant="outline" onClick={handleImportClick} className="h-auto py-4 flex flex-col gap-2 items-center justify-center">
-                        <Upload className="h-6 w-6" />
-                        <span>Import Data</span>
-                    </Button>
-
-                    <input 
-                        type="file" 
-                        ref={fileInputRef} 
-                        onChange={handleFileChange} 
-                        className="hidden" 
-                        accept=".json"
-                    />
-
-                    <Button variant="outline" onClick={handleReset} className="h-auto py-4 flex flex-col gap-2 items-center justify-center text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20">
-                        <Trash2 className="h-6 w-6" />
-                        <span>Reset All Data</span>
-                    </Button>
-                </div>
-
-                {/* Quizlet Import Section */}
-                <div className="border-t pt-6">
-                    <div className="flex items-center gap-4 mb-4">
-                        <div className="p-3 bg-blue-500/10 rounded-full text-blue-500">
-                            <ExternalLink className="h-6 w-6" />
-                        </div>
-                        <div>
-                            <h2 className="text-xl font-semibold">Import from Quizlet</h2>
-                            <p className="text-sm text-muted-foreground">Reverse-Engineer Quizlet's API to fetch flashcards from a public URL.</p>
-                        </div>
-                    </div>
-                    
-                    <div className="bg-secondary/20 p-6 rounded-xl border border-border/50 space-y-4">
-                        <div className="flex gap-2">
-                            <Input 
-                                placeholder="Paste Quizlet URL (e.g., https://quizlet.com/123456/set-name)"
-                                value={quizletUrl}
-                                onChange={(e) => setQuizletUrl(e.target.value)}
-                                className="flex-1"
-                            />
-                            <Button 
-                                onClick={handleQuizletImport} 
-                                disabled={isImporting || !quizletUrl}
-                                className="min-w-[120px]"
-                            >
-                                {isImporting ? (
-                                    <RefreshCw className="h-4 w-4 animate-spin mr-2" />
-                                ) : (
-                                    <Download className="h-4 w-4 mr-2" />
-                                )}
-                                {isImporting ? 'Fetching...' : 'Import'}
-                            </Button>
-                        </div>
-                        
-                        {importStatus === 'success' && (
-                            <div className="flex items-center gap-2 text-green-500 bg-green-500/10 p-3 rounded-lg text-sm">
-                                <Check className="h-4 w-4" />
-                                {importMsg}
-                            </div>
-                        )}
-                        
-                        {importStatus === 'error' && (
-                            <div className="flex items-center gap-2 text-destructive bg-destructive/10 p-3 rounded-lg text-sm">
-                                <AlertCircle className="h-4 w-4" />
-                                {importMsg}
-                            </div>
-                        )}
-                        
-                        <p className="text-xs text-muted-foreground">
-                            Note: This uses a public proxy to access Quizlet. It only works for <strong>public</strong> sets. Private or password-protected sets cannot be imported.
-                        </p>
-                    </div>
-                </div>
+          {/* Data Management */}
+          <div className="rounded-2xl border border-border/50 bg-card overflow-hidden">
+            <div className="flex items-center gap-3 px-6 py-4 border-b border-border/40 bg-linear-to-r from-blue-500/8 via-cyan-500/5 to-transparent">
+              <div className="p-2 rounded-lg bg-blue-500/15 text-blue-500">
+                <Database className="h-4 w-4" />
+              </div>
+              <div>
+                <h2 className="font-semibold text-sm">Data Management</h2>
+                <p className="text-xs text-muted-foreground">Back up, restore, or reset your study data.</p>
+              </div>
             </div>
+            <div className="p-6">
+              <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".json" />
+              <div className="grid gap-3 sm:grid-cols-3">
+                {/* Export */}
+                <button
+                  onClick={handleExport}
+                  className="group flex flex-col items-center gap-3 p-5 rounded-xl border border-blue-500/20 bg-blue-500/5 hover:bg-blue-500/10 hover:border-blue-500/40 transition-all duration-200"
+                >
+                  <div className="p-3 rounded-xl bg-blue-500/15 text-blue-500 group-hover:scale-110 transition-transform">
+                    <Download className="h-5 w-5" />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-semibold">Export</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Save backup</p>
+                  </div>
+                </button>
+
+                {/* Import */}
+                <button
+                  onClick={handleImportClick}
+                  className="group flex flex-col items-center gap-3 p-5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 hover:border-emerald-500/40 transition-all duration-200"
+                >
+                  <div className="p-3 rounded-xl bg-emerald-500/15 text-emerald-500 group-hover:scale-110 transition-transform">
+                    <Upload className="h-5 w-5" />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-semibold">Import</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Load backup</p>
+                  </div>
+                </button>
+
+                {/* Reset */}
+                <button
+                  onClick={handleReset}
+                  className="group flex flex-col items-center gap-3 p-5 rounded-xl border border-destructive/20 bg-destructive/5 hover:bg-destructive/10 hover:border-destructive/40 transition-all duration-200"
+                >
+                  <div className="p-3 rounded-xl bg-destructive/15 text-destructive group-hover:scale-110 transition-transform">
+                    <Trash2 className="h-5 w-5" />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-semibold text-destructive">Reset</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Delete all data</p>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Quizlet Import */}
+          <div className="rounded-2xl border border-border/50 bg-card overflow-hidden">
+            <div className="flex items-center gap-3 px-6 py-4 border-b border-border/40 bg-linear-to-r from-sky-500/8 via-indigo-500/5 to-transparent">
+              <div className="p-2 rounded-lg bg-sky-500/15 text-sky-500">
+                <ExternalLink className="h-4 w-4" />
+              </div>
+              <div>
+                <h2 className="font-semibold text-sm">Import from Quizlet</h2>
+                <p className="text-xs text-muted-foreground">Fetch flashcards from any public Quizlet set.</p>
+              </div>
+              <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-500 border border-sky-500/25">
+                PUBLIC ONLY
+              </span>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Paste Quizlet URL — e.g. https://quizlet.com/123456/set-name"
+                  value={quizletUrl}
+                  onChange={(e) => setQuizletUrl(e.target.value)}
+                  className="flex-1"
+                />
+                <Button
+                  onClick={handleQuizletImport}
+                  disabled={isImporting || !quizletUrl}
+                  className="min-w-[110px] gap-2"
+                >
+                  {isImporting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                  {isImporting ? 'Fetching…' : 'Import'}
+                </Button>
+              </div>
+
+              {importStatus === 'loading' && importMsg && (
+                <div className="flex items-center gap-2 text-sky-500 bg-sky-500/8 border border-sky-500/20 p-3 rounded-xl text-xs">
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin shrink-0" />
+                  {importMsg}
+                </div>
+              )}
+              {importStatus === 'success' && (
+                <div className="flex items-center gap-2 text-emerald-500 bg-emerald-500/8 border border-emerald-500/20 p-3 rounded-xl text-xs">
+                  <Check className="h-3.5 w-3.5 shrink-0" />
+                  {importMsg}
+                </div>
+              )}
+              {importStatus === 'error' && (
+                <div className="flex items-center gap-2 text-destructive bg-destructive/8 border border-destructive/20 p-3 rounded-xl text-xs">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                  {importMsg}
+                </div>
+              )}
+
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Uses a public proxy to fetch Quizlet content. Only <strong className="text-foreground">public</strong> sets can be imported — private or password-protected sets will fail.
+              </p>
+            </div>
+          </div>
         </motion.div>
       )}
 
-      {/* About Tab */}
+      {/* ── ABOUT TAB ── */}
       {activeTab === 'about' && (
-        <motion.div 
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="space-y-6"
+        <motion.div
+          key="about"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="space-y-5"
         >
-            {/* Community & Feedback Section */}
-            <div className="bg-card border rounded-xl p-6 space-y-6">
-                <div className="flex items-center gap-4">
-                    <div className="p-3 bg-primary/10 rounded-full text-primary">
-                        <Users className="h-6 w-6" />
-                    </div>
-                    <div>
-                        <h2 className="text-xl font-semibold">Community & Feedback</h2>
-                        <p className="text-sm text-muted-foreground">Join the conversation and help shape Qudoro.</p>
-                    </div>
-                </div>
-                
-                <div className="grid gap-6 md:grid-cols-2">
-                    <div className="space-y-4 p-4 rounded-lg bg-secondary/20 border border-secondary">
-                        <h3 className="font-semibold flex items-center gap-2">
-                            <Users className="h-4 w-4" />
-                            Feature Requests & Voting
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                            Have an idea? Post it on our community board. Other users can vote on features they want to see next.
-                        </p>
-                        <Button 
-                            onClick={() => void handleOpenExternal('https://github.com/Mbstudio101/Qudoro/discussions')}
-                            className="w-full"
-                        >
-                            <ExternalLink className="mr-2 h-4 w-4" />
-                            Join the Discussion
-                        </Button>
-                    </div>
-
-                    <div className="space-y-4 p-4 rounded-lg bg-secondary/20 border border-secondary">
-                        <h3 className="font-semibold flex items-center gap-2">
-                            <Mail className="h-4 w-4" />
-                            Private Feedback
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                            Found a critical bug or have a private concern? Email our support team directly.
-                        </p>
-                        <Button 
-                            onClick={() => void handleOpenExternal('mailto:feedback@qudoro.com?subject=Qudoro Feedback')}
-                            className="w-full"
-                            variant="outline"
-                        >
-                            <MessageSquare className="mr-2 h-4 w-4" />
-                            Send Email
-                        </Button>
-                    </div>
-                </div>
+          {/* Community & Feedback */}
+          <div className="rounded-2xl border border-border/50 bg-card overflow-hidden">
+            <div className="flex items-center gap-3 px-6 py-4 border-b border-border/40 bg-linear-to-r from-fuchsia-500/8 via-purple-500/5 to-transparent">
+              <div className="p-2 rounded-lg bg-fuchsia-500/15 text-fuchsia-500">
+                <Users className="h-4 w-4" />
+              </div>
+              <div>
+                <h2 className="font-semibold text-sm">Community & Feedback</h2>
+                <p className="text-xs text-muted-foreground">Help shape the future of Qudoro.</p>
+              </div>
             </div>
-
-            {/* Legal Section */}
-            <div className="bg-card border rounded-xl p-6 space-y-6">
-                <div className="flex items-center gap-4">
-                    <div className="p-3 bg-primary/10 rounded-full text-primary">
-                        <Shield className="h-6 w-6" />
-                    </div>
-                    <div>
-                        <h2 className="text-xl font-semibold">Legal & Compliance</h2>
-                        <p className="text-sm text-muted-foreground">Review our terms of service and privacy policies.</p>
-                    </div>
+            <div className="p-6 grid gap-4 sm:grid-cols-2">
+              {/* GitHub Discussion */}
+              <div className="flex flex-col gap-3 p-4 rounded-xl border border-fuchsia-500/20 bg-fuchsia-500/5">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-fuchsia-500/15 text-fuchsia-500">
+                    <Users className="h-3.5 w-3.5" />
+                  </div>
+                  <span className="text-sm font-semibold">Feature Requests</span>
                 </div>
-                
-                <div className="grid gap-4 md:grid-cols-2 max-w-lg">
-                    <Button variant="outline" onClick={() => setShowTerms(true)} className="justify-start">
-                        <FileText className="mr-2 h-4 w-4" />
-                        Terms of Service
+                <p className="text-xs text-muted-foreground leading-relaxed flex-1">
+                  Have an idea? Post it on our board — other users vote on what gets built next.
+                </p>
+                <Button
+                  onClick={() => void handleOpenExternal('https://github.com/Mbstudio101/Qudoro/discussions')}
+                  className="w-full gap-2 bg-fuchsia-600 hover:bg-fuchsia-700 text-white border-0"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Join the Discussion
+                </Button>
+              </div>
+
+              {/* Email Support */}
+              <div className="flex flex-col gap-3 p-4 rounded-xl border border-border/40 bg-secondary/20">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-secondary text-muted-foreground">
+                    <Mail className="h-3.5 w-3.5" />
+                  </div>
+                  <span className="text-sm font-semibold">Private Feedback</span>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed flex-1">
+                  Found a critical bug or have a private concern? Reach out directly.
+                </p>
+                <Button
+                  variant="outline"
+                  onClick={() => void handleOpenExternal('mailto:feedback@qudoro.com?subject=Qudoro Feedback')}
+                  className="w-full gap-2"
+                >
+                  <MessageSquare className="h-3.5 w-3.5" />
+                  Send Email
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Legal */}
+          <div className="rounded-2xl border border-border/50 bg-card overflow-hidden">
+            <div className="flex items-center gap-3 px-6 py-4 border-b border-border/40 bg-linear-to-r from-slate-500/8 to-transparent">
+              <div className="p-2 rounded-lg bg-slate-500/15 text-slate-400">
+                <Shield className="h-4 w-4" />
+              </div>
+              <div>
+                <h2 className="font-semibold text-sm">Legal & Compliance</h2>
+                <p className="text-xs text-muted-foreground">Review our policies and terms.</p>
+              </div>
+            </div>
+            <div className="p-6 flex gap-3">
+              <button
+                onClick={() => setShowTerms(true)}
+                className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl border border-border/50 bg-secondary/30 hover:bg-secondary/60 text-sm font-medium transition-all"
+              >
+                <FileText className="h-4 w-4 text-muted-foreground" />
+                Terms of Service
+              </button>
+              <button
+                onClick={() => setShowPrivacy(true)}
+                className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl border border-border/50 bg-secondary/30 hover:bg-secondary/60 text-sm font-medium transition-all"
+              >
+                <Lock className="h-4 w-4 text-muted-foreground" />
+                Privacy Policy
+              </button>
+            </div>
+          </div>
+
+          {/* Updates */}
+          <div className="rounded-2xl border border-border/50 bg-card overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border/40 bg-linear-to-r from-amber-500/8 via-orange-500/5 to-transparent">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-amber-500/15 text-amber-500">
+                  <Package className="h-4 w-4" />
+                </div>
+                <div>
+                  <h2 className="font-semibold text-sm">Application Updates</h2>
+                  <p className="text-xs text-muted-foreground">Current version: <span className="font-mono">1.0.0</span></p>
+                </div>
+              </div>
+              {(status === 'idle' || status === 'not-available' || status === 'error') && (
+                <Button onClick={checkForUpdates} variant="outline" className="gap-2 text-xs h-8">
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Check for Updates
+                </Button>
+              )}
+            </div>
+            <div className="p-6">
+              {status === 'idle' && (
+                <p className="text-xs text-muted-foreground">Click "Check for Updates" to see if a new version is available.</p>
+              )}
+
+              {status === 'checking' && (
+                <div className="flex items-center gap-3 text-muted-foreground">
+                  <RefreshCw className="h-4 w-4 animate-spin text-primary" />
+                  <p className="text-sm">Checking for updates…</p>
+                </div>
+              )}
+
+              {status === 'not-available' && (
+                <div className="flex items-center gap-3 text-emerald-500 bg-emerald-500/8 border border-emerald-500/20 p-4 rounded-xl">
+                  <Check className="h-5 w-5 shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold">You're up to date!</p>
+                    <p className="text-xs text-emerald-600/80 dark:text-emerald-400/80">Qudoro 1.0.0 is the latest version.</p>
+                  </div>
+                </div>
+              )}
+
+              {status === 'available' && updateInfo && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-4 rounded-xl bg-primary/5 border border-primary/20">
+                    <div>
+                      <p className="font-semibold text-sm">v{updateInfo.version} Available</p>
+                      <p className="text-xs text-muted-foreground">Released {new Date(updateInfo.releaseDate).toLocaleDateString()}</p>
+                    </div>
+                    <Button onClick={downloadUpdate} className="gap-2 h-8 text-xs">
+                      <Download className="h-3.5 w-3.5" />
+                      Download
                     </Button>
-                    <Button variant="outline" onClick={() => setShowPrivacy(true)} className="justify-start">
-                        <Lock className="mr-2 h-4 w-4" />
-                        Privacy Policy
-                    </Button>
-                </div>
-            </div>
-
-            {/* Update Section */}
-            <div className="bg-card border rounded-xl p-6 space-y-6">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <div className="p-3 bg-primary/10 rounded-full text-primary">
-                            <Package className="h-6 w-6" />
-                        </div>
-                        <div>
-                            <h2 className="text-xl font-semibold">Application Updates</h2>
-                            <p className="text-sm text-muted-foreground">Current Version: 1.0.0</p>
-                        </div>
+                  </div>
+                  {updateInfo.releaseNotes && (
+                    <div className="bg-secondary/30 p-4 rounded-xl text-xs max-h-48 overflow-y-auto">
+                      <p className="font-semibold mb-2 text-muted-foreground uppercase tracking-wide">Release Notes</p>
+                      <div className="prose prose-sm dark:prose-invert" dangerouslySetInnerHTML={{ __html: updateInfo.releaseNotes }} />
                     </div>
+                  )}
+                </div>
+              )}
+
+              {status === 'downloading' && (
+                <div className="space-y-3">
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Downloading update…</span>
+                    <span className="font-mono font-semibold">{Math.round(progress)}%</span>
+                  </div>
+                  <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                    <motion.div
+                      className="h-full bg-linear-to-r from-primary to-primary/70 rounded-full"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${progress}%` }}
+                      transition={{ duration: 0.3 }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {status === 'downloaded' && (
+                <div className="flex items-center justify-between p-4 rounded-xl bg-emerald-500/8 border border-emerald-500/20">
+                  <div className="flex items-center gap-3">
+                    <Check className="h-5 w-5 text-emerald-500 shrink-0" />
                     <div>
-                        {status === 'idle' || status === 'not-available' || status === 'error' ? (
-                            <Button onClick={checkForUpdates}>
-                                <RefreshCw className="mr-2 h-4 w-4" />
-                                Check for Updates
-                            </Button>
-                        ) : null}
+                      <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">Ready to Install</p>
+                      <p className="text-xs text-emerald-600/75 dark:text-emerald-400/75">Restart the app to apply changes.</p>
                     </div>
+                  </div>
+                  <Button onClick={installUpdate} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 h-8 text-xs">
+                    Restart & Install
+                  </Button>
                 </div>
+              )}
 
-                <div className="border-t pt-6">
-                    {status === 'checking' && (
-                        <div className="text-center py-4 text-muted-foreground">
-                            <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2" />
-                            <p>Checking for updates...</p>
-                        </div>
-                    )}
-
-                    {status === 'not-available' && (
-                        <div className="flex items-center gap-2 text-green-600 bg-green-500/10 p-4 rounded-lg">
-                            <Check className="h-5 w-5" />
-                            <p>You are using the latest version.</p>
-                        </div>
-                    )}
-
-                    {status === 'available' && updateInfo && (
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between bg-primary/5 p-4 rounded-lg border border-primary/20">
-                                <div>
-                                    <h3 className="font-semibold text-lg">New Update Available: {updateInfo.version}</h3>
-                                    <p className="text-sm text-muted-foreground">Released: {new Date(updateInfo.releaseDate).toLocaleDateString()}</p>
-                                </div>
-                                <Button onClick={downloadUpdate}>
-                                    <Download className="mr-2 h-4 w-4" />
-                                    Download Update
-                                </Button>
-                            </div>
-                            {updateInfo.releaseNotes && (
-                                <div className="bg-secondary/30 p-4 rounded-lg text-sm max-h-60 overflow-y-auto">
-                                    <h4 className="font-medium mb-2">Release Notes:</h4>
-                                    <div className="prose prose-sm dark:prose-invert" dangerouslySetInnerHTML={{ __html: updateInfo.releaseNotes }}></div>
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {status === 'downloading' && (
-                        <div className="space-y-2">
-                            <div className="flex justify-between text-sm">
-                                <span>Downloading update...</span>
-                                <span>{Math.round(progress)}%</span>
-                            </div>
-                            <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                                <motion.div 
-                                    className="h-full bg-primary"
-                                    initial={{ width: 0 }}
-                                    animate={{ width: `${progress}%` }}
-                                />
-                            </div>
-                        </div>
-                    )}
-
-                    {status === 'downloaded' && (
-                        <div className="flex items-center justify-between bg-green-500/10 p-4 rounded-lg border border-green-500/20">
-                            <div className="flex items-center gap-3">
-                                <Check className="h-5 w-5 text-green-600" />
-                                <div>
-                                    <h3 className="font-semibold text-green-700 dark:text-green-400">Update Ready to Install</h3>
-                                    <p className="text-sm text-green-600/80 dark:text-green-400/80">Restart the application to apply changes.</p>
-                                </div>
-                            </div>
-                            <Button onClick={installUpdate} className="bg-green-600 hover:bg-green-700 text-white">
-                                Restart & Install
-                            </Button>
-                        </div>
-                    )}
-
-                    {status === 'error' && (
-                        <div className="flex items-center gap-2 text-destructive bg-destructive/10 p-4 rounded-lg">
-                            <AlertCircle className="h-5 w-5" />
-                            <p>Error: {error}</p>
-                        </div>
-                    )}
+              {status === 'error' && (
+                <div className="flex items-center gap-3 text-destructive bg-destructive/8 border border-destructive/20 p-4 rounded-xl">
+                  <AlertCircle className="h-5 w-5 shrink-0" />
+                  <p className="text-sm">{error || 'Failed to check for updates.'}</p>
                 </div>
+              )}
             </div>
+          </div>
         </motion.div>
       )}
-      </div>
 
+      {/* Terms Modal */}
       <Modal isOpen={showTerms} onClose={() => setShowTerms(false)} title="Terms of Service" className="max-w-2xl">
         <div className="max-h-[60vh] overflow-y-auto space-y-4 pr-2 text-sm text-muted-foreground">
-            <p className="font-semibold text-foreground">Last Updated: {new Date().toLocaleDateString()}</p>
-            
-            <section className="space-y-2">
-                <h3 className="font-semibold text-foreground">1. Acceptance of Terms</h3>
-                <p>By accessing or using Qudoro ("the Application"), you agree to be bound by these Terms of Service. If you do not agree, do not use the Application.</p>
-            </section>
-
-            <section className="space-y-2">
-                <h3 className="font-semibold text-foreground">2. Educational Purposes Only</h3>
-                <p>Qudoro is a study aid intended solely for educational and informational purposes. It is not a substitute for professional training, official certification exams, or accredited educational programs. We do not guarantee that using this Application will result in passing any specific examination or obtaining any certification.</p>
-            </section>
-
-            <section className="space-y-2">
-                <h3 className="font-semibold text-foreground">3. Medical Disclaimer</h3>
-                <p>Content related to nursing, medicine, or health is for practice purposes only and does not constitute medical advice, diagnosis, or treatment. Always follow official protocols and consult qualified healthcare professionals for medical decisions.</p>
-            </section>
-
-            <section className="space-y-2">
-                <h3 className="font-semibold text-foreground">4. "As Is" Disclaimer</h3>
-                <p className="uppercase">THE APPLICATION IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, OR NON-INFRINGEMENT.</p>
-            </section>
-
-            <section className="space-y-2">
-                <h3 className="font-semibold text-foreground">5. Limitation of Liability</h3>
-                <p className="uppercase">TO THE MAXIMUM EXTENT PERMITTED BY LAW, QUDORO AND ITS DEVELOPERS SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR ANY LOSS OF PROFITS OR REVENUES, WHETHER INCURRED DIRECTLY OR INDIRECTLY, OR ANY LOSS OF DATA, USE, GOODWILL, OR OTHER INTANGIBLE LOSSES, RESULTING FROM YOUR USE OF THE APPLICATION.</p>
-            </section>
-
-            <section className="space-y-2">
-                <h3 className="font-semibold text-foreground">6. Intellectual Property</h3>
-                <p>All content, features, and functionality of the Application (excluding user-generated content) are owned by the developers of Qudoro and are protected by international copyright, trademark, patent, trade secret, and other intellectual property laws.</p>
-            </section>
+          <p className="font-semibold text-foreground">Last Updated: {new Date().toLocaleDateString()}</p>
+          <section className="space-y-2">
+            <h3 className="font-semibold text-foreground">1. Acceptance of Terms</h3>
+            <p>By accessing or using Qudoro ("the Application"), you agree to be bound by these Terms of Service. If you do not agree, do not use the Application.</p>
+          </section>
+          <section className="space-y-2">
+            <h3 className="font-semibold text-foreground">2. Educational Purposes Only</h3>
+            <p>Qudoro is a study aid intended solely for educational and informational purposes. It is not a substitute for professional training, official certification exams, or accredited educational programs. We do not guarantee that using this Application will result in passing any specific examination or obtaining any certification.</p>
+          </section>
+          <section className="space-y-2">
+            <h3 className="font-semibold text-foreground">3. Medical Disclaimer</h3>
+            <p>Content related to nursing, medicine, or health is for practice purposes only and does not constitute medical advice, diagnosis, or treatment. Always follow official protocols and consult qualified healthcare professionals for medical decisions.</p>
+          </section>
+          <section className="space-y-2">
+            <h3 className="font-semibold text-foreground">4. "As Is" Disclaimer</h3>
+            <p className="uppercase">THE APPLICATION IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, OR NON-INFRINGEMENT.</p>
+          </section>
+          <section className="space-y-2">
+            <h3 className="font-semibold text-foreground">5. Limitation of Liability</h3>
+            <p className="uppercase">TO THE MAXIMUM EXTENT PERMITTED BY LAW, QUDORO AND ITS DEVELOPERS SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR ANY LOSS OF PROFITS OR REVENUES, WHETHER INCURRED DIRECTLY OR INDIRECTLY, OR ANY LOSS OF DATA, USE, GOODWILL, OR OTHER INTANGIBLE LOSSES, RESULTING FROM YOUR USE OF THE APPLICATION.</p>
+          </section>
+          <section className="space-y-2">
+            <h3 className="font-semibold text-foreground">6. Intellectual Property</h3>
+            <p>All content, features, and functionality of the Application (excluding user-generated content) are owned by the developers of Qudoro and are protected by international copyright, trademark, patent, trade secret, and other intellectual property laws.</p>
+          </section>
         </div>
       </Modal>
 
+      {/* Privacy Modal */}
       <Modal isOpen={showPrivacy} onClose={() => setShowPrivacy(false)} title="Privacy Policy" className="max-w-2xl">
         <div className="max-h-[60vh] overflow-y-auto space-y-4 pr-2 text-sm text-muted-foreground">
-            <p className="font-semibold text-foreground">Last Updated: {new Date().toLocaleDateString()}</p>
-            
-            <section className="space-y-2">
-                <h3 className="font-semibold text-foreground">1. Data Collection & Storage</h3>
-                <p>Qudoro operates on a "local-first" basis. We do not collect, transmit, or store your personal study data, flashcards, or exam results on our servers. All such data is stored locally on your device.</p>
-            </section>
-
-            <section className="space-y-2">
-                <h3 className="font-semibold text-foreground">2. User Profile Information</h3>
-                <p>Information you enter into your profile (such as your name, field of study, and avatar preferences) remains on your local device. We do not have access to this information.</p>
-            </section>
-
-            <section className="space-y-2">
-                <h3 className="font-semibold text-foreground">3. Third-Party Services</h3>
-                <ul className="list-disc pl-5 space-y-1">
-                    <li><strong>DiceBear:</strong> We use the DiceBear API to generate avatar images. When you create an avatar, your configuration choices are sent to DiceBear's servers to generate the image. Please review <a href="https://dicebear.com/legal/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">DiceBear's Privacy Policy</a>.</li>
-                    <li><strong>Cash App:</strong> If you choose to donate, you will be directed to Cash App. We do not process payments directly and do not have access to your financial information.</li>
-                </ul>
-            </section>
-
-            <section className="space-y-2">
-                <h3 className="font-semibold text-foreground">4. Data Security</h3>
-                <p>Since your data is stored locally, you are responsible for securing your device. We recommend using device-level security features (passwords, encryption) to protect your study data.</p>
-            </section>
-
-            <section className="space-y-2">
-                <h3 className="font-semibold text-foreground">5. Changes to This Policy</h3>
-                <p>We may update our Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page and updating the "Last Updated" date.</p>
-            </section>
+          <p className="font-semibold text-foreground">Last Updated: {new Date().toLocaleDateString()}</p>
+          <section className="space-y-2">
+            <h3 className="font-semibold text-foreground">1. Data Collection & Storage</h3>
+            <p>Qudoro operates on a "local-first" basis. We do not collect, transmit, or store your personal study data, flashcards, or exam results on our servers. All such data is stored locally on your device.</p>
+          </section>
+          <section className="space-y-2">
+            <h3 className="font-semibold text-foreground">2. User Profile Information</h3>
+            <p>Information you enter into your profile (such as your name, field of study, and avatar preferences) remains on your local device. We do not have access to this information.</p>
+          </section>
+          <section className="space-y-2">
+            <h3 className="font-semibold text-foreground">3. Third-Party Services</h3>
+            <ul className="list-disc pl-5 space-y-1">
+              <li><strong>DiceBear:</strong> We use the DiceBear API to generate avatar images. When you create an avatar, your configuration choices are sent to DiceBear's servers to generate the image. Please review <a href="https://dicebear.com/legal/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">DiceBear's Privacy Policy</a>.</li>
+              <li><strong>Cash App:</strong> If you choose to donate, you will be directed to Cash App. We do not process payments directly and do not have access to your financial information.</li>
+            </ul>
+          </section>
+          <section className="space-y-2">
+            <h3 className="font-semibold text-foreground">4. Data Security</h3>
+            <p>Since your data is stored locally, you are responsible for securing your device. We recommend using device-level security features (passwords, encryption) to protect your study data.</p>
+          </section>
+          <section className="space-y-2">
+            <h3 className="font-semibold text-foreground">5. Changes to This Policy</h3>
+            <p>We may update our Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page and updating the "Last Updated" date.</p>
+          </section>
         </div>
       </Modal>
     </div>

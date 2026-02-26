@@ -419,9 +419,44 @@ const Practice = () => {
                                     <span>Perfect score! You have mastered this material. Challenge yourself with a harder set next!</span>
                                 </div>
                             ) : (
-                                <p className="text-sm text-muted-foreground">
-                                    You missed a few questions, but they didn't have specific tags. Review the rationales below to understand the concepts better.
-                                </p>
+                                <div className="space-y-3">
+                                    {/* Score-aware recommendation */}
+                                    <p className="text-sm text-muted-foreground">
+                                        {percentage >= 85
+                                            ? `So close to perfect! Review the ${setQuestions.length - score} missed question${setQuestions.length - score !== 1 ? 's' : ''} below — one more round should get you there.`
+                                            : percentage >= 70
+                                            ? `Good work! Drilling the ${setQuestions.length - score} missed question${setQuestions.length - score !== 1 ? 's' : ''} below will push you over the mastery line.`
+                                            : percentage >= 50
+                                            ? `You're making progress. Focus on the questions below — read each rationale carefully to understand the reasoning.`
+                                            : `Take time to work through each missed question and its rationale below. Understanding the "why" builds lasting retention.`}
+                                    </p>
+
+                                    {/* Missed question snippets */}
+                                    {incorrectQuestions.length > 0 && (
+                                        <div className="space-y-1.5 pt-1">
+                                            {incorrectQuestions.slice(0, 5).map((q, i) => {
+                                                const plain = q.content.replace(/<[^>]*>/g, '').trim();
+                                                const snippet = plain.length > 90 ? plain.slice(0, 90) + '…' : plain;
+                                                return (
+                                                    <div key={q.id} className="flex items-start gap-2 text-xs bg-red-500/5 border border-red-500/10 rounded-lg px-3 py-2">
+                                                        <span className="text-red-400 font-bold shrink-0 mt-0.5">#{i + 1}</span>
+                                                        <span className="text-muted-foreground leading-relaxed">{snippet}</span>
+                                                    </div>
+                                                );
+                                            })}
+                                            {incorrectQuestions.length > 5 && (
+                                                <p className="text-xs text-muted-foreground px-1">
+                                                    +{incorrectQuestions.length - 5} more missed questions — see full review below.
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Drill tip */}
+                                    <p className="text-xs text-muted-foreground border-t border-border/40 pt-2 mt-1">
+                                        💡 Use <span className="text-primary font-medium">Drill Missed Cards</span> at the bottom to practice only the questions you got wrong.
+                                    </p>
+                                </div>
                             )}
                         </div>
                     </div>
