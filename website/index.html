@@ -1,112 +1,314 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Qudoro | Intelligent Study Platform</title>
-    <meta
-      name="description"
-      content="Qudoro is an intelligent study platform for question-bank workflows, exam simulation, flashcards, notes, and community-driven feature development."
-    />
-    <link rel="icon" href="/icon.png" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700;800&family=Manrope:wght@400;500;700&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="/styles.css" />
-  </head>
-  <body>
-    <div class="bg-shape bg-shape-1"></div>
-    <div class="bg-shape bg-shape-2"></div>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Qudoro — Intelligent Study Platform</title>
+  <meta name="description" content="Qudoro is an intelligent study engine for nursing and exam-heavy study tracks. Question banks, exam simulation, spaced-repetition flashcards, and community sets — all in one desktop app." />
+  <link rel="icon" href="/icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700;800&family=Manrope:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    /* ── Hero ── */
+    .hero {
+      display: grid;
+      grid-template-columns: 1.15fr 1fr;
+      gap: 2.5rem;
+      align-items: center;
+      padding: 4.5rem 0 3rem;
+    }
+    .hero h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(2.2rem, 5.5vw, 3.8rem);
+      font-weight: 800;
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      margin: 0.7rem 0 1rem;
+    }
+    .hero-sub {
+      color: var(--muted);
+      font-size: 1.08rem;
+      line-height: 1.7;
+      max-width: 52ch;
+      margin-bottom: 1.8rem;
+    }
+    .hero-cta { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+    .hero-meta { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1.5rem; }
 
-    <header class="container nav">
-      <a class="brand" href="/">
-        <img src="/icon.png" alt="Qudoro logo" />
-        <span>Qudoro</span>
-      </a>
-      <div class="nav-links">
-        <a href="/download">Download</a>
-        <a href="/features">Features</a>
-        <a href="/tour">Tour</a>
-        <a href="/why">Why Qudoro</a>
-        <a href="/forum">Forum</a>
-        <a href="/terms">Terms</a>
-        <a href="/privacy">Privacy</a>
+    /* Hero visual */
+    .hero-visual { position: relative; }
+    .hero-visual .screenshot-wrap { box-shadow: 0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px var(--border), 0 0 80px rgba(99,102,241,0.12); }
+
+    /* Floating badges */
+    .badge-float {
+      position: absolute;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.52rem 0.85rem;
+      border-radius: 12px;
+      background: rgba(12, 20, 40, 0.88);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(16px);
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--text);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+      white-space: nowrap;
+    }
+    .badge-float .icon { font-size: 1rem; }
+    .badge-1 { top: -1rem; right: -1.5rem; }
+    .badge-2 { bottom: 2rem; left: -1.8rem; }
+
+    /* ── Social proof strip ── */
+    .social-strip {
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+      padding: 1.5rem 0;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+    .social-strip p { color: var(--subtle); font-size: 0.88rem; }
+    .social-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.88rem; font-weight: 700; color: var(--muted); }
+    .social-item strong { color: var(--text); }
+
+    /* ── Features overview ── */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+    }
+
+    /* ── Workflow section ── */
+    .workflow-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.9rem;
+    }
+    .workflow-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--bg-card);
+      padding: 1.2rem;
+      transition: border-color 180ms, background 180ms;
+    }
+    .workflow-card:hover { border-color: var(--border-h); background: var(--bg-card-h); }
+
+    /* ── Community section ── */
+    .community-card {
+      border: 1px solid rgba(99,102,241,0.25);
+      border-radius: 20px;
+      background: linear-gradient(135deg, rgba(99,102,241,0.08), rgba(139,92,246,0.06));
+      padding: 2.5rem;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 2rem;
+    }
+    .community-card h2 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(1.4rem, 3vw, 2rem);
+      font-weight: 800;
+      margin-bottom: 0.6rem;
+    }
+
+    @media (max-width: 900px) {
+      .hero { grid-template-columns: 1fr; padding: 3rem 0 2rem; }
+      .hero-visual { display: none; }
+      .features-grid { grid-template-columns: 1fr; }
+      .workflow-grid  { grid-template-columns: 1fr; }
+      .community-card { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+
+  <!-- Nav -->
+  <header class="container nav">
+    <a class="brand" href="/"><img src="/icon.png" alt="Qudoro" /><span class="brand-name">Qudoro</span></a>
+    <nav class="nav-links">
+      <a href="/download">Download</a>
+      <a href="/features">Features</a>
+      <a href="/tour">Tour</a>
+      <a href="/why">Why Qudoro</a>
+      <a href="/forum">Forum</a>
+      <a href="/download" class="nav-cta">Get the App</a>
+    </nav>
+  </header>
+
+  <main>
+    <!-- ── Hero ───────────────────────────────────────────────────── -->
+    <section class="container hero">
+      <div class="hero-copy">
+        <span class="pill">✦ Purpose-built for nursing &amp; exam-heavy tracks</span>
+        <h1>Master what's hardest.<br /><span class="grad-text">Forget less.</span><br />Pass with confidence.</h1>
+        <p class="hero-sub">
+          Qudoro is your intelligent study engine — it surfaces weak areas, reinforces high-yield concepts, and turns every practice session into measurable progress.
+        </p>
+        <div class="hero-cta">
+          <a class="btn btn-primary btn-lg" href="/download">Download Free</a>
+          <a class="btn btn-outline btn-lg" href="/features">See All Features</a>
+        </div>
+        <div class="hero-meta">
+          <span class="stat-chip"><strong>Free</strong> desktop app</span>
+          <span class="stat-chip">macOS &amp; Windows</span>
+          <span class="stat-chip">✦ Community-driven</span>
+        </div>
       </div>
-    </header>
 
-    <main>
-      <section class="container hero">
-        <div class="hero-copy">
-          <p class="pill">Purpose-built for nursing and exam-heavy study tracks</p>
-          <h1>Master what’s hardest, forget less, and walk into exam day fully prepared.</h1>
-          <p class="sub">
-            Qudoro is your intelligent study engine: it surfaces weak areas, reinforces high-yield concepts, and
-            turns every practice session into measurable progress.
+      <div class="hero-visual">
+        <div class="screenshot-wrap">
+          <div class="screenshot-bar">
+            <span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span>
+          </div>
+          <img src="/screenshots/practice-mode.png" alt="Qudoro practice mode" loading="eager" />
+        </div>
+        <div class="badge-float badge-1">
+          <span class="icon">🎯</span>
+          <span>92% accuracy — keep it up</span>
+        </div>
+        <div class="badge-float badge-2">
+          <span class="icon">🔥</span>
+          <span>12-day streak</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Social proof ────────────────────────────────────────────── -->
+    <div class="container">
+      <div class="social-strip">
+        <p>Trusted by nursing students preparing for</p>
+        <span class="social-item">📋 <strong>NCLEX-RN</strong></span>
+        <span class="social-item">🩺 <strong>NCLEX-PN</strong></span>
+        <span class="social-item">📚 <strong>Fundamentals</strong></span>
+        <span class="social-item">💊 <strong>Pharmacology</strong></span>
+        <span class="social-item">🧠 <strong>Psych Nursing</strong></span>
+      </div>
+    </div>
+
+    <!-- ── Features overview ───────────────────────────────────────── -->
+    <section class="container section">
+      <div class="section-label">Platform</div>
+      <h2 class="section-title">Everything you need to<br /><span class="grad-text">study smarter</span></h2>
+      <p class="section-sub" style="margin-bottom:2.5rem">Six integrated workflows that work together — from creating questions to reviewing what you missed.</p>
+
+      <div class="features-grid">
+        <article class="card">
+          <div class="feat-icon icon-indigo">📝</div>
+          <h3>Question Bank</h3>
+          <p>Build, import, or paste MCQs with auto-structure detection. Rich text, images, SATA support.</p>
+        </article>
+        <article class="card">
+          <div class="feat-icon icon-violet">📊</div>
+          <h3>Exam Simulation</h3>
+          <p>Timed exams, randomized order, immediate rationale feedback, and full review of missed items.</p>
+        </article>
+        <article class="card">
+          <div class="feat-icon icon-cyan">🃏</div>
+          <h3>Spaced Flashcards</h3>
+          <p>SM-2 algorithm schedules each card for the optimal review interval — no guesswork needed.</p>
+        </article>
+        <article class="card">
+          <div class="feat-icon icon-green">📒</div>
+          <h3>Notes</h3>
+          <p>Rich-text notes linked to sets. Convert notes into flashcards automatically.</p>
+        </article>
+        <article class="card">
+          <div class="feat-icon icon-amber">🌍</div>
+          <h3>Discover Marketplace</h3>
+          <p>Browse, import, and vote on community question sets. Publish your own for others.</p>
+        </article>
+        <article class="card">
+          <div class="feat-icon icon-rose">🏆</div>
+          <h3>Progress &amp; XP</h3>
+          <p>Streaks, level-up XP, achievements, and deep analytics surface exactly where to focus.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ── Screenshot row ──────────────────────────────────────────── -->
+    <section class="container section-sm">
+      <div class="grid-2" style="gap:1.2rem; align-items:start">
+        <div>
+          <div class="glow-line"></div>
+          <div class="section-label">Study Flow</div>
+          <h2 class="section-title" style="font-size:clamp(1.4rem,3vw,2rem); margin-bottom:0.9rem">
+            From import to<br /><span class="grad-text">mastery in minutes</span>
+          </h2>
+          <p class="section-sub" style="margin-bottom:1.5rem">
+            Paste a question set from any source. Qudoro auto-parses stems, options, and rationales — then schedules review sessions using spaced repetition.
           </p>
-          <div class="hero-cta">
-            <a class="btn btn-primary" href="/download">Get Qudoro</a>
-            <a class="btn btn-outline" href="/features">Explore Platform</a>
+          <div style="display:flex; flex-direction:column; gap:0.75rem">
+            <div class="card" style="display:flex; align-items:center; gap:0.85rem; padding:0.85rem 1rem">
+              <div class="feat-icon icon-indigo" style="margin:0; width:36px; height:36px; font-size:1.1rem; border-radius:10px; flex-shrink:0">1</div>
+              <div><strong style="font-size:0.92rem">Paste or import</strong><p style="margin:0; font-size:0.83rem">From text, PDF, or Quizlet URL</p></div>
+            </div>
+            <div class="card" style="display:flex; align-items:center; gap:0.85rem; padding:0.85rem 1rem">
+              <div class="feat-icon icon-violet" style="margin:0; width:36px; height:36px; font-size:1.1rem; border-radius:10px; flex-shrink:0">2</div>
+              <div><strong style="font-size:0.92rem">Practice with focus</strong><p style="margin:0; font-size:0.83rem">Timed exams, cram mode, or drill missed</p></div>
+            </div>
+            <div class="card" style="display:flex; align-items:center; gap:0.85rem; padding:0.85rem 1rem">
+              <div class="feat-icon icon-green" style="margin:0; width:36px; height:36px; font-size:1.1rem; border-radius:10px; flex-shrink:0">3</div>
+              <div><strong style="font-size:0.92rem">Review &amp; retain</strong><p style="margin:0; font-size:0.83rem">SM-2 flashcards keep weak areas fresh</p></div>
+            </div>
           </div>
         </div>
-        <div class="hero-card">
-          <p class="hero-card-title">Navigate by intent</p>
-          <div class="hero-stats">
-            <div><strong>Download</strong><span>Always latest macOS/Windows release</span></div>
-            <div><strong>Features</strong><span>Clear platform capabilities by workflow</span></div>
-            <div><strong>Tour</strong><span>Visual walkthrough of real app screens</span></div>
-            <div><strong>Forum</strong><span>Submit and vote on feature requests</span></div>
+        <div class="screenshot-wrap">
+          <div class="screenshot-bar">
+            <span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span>
           </div>
+          <img src="/screenshots/create-set.png" alt="Creating a question set in Qudoro" loading="lazy" />
         </div>
-      </section>
-
-      <section class="container section">
-        <h2>Platform Pages</h2>
-        <p class="section-intro">Each section has its own dedicated page so information stays organized and easy to scan.</p>
-        <div class="grid feature-grid">
-          <article class="card nav-card">
-            <h3>Download</h3>
-            <p>Installers for macOS (.dmg) and Windows (.exe), auto-linked to latest GitHub release.</p>
-            <a class="btn btn-outline" href="/download">Open Download</a>
-          </article>
-          <article class="card nav-card">
-            <h3>Features</h3>
-            <p>Question bank, exam mode, flashcards, notes, discover marketplace, and profile-based progress.</p>
-            <a class="btn btn-outline" href="/features">Open Features</a>
-          </article>
-          <article class="card nav-card">
-            <h3>Product Tour</h3>
-            <p>Real screenshots that show create-set flow, exam practice mode, and notes-to-flashcards workflow.</p>
-            <a class="btn btn-outline" href="/tour">Open Tour</a>
-          </article>
-          <article class="card nav-card">
-            <h3>Why Qudoro</h3>
-            <p>How students use Qudoro end-to-end plus trust and security design decisions.</p>
-            <a class="btn btn-outline" href="/why">Open Why</a>
-          </article>
-          <article class="card nav-card">
-            <h3>Feature Forum</h3>
-            <p>Same Supabase auth, request posting, and user voting on ideas that matter most.</p>
-            <a class="btn btn-outline" href="/forum">Open Forum</a>
-          </article>
-        </div>
-      </section>
-    </main>
-
-    <footer class="container footer">
-      <p>&copy; <span id="year"></span> Qudoro. All rights reserved.</p>
-      <div class="footer-links">
-        <a href="mailto:hello@qudoro.com">hello@qudoro.com</a>
-        <a href="/forum">Forum</a>
-        <a href="/terms">Terms</a>
-        <a href="/privacy">Privacy</a>
       </div>
-    </footer>
+    </section>
 
-    <script>
-      document.getElementById('year').textContent = String(new Date().getFullYear());
-    </script>
-  </body>
+    <!-- ── Community CTA ───────────────────────────────────────────── -->
+    <section class="container section-sm">
+      <div class="community-card">
+        <div>
+          <span class="pill" style="margin-bottom:1rem; display:inline-flex">💬 Community</span>
+          <h2>Shape what gets built next.</h2>
+          <p style="color:var(--muted); font-size:1rem; line-height:1.65; max-width:52ch; margin-bottom:1.4rem">
+            Qudoro is built with its users. Submit feature requests, vote on ideas, and watch them land in the app.
+          </p>
+          <div style="display:flex; gap:0.75rem; flex-wrap:wrap">
+            <a class="btn btn-primary" href="/forum">Open Forum</a>
+            <a class="btn btn-outline" href="/download">Download Free</a>
+          </div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:0.65rem; min-width:200px">
+          <div class="card" style="padding:0.8rem 1rem; text-align:center">
+            <div style="font-size:1.5rem; font-weight:800; color:var(--text); font-family:'Space Grotesk',sans-serif">Free</div>
+            <div style="font-size:0.8rem; color:var(--muted)">Always</div>
+          </div>
+          <div class="card" style="padding:0.8rem 1rem; text-align:center">
+            <div style="font-size:1.5rem; font-weight:800; color:var(--text); font-family:'Space Grotesk',sans-serif">macOS + Win</div>
+            <div style="font-size:0.8rem; color:var(--muted)">Desktop</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="container footer">
+    <p>© 2025 Qudoro</p>
+    <div class="footer-links">
+      <a href="/download">Download</a>
+      <a href="/features">Features</a>
+      <a href="/tour">Tour</a>
+      <a href="/why">Why Qudoro</a>
+      <a href="/forum">Forum</a>
+      <a href="/privacy">Privacy</a>
+      <a href="/terms">Terms</a>
+    </div>
+  </footer>
+</body>
 </html>

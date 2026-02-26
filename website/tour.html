@@ -1,72 +1,221 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Qudoro Product Tour</title>
-    <meta name="description" content="Visual tour of Qudoro workflows." />
-    <link rel="icon" href="/icon.png" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700;800&family=Manrope:wght@400;500;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/styles.css" />
-  </head>
-  <body>
-    <div class="bg-shape bg-shape-1"></div>
-    <div class="bg-shape bg-shape-2"></div>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Product Tour | Qudoro</title>
+  <meta name="description" content="See Qudoro in action — a visual walkthrough of creating sets, running exam simulation, reviewing flashcards, and tracking progress." />
+  <link rel="icon" href="/icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700;800&family=Manrope:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    .page-hero {
+      padding: 3.5rem 0 2.5rem;
+      text-align: center;
+      max-width: 640px;
+      margin-inline: auto;
+    }
+    .page-hero h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 800;
+      line-height: 1.08;
+      letter-spacing: -0.02em;
+      margin: 0.7rem 0 1rem;
+    }
 
-    <header class="container nav">
-      <a class="brand" href="/"><img src="/icon.png" alt="Qudoro logo" /><span>Qudoro</span></a>
-      <div class="nav-links">
-        <a href="/download">Download</a>
-        <a href="/features">Features</a>
-        <a href="/tour">Tour</a>
-        <a href="/why">Why Qudoro</a>
-        <a href="/forum">Forum</a>
+    /* alternating screenshot + text rows */
+    .tour-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2.5rem;
+      align-items: center;
+      padding: 3rem 0;
+      border-top: 1px solid var(--border);
+    }
+    .tour-row.flip { direction: rtl; }
+    .tour-row.flip > * { direction: ltr; }
+
+    .tour-copy h2 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(1.4rem, 3vw, 2rem);
+      font-weight: 800;
+      line-height: 1.15;
+      margin-bottom: 0.75rem;
+    }
+    .tour-copy p {
+      color: var(--muted);
+      font-size: 0.97rem;
+      line-height: 1.7;
+      margin-bottom: 1.1rem;
+    }
+    .tour-bullets {
+      list-style: none;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .tour-bullets li {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.6rem;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+    .tour-bullets li::before {
+      content: '✦';
+      color: #6366f1;
+      font-size: 0.7rem;
+      margin-top: 0.22rem;
+      flex-shrink: 0;
+    }
+
+    @media (max-width: 860px) {
+      .tour-row, .tour-row.flip { grid-template-columns: 1fr; direction: ltr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+
+  <header class="container nav">
+    <a class="brand" href="/"><img src="/icon.png" alt="Qudoro" /><span class="brand-name">Qudoro</span></a>
+    <nav class="nav-links">
+      <a href="/download">Download</a>
+      <a href="/features">Features</a>
+      <a href="/tour" class="active">Tour</a>
+      <a href="/why">Why Qudoro</a>
+      <a href="/forum">Forum</a>
+      <a href="/download" class="nav-cta">Get the App</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <div class="page-hero">
+      <span class="pill">Visual Walkthrough</span>
+      <h1>See Qudoro<br /><span class="grad-text">in action</span></h1>
+      <p style="color:var(--muted); font-size:1rem; line-height:1.65">A guided tour through the core workflows — from building your first set to tracking mastery over time.</p>
+    </div>
+
+    <!-- Row 1: Create & import -->
+    <div class="tour-row">
+      <div class="tour-copy">
+        <div class="glow-line"></div>
+        <span class="section-label">Step 1</span>
+        <h2>Build or import<br /><span class="grad-text">your question bank</span></h2>
+        <p>Start from scratch, paste a block of MCQs, upload a PDF, or pull directly from a Quizlet URL. Qudoro auto-detects question structure so you're reviewing in minutes.</p>
+        <ul class="tour-bullets">
+          <li>Auto-parses stems, lettered options, SATA questions</li>
+          <li>Attach images, ECGs, or diagrams to any question</li>
+          <li>Tag questions by topic for targeted analytics</li>
+          <li>Draft auto-save means you never lose in-progress work</li>
+        </ul>
       </div>
-    </header>
-
-    <main class="container section">
-      <h1 class="page-title">Product Tour</h1>
-      <p class="section-intro">Core screens and workflows you can expect inside the app.</p>
-
-      <div class="tour-grid">
-        <article class="tour-card">
-          <img src="/screenshots/create-set.png" alt="Create set workflow" loading="lazy" />
-          <div>
-            <h3>Create and Expand Sets</h3>
-            <p>Build sets quickly and keep adding questions as your content grows.</p>
-          </div>
-        </article>
-        <article class="tour-card">
-          <img src="/screenshots/practice-mode.png" alt="Practice mode screen" loading="lazy" />
-          <div>
-            <h3>Exam Simulation Mode</h3>
-            <p>Practice with exam-style formatting and focused review flow.</p>
-          </div>
-        </article>
-        <article class="tour-card">
-          <img src="/screenshots/notes-flashcards.png" alt="Notes to flashcards" loading="lazy" />
-          <div>
-            <h3>Notes to Flashcards</h3>
-            <p>Convert note content into active-recall flashcards in one workflow.</p>
-          </div>
-        </article>
+      <div class="screenshot-wrap">
+        <div class="screenshot-bar">
+          <span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span>
+          <span style="margin-left:0.5rem; font-size:0.75rem; color:#475569">Question Bank</span>
+        </div>
+        <img src="/screenshots/create-set.png" alt="Creating a question set in Qudoro" loading="lazy" />
       </div>
-    </main>
+    </div>
 
-    <footer class="container footer">
-      <p>&copy; <span id="year"></span> Qudoro. All rights reserved.</p>
-      <div class="footer-links">
-        <a href="/">Home</a>
-        <a href="/forum">Forum</a>
-        <a href="/terms">Terms</a>
-        <a href="/privacy">Privacy</a>
+    <!-- Row 2: Practice (flipped) -->
+    <div class="tour-row flip">
+      <div class="tour-copy">
+        <div class="glow-line"></div>
+        <span class="section-label">Step 2</span>
+        <h2>Practice with<br /><span class="grad-text">exam-day conditions</span></h2>
+        <p>Run timed exams that simulate real test pressure, or use cram mode for quick revision. After each session, drill only the questions you missed and study rationales inline.</p>
+        <ul class="tour-bullets">
+          <li>Custom time limits per session</li>
+          <li>Randomised question order in cram mode</li>
+          <li>Rationale displayed immediately after each answer</li>
+          <li>Drill missed cards — re-run weak questions only</li>
+          <li>Weak area analysis by topic tag</li>
+        </ul>
       </div>
-    </footer>
+      <div class="screenshot-wrap">
+        <div class="screenshot-bar">
+          <span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span>
+          <span style="margin-left:0.5rem; font-size:0.75rem; color:#475569">Exam Simulation</span>
+        </div>
+        <img src="/screenshots/practice-mode.png" alt="Exam simulation mode in Qudoro" loading="lazy" />
+      </div>
+    </div>
 
-    <script>
-      document.getElementById('year').textContent = String(new Date().getFullYear());
-    </script>
-  </body>
+    <!-- Row 3: Notes & flashcards -->
+    <div class="tour-row">
+      <div class="tour-copy">
+        <div class="glow-line"></div>
+        <span class="section-label">Step 3</span>
+        <h2>Notes that become<br /><span class="grad-text">flashcard decks</span></h2>
+        <p>Write rich study notes linked to your sets. When you're ready, convert any note into a spaced-repetition flashcard deck with one click — no copy-pasting needed.</p>
+        <ul class="tour-bullets">
+          <li>Rich text: bold, italic, lists, headings</li>
+          <li>Convert notes → flashcard decks instantly</li>
+          <li>SM-2 algorithm schedules each card's next review</li>
+          <li>Keyboard-driven: Space to flip, 1–4 to rate</li>
+        </ul>
+      </div>
+      <div class="screenshot-wrap">
+        <div class="screenshot-bar">
+          <span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span>
+          <span style="margin-left:0.5rem; font-size:0.75rem; color:#475569">Notes → Flashcards</span>
+        </div>
+        <img src="/screenshots/notes-flashcards.png" alt="Notes and flashcards in Qudoro" loading="lazy" />
+      </div>
+    </div>
+
+    <!-- Row 4: Progress (flipped) -->
+    <div class="tour-row flip">
+      <div class="tour-copy">
+        <div class="glow-line"></div>
+        <span class="section-label">Step 4</span>
+        <h2>Track mastery,<br /><span class="grad-text">earn achievements</span></h2>
+        <p>The dashboard surfaces your exact study trajectory — cards due, mastery rate, weekly review forecast, and a streak to keep you consistent. XP and achievements keep it motivating.</p>
+        <ul class="tour-bullets">
+          <li>Daily streak counter with XP rewards</li>
+          <li>Mastery breakdown: Learning / Reviewing / Mastered</li>
+          <li>7-day review forecast bar chart</li>
+          <li>Session history and accuracy trends</li>
+          <li>Achievement badges unlock as you hit milestones</li>
+        </ul>
+      </div>
+      <div class="screenshot-wrap">
+        <div class="screenshot-bar">
+          <span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span>
+          <span style="margin-left:0.5rem; font-size:0.75rem; color:#475569">Dashboard</span>
+        </div>
+        <img src="/screenshots/slide-1.png" alt="Dashboard and progress tracking in Qudoro" loading="lazy" />
+      </div>
+    </div>
+
+    <!-- CTA -->
+    <section style="padding:3rem 0 1rem; text-align:center">
+      <h2 class="section-title" style="margin-bottom:0.75rem">Seen enough?</h2>
+      <p class="section-sub" style="margin-inline:auto; margin-bottom:1.5rem">Download free and run your first session today.</p>
+      <div style="display:flex; justify-content:center; gap:0.75rem; flex-wrap:wrap">
+        <a class="btn btn-primary btn-lg" href="/download">Download Free</a>
+        <a class="btn btn-outline btn-lg" href="/features">All Features</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="container footer">
+    <p>© 2025 Qudoro</p>
+    <div class="footer-links">
+      <a href="/download">Download</a>
+      <a href="/features">Features</a>
+      <a href="/why">Why Qudoro</a>
+      <a href="/forum">Forum</a>
+      <a href="/privacy">Privacy</a>
+      <a href="/terms">Terms</a>
+    </div>
+  </footer>
+</body>
 </html>

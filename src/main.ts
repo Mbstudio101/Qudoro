@@ -374,69 +374,77 @@ ipcMain.handle('parse-pdf', async (event, buffer) => {
 
 // Fetch URL (for Quizlet Import)
 ipcMain.handle('fetch-url', async (event, url) => {
+  let win: BrowserWindow | null = null;
+  const OVERALL_TIMEOUT_MS = 35000;
+
   try {
-    const win = new BrowserWindow({
+    win = new BrowserWindow({
       show: false,
       width: 1000,
       height: 800,
       webPreferences: {
-        offscreen: false, 
+        offscreen: false,
       }
     });
 
-    // Set a proper user agent
     win.webContents.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
 
-    await win.loadURL(url);
-    
-    // Wait for potential Cloudflare challenges or dynamic content loading
-    // We wait up to 30 seconds, checking every 1s
-    let attempts = 0;
-    let content = '';
-    
-    while (attempts < 30) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        content = await win.webContents.executeJavaScript('document.documentElement.outerHTML');
-        
-        // Check if we passed the challenge (title is not "Just a moment...")
-        // And if we have some quizlet data markers
-        // We log the title for debugging
-        const title = await win.webContents.executeJavaScript('document.title');
+    // Wrap entire fetch in an overall timeout so it never hangs forever
+    const fetchWithTimeout = new Promise<{ success: boolean; data?: string; error?: string }>(async (resolve) => {
+      const overallTimer = setTimeout(() => {
+        resolve({ success: false, error: 'Fetch timed out after 35 seconds' });
+      }, OVERALL_TIMEOUT_MS);
 
-        if (!content.includes('<title>Just a moment...</title>') && 
-           (content.includes('SetPageTerms-term') || 
-            content.includes('__NEXT_DATA__') || 
-            content.includes('window.Quizlet') ||
-            content.includes('application/ld+json') ||
-            content.includes('StudiableItem') ||
-            content.includes('TermText') ||
-            // Fallback: If title is the set title (not "Just a moment..."), we might have loaded
-            (title && !title.includes('Just a moment') && content.length > 50000))) {
-             
-             // Additional wait to ensure dynamic content settles
-             await new Promise(resolve => setTimeout(resolve, 3000));
-             // Re-fetch content after settling
-             content = await win.webContents.executeJavaScript('document.documentElement.outerHTML');
-             break;
-        }
-        
-        // Attempt to scroll to trigger lazy loading if we are not on the challenge page
-        if (!content.includes('<title>Just a moment...</title>')) {
-             await win.webContents.executeJavaScript('window.scrollTo(0, document.body.scrollHeight)');
-             // Also simulate a mouse move to trigger hydration
-             if (win.webContents) {
-                win.webContents.sendInputEvent({ type: 'mouseMove', x: 100, y: 100 });
-             }
+      try {
+        await win!.loadURL(url);
+
+        let attempts = 0;
+        let content = '';
+
+        while (attempts < 30) {
+          await new Promise(r => setTimeout(r, 1000));
+          content = await win!.webContents.executeJavaScript('document.documentElement.outerHTML');
+          const title = await win!.webContents.executeJavaScript('document.title');
+
+          if (!content.includes('<title>Just a moment...</title>') &&
+             (content.includes('SetPageTerms-term') ||
+              content.includes('__NEXT_DATA__') ||
+              content.includes('window.Quizlet') ||
+              content.includes('application/ld+json') ||
+              content.includes('StudiableItem') ||
+              content.includes('TermText') ||
+              (title && !title.includes('Just a moment') && content.length > 50000))) {
+            await new Promise(r => setTimeout(r, 3000));
+            content = await win!.webContents.executeJavaScript('document.documentElement.outerHTML');
+            break;
+          }
+
+          if (!content.includes('<title>Just a moment...</title>')) {
+            await win!.webContents.executeJavaScript('window.scrollTo(0, document.body.scrollHeight)');
+            if (win!.webContents) {
+              win!.webContents.sendInputEvent({ type: 'mouseMove', x: 100, y: 100 });
+            }
+          }
+
+          attempts++;
         }
 
-        attempts++;
-    }
+        clearTimeout(overallTimer);
+        resolve({ success: true, data: content });
+      } catch (innerError: any) {
+        clearTimeout(overallTimer);
+        resolve({ success: false, error: innerError?.message || 'Unknown error' });
+      }
+    });
 
-    win.destroy();
-    return { success: true, data: content };
-  } catch (error) {
+    return await fetchWithTimeout;
+  } catch (error: any) {
     console.error('Fetch error:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: error?.message || 'Unknown error' };
+  } finally {
+    if (win && !win.isDestroyed()) {
+      win.destroy();
+    }
   }
 });
 

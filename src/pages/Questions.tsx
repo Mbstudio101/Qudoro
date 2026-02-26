@@ -10,6 +10,7 @@ import { motion } from 'framer-motion';
 import { classifyQuestion } from '../utils/nursingConstants';
 import { CARD_GRADIENT_OPTIONS, getCardGradientClasses } from '../utils/cardGradients';
 import { cleanMcqText, parseLabeledMcq } from '../utils/mcqParser';
+import { draftKey as makeDraftKey } from '../utils/storageKeys';
 
 const Questions = () => {
   const {
@@ -69,7 +70,7 @@ const Questions = () => {
 
   // ── Draft auto-save ───────────────────────────────────────────────────────
   // Key is profile-scoped so switching profiles never shows the wrong draft.
-  const draftKey = `qudoro-draft-sb-${activeProfileId || 'default'}`;
+  const draftKey = makeDraftKey(activeProfileId || 'default');
 
   type SetBuilderDraft = {
     draftQuestions: DraftQuestion[];

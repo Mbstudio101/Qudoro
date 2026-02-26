@@ -1,48 +1,120 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Terms of Service | Qudoro</title>
-    <meta name="description" content="Qudoro Terms of Service." />
-    <link rel="icon" href="/icon.png" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700;800&family=Manrope:wght@400;600&display=swap" rel="stylesheet" />
-    <style>
-      body { margin: 0; font-family: Manrope, system-ui, sans-serif; color: #0f172a; background: #f8fafc; }
-      .container { width: min(900px, 92vw); margin: 0 auto; padding: 1.2rem 0 2rem; }
-      .brand { display: inline-flex; align-items: center; gap: .55rem; text-decoration: none; color: inherit; font-family: "Space Grotesk", sans-serif; font-weight: 800; }
-      .brand img { width: 32px; height: 32px; border-radius: 8px; }
-      h1 { font-family: "Space Grotesk", sans-serif; margin: 1rem 0 .5rem; }
-      h2 { margin: 1.1rem 0 .35rem; font-size: 1.08rem; }
-      p, li { color: #334155; line-height: 1.6; }
-      .muted { color: #64748b; font-size: .95rem; }
-    </style>
-  </head>
-  <body>
-    <main class="container">
-      <a class="brand" href="/"><img src="/icon.png" alt="Qudoro logo" /><span>Qudoro</span></a>
-      <h1>Terms of Service</h1>
-      <p class="muted">Last updated: February 19, 2026</p>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Terms of Service | Qudoro</title>
+  <meta name="description" content="Qudoro Terms of Service — read the terms governing use of the Qudoro study platform." />
+  <link rel="icon" href="/icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700;800&family=Manrope:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    .legal-hero {
+      padding: 3rem 0 2rem;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 2.5rem;
+    }
+    .legal-hero h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(1.8rem, 4vw, 2.8rem);
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      margin: 0.5rem 0 0.5rem;
+    }
+    .legal-body {
+      max-width: 720px;
+      padding-bottom: 4rem;
+    }
+    .legal-body h2 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--text);
+      margin: 2rem 0 0.5rem;
+    }
+    .legal-body h2:first-of-type { margin-top: 0; }
+    .legal-body p, .legal-body li {
+      color: var(--muted);
+      font-size: 0.95rem;
+      line-height: 1.7;
+      margin: 0 0 0.75rem;
+    }
+    .legal-body ul { padding-left: 1.4rem; margin: 0 0 0.75rem; }
+    .legal-body a { color: #a5b4fc; text-decoration: none; }
+    .legal-body a:hover { text-decoration: underline; }
+    .legal-date {
+      color: var(--subtle);
+      font-size: 0.85rem;
+      margin-bottom: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
 
+  <header class="container nav">
+    <a class="brand" href="/"><img src="/icon.png" alt="Qudoro" /><span class="brand-name">Qudoro</span></a>
+    <nav class="nav-links">
+      <a href="/download">Download</a>
+      <a href="/features">Features</a>
+      <a href="/tour">Tour</a>
+      <a href="/why">Why Qudoro</a>
+      <a href="/forum">Forum</a>
+      <a href="/download" class="nav-cta">Get the App</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <div class="legal-hero">
+      <span class="pill">Legal</span>
+      <h1>Terms of <span class="grad-text">Service</span></h1>
+      <p class="legal-date">Last updated: February 19, 2026</p>
+    </div>
+
+    <div class="legal-body">
       <h2>Use of Service</h2>
-      <p>Qudoro provides study tools, question sets, and practice workflows for learning purposes. You agree to use the service lawfully and responsibly.</p>
+      <p>Qudoro provides study tools, question sets, and practice workflows for learning purposes. By using Qudoro you agree to use the service lawfully and responsibly.</p>
 
       <h2>Accounts</h2>
-      <p>You are responsible for your account credentials and activity. Keep your password private and notify us if you suspect unauthorized access.</p>
+      <p>You are responsible for your account credentials and all activity under your account. Keep your password private and notify us immediately if you suspect unauthorized access.</p>
 
       <h2>User Content</h2>
-      <p>You retain rights to content you create. By publishing shared sets, you grant Qudoro permission to host and display that content within the platform.</p>
+      <p>You retain all rights to content you create. By publishing shared sets to the Qudoro marketplace, you grant Qudoro a non-exclusive, royalty-free license to host, display, and distribute that content within the platform for other users.</p>
 
       <h2>Acceptable Use</h2>
-      <p>You may not upload malicious, infringing, or abusive content, attempt unauthorized access, or disrupt the service.</p>
+      <p>You may not:</p>
+      <ul>
+        <li>Upload malicious, infringing, or abusive content</li>
+        <li>Attempt to gain unauthorized access to any part of the service</li>
+        <li>Disrupt the service or other users' access to it</li>
+        <li>Use automated tools to scrape or abuse the platform</li>
+      </ul>
 
       <h2>Availability</h2>
-      <p>We may change, improve, or temporarily suspend parts of the service for maintenance, security, or product updates.</p>
+      <p>We may change, improve, or temporarily suspend parts of the service for maintenance, security, or product updates. We will do our best to give advance notice for significant changes.</p>
+
+      <h2>Disclaimer</h2>
+      <p>Qudoro is provided "as is" without warranties of any kind. Study content on the platform is user-generated and should not replace professional advice, clinical judgment, or official study materials.</p>
 
       <h2>Contact</h2>
       <p>Questions about these terms: <a href="mailto:hello@qudoro.com">hello@qudoro.com</a></p>
-    </main>
-  </body>
+    </div>
+  </main>
+
+  <footer class="container footer">
+    <p>© 2025 Qudoro</p>
+    <div class="footer-links">
+      <a href="/download">Download</a>
+      <a href="/features">Features</a>
+      <a href="/tour">Tour</a>
+      <a href="/forum">Forum</a>
+      <a href="/privacy">Privacy</a>
+      <a href="/terms">Terms</a>
+    </div>
+  </footer>
+</body>
 </html>

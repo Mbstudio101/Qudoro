@@ -483,13 +483,12 @@ const storage: StateStorage = {
     return null;
   },
   setItem: async (name: string, value: string): Promise<void> => {
-    // Save to IndexedDB (Async, non-blocking UI)
-    const encryptedValue = await encryptPersistedValue(value);
-    await idbSet(name, encryptedValue);
-    
-    // Optional: Sync to Electron Store as a backup in background (Debounced ideally)
-    // For now, let's skip syncing to file to avoid the "100k cards" JSON parse bottleneck.
-    // The file store is now considered legacy/backup only.
+    try {
+      const encryptedValue = await encryptPersistedValue(value);
+      await idbSet(name, encryptedValue);
+    } catch (e) {
+      console.error('IDB Write Error — data may not have been saved:', e);
+    }
   },
   removeItem: async (name: string): Promise<void> => {
     await del(name);
@@ -1116,10 +1115,10 @@ export const useStore = create<AppState>()(
                 accounts: updatedAccounts
             };
         }),
-      checkAchievements: () => 
+      checkAchievements: () =>
         set((state) => {
-            const stats = state.userProfile.stats;
-            if (!stats) return state;
+            if (!state.userProfile.stats) return state;
+            const stats = { ...state.userProfile.stats, perfectedSetIds: [...(state.userProfile.stats.perfectedSetIds || [])] };
             const achievements = state.userProfile.achievements || [];
             const newAchievements = [...achievements];
             let updated = false;

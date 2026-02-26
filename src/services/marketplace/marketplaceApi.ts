@@ -9,8 +9,7 @@ import type {
 } from '../../types/marketplace';
 import { MOCK_SHARED_SETS } from './mockData';
 import { getSupabaseClient } from './supabaseClient';
-
-const IMPORT_LINKS_KEY = 'qudoro-import-links-v1';
+import { MARKETPLACE_LINKS_KEY as IMPORT_LINKS_KEY } from '../../utils/storageKeys';
 
 const sortByPopular = (items: SharedSetSummary[]): SharedSetSummary[] =>
   [...items].sort((a, b) => {

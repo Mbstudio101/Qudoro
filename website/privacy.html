@@ -1,48 +1,150 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Privacy Policy | Qudoro</title>
-    <meta name="description" content="Qudoro Privacy Policy." />
-    <link rel="icon" href="/icon.png" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700;800&family=Manrope:wght@400;600&display=swap" rel="stylesheet" />
-    <style>
-      body { margin: 0; font-family: Manrope, system-ui, sans-serif; color: #0f172a; background: #f8fafc; }
-      .container { width: min(900px, 92vw); margin: 0 auto; padding: 1.2rem 0 2rem; }
-      .brand { display: inline-flex; align-items: center; gap: .55rem; text-decoration: none; color: inherit; font-family: "Space Grotesk", sans-serif; font-weight: 800; }
-      .brand img { width: 32px; height: 32px; border-radius: 8px; }
-      h1 { font-family: "Space Grotesk", sans-serif; margin: 1rem 0 .5rem; }
-      h2 { margin: 1.1rem 0 .35rem; font-size: 1.08rem; }
-      p, li { color: #334155; line-height: 1.6; }
-      .muted { color: #64748b; font-size: .95rem; }
-    </style>
-  </head>
-  <body>
-    <main class="container">
-      <a class="brand" href="/"><img src="/icon.png" alt="Qudoro logo" /><span>Qudoro</span></a>
-      <h1>Privacy Policy</h1>
-      <p class="muted">Last updated: February 19, 2026</p>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy | Qudoro</title>
+  <meta name="description" content="Qudoro Privacy Policy — how we handle your data, what we collect, and your rights." />
+  <link rel="icon" href="/icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700;800&family=Manrope:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    .legal-hero {
+      padding: 3rem 0 2rem;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 2.5rem;
+    }
+    .legal-hero h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(1.8rem, 4vw, 2.8rem);
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      margin: 0.5rem 0 0.5rem;
+    }
+    .legal-body {
+      max-width: 720px;
+      padding-bottom: 4rem;
+    }
+    .legal-body h2 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--text);
+      margin: 2rem 0 0.5rem;
+    }
+    .legal-body h2:first-of-type { margin-top: 0; }
+    .legal-body p, .legal-body li {
+      color: var(--muted);
+      font-size: 0.95rem;
+      line-height: 1.7;
+      margin: 0 0 0.75rem;
+    }
+    .legal-body ul { padding-left: 1.4rem; margin: 0 0 0.75rem; }
+    .legal-body a { color: #a5b4fc; text-decoration: none; }
+    .legal-body a:hover { text-decoration: underline; }
+    .legal-date {
+      color: var(--subtle);
+      font-size: 0.85rem;
+      margin-bottom: 0;
+    }
+    .highlight-box {
+      border: 1px solid rgba(99,102,241,0.2);
+      border-radius: 14px;
+      background: rgba(99,102,241,0.06);
+      padding: 1rem 1.2rem;
+      margin-bottom: 2rem;
+      font-size: 0.92rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    .highlight-box strong { color: var(--text); }
+  </style>
+</head>
+<body>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+
+  <header class="container nav">
+    <a class="brand" href="/"><img src="/icon.png" alt="Qudoro" /><span class="brand-name">Qudoro</span></a>
+    <nav class="nav-links">
+      <a href="/download">Download</a>
+      <a href="/features">Features</a>
+      <a href="/tour">Tour</a>
+      <a href="/why">Why Qudoro</a>
+      <a href="/forum">Forum</a>
+      <a href="/download" class="nav-cta">Get the App</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <div class="legal-hero">
+      <span class="pill">Legal</span>
+      <h1>Privacy <span class="grad-text">Policy</span></h1>
+      <p class="legal-date">Last updated: February 19, 2026</p>
+    </div>
+
+    <div class="legal-body">
+      <div class="highlight-box">
+        <strong>Short version:</strong> Your study data lives on your device and is encrypted locally. We only process data needed to run the platform. We don't sell your information — ever.
+      </div>
 
       <h2>Information We Collect</h2>
-      <p>We collect account details (such as name and email), study data you create (question sets, notes, progress), and basic usage diagnostics for app reliability.</p>
+      <p>We collect the minimum required to operate Qudoro:</p>
+      <ul>
+        <li><strong>Account details</strong> — name, email address, and avatar (when you sign up)</li>
+        <li><strong>Study data</strong> — question sets, notes, session history, and progress (stored locally on your device; only synced if you publish to the marketplace)</li>
+        <li><strong>Usage diagnostics</strong> — basic crash reports and performance data to improve app reliability</li>
+      </ul>
 
-      <h2>How We Use Data</h2>
-      <p>We use your data to operate Qudoro features, secure accounts, provide support, and improve study experience and performance.</p>
+      <h2>How We Use Your Data</h2>
+      <p>We use your data to:</p>
+      <ul>
+        <li>Operate Qudoro features — question banks, flashcards, exam simulation, and the marketplace</li>
+        <li>Secure your account and protect against unauthorized access</li>
+        <li>Respond to support requests</li>
+        <li>Improve study experience and app performance</li>
+      </ul>
+
+      <h2>Local-First Storage</h2>
+      <p>Qudoro is designed as an offline-first desktop app. Your question banks and study sessions are stored in IndexedDB on your device, encrypted at rest. Data is only transmitted to our servers when you explicitly use cloud features (marketplace publishing, account sync).</p>
 
       <h2>Data Sharing</h2>
-      <p>We do not sell personal information. We share data only with service providers required to operate Qudoro (for example hosting, authentication, and analytics).</p>
+      <p>We do not sell personal information. We share data only with service providers required to operate Qudoro — this includes hosting (Supabase), authentication, and diagnostics. These providers are contractually bound to protect your data.</p>
+      <p>If you publish sets to the marketplace, your display name, country, and avatar will be visible to other users alongside your published content.</p>
 
       <h2>Security</h2>
-      <p>We use technical and organizational safeguards to protect your information, including authentication controls and restricted data access.</p>
+      <p>We use technical and organizational safeguards to protect your information, including:</p>
+      <ul>
+        <li>Encrypted local storage (IndexedDB with encryption)</li>
+        <li>Row-Level Security (RLS) enforced at the Supabase database layer</li>
+        <li>Authentication controls with email confirmation</li>
+        <li>Restricted internal data access</li>
+      </ul>
 
-      <h2>Your Choices</h2>
-      <p>You can request updates or deletion of your account data by contacting us.</p>
+      <h2>Your Rights & Choices</h2>
+      <p>You can request access to, correction of, or deletion of your account data at any time by contacting us. Because your study data is stored locally, you can also delete it directly from within the app.</p>
+
+      <h2>Changes to This Policy</h2>
+      <p>We may update this policy when the service changes. Significant changes will be announced in the app. Continued use after changes constitutes acceptance of the updated policy.</p>
 
       <h2>Contact</h2>
       <p>Privacy questions: <a href="mailto:hello@qudoro.com">hello@qudoro.com</a></p>
-    </main>
-  </body>
+    </div>
+  </main>
+
+  <footer class="container footer">
+    <p>© 2025 Qudoro</p>
+    <div class="footer-links">
+      <a href="/download">Download</a>
+      <a href="/features">Features</a>
+      <a href="/tour">Tour</a>
+      <a href="/forum">Forum</a>
+      <a href="/privacy">Privacy</a>
+      <a href="/terms">Terms</a>
+    </div>
+  </footer>
+</body>
 </html>

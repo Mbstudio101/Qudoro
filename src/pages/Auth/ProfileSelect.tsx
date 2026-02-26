@@ -57,6 +57,12 @@ const ProfileSelect = () => {
           <h1 className="text-4xl font-bold tracking-tight mb-4">Who's Studying?</h1>
         </div>
 
+        {profiles.length === 0 && !isCreating && (
+          <p className="text-center text-muted-foreground text-sm">
+            No profiles yet. Create your first one to get started.
+          </p>
+        )}
+
         <div className="flex flex-wrap items-center justify-center gap-8">
           {profiles.map((profile) => (
             <motion.div

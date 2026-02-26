@@ -1,84 +1,195 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Qudoro Features</title>
-    <meta name="description" content="Complete Qudoro feature overview organized by workflow." />
-    <link rel="icon" href="/icon.png" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700;800&family=Manrope:wght@400;500;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/styles.css" />
-  </head>
-  <body>
-    <div class="bg-shape bg-shape-1"></div>
-    <div class="bg-shape bg-shape-2"></div>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Features | Qudoro</title>
+  <meta name="description" content="Explore every feature in Qudoro — question bank, exam simulation, spaced-repetition flashcards, notes, discover marketplace, and profile-based progress tracking." />
+  <link rel="icon" href="/icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700;800&family=Manrope:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    .page-hero {
+      padding: 3.5rem 0 2.5rem;
+      text-align: center;
+      max-width: 680px;
+      margin-inline: auto;
+    }
+    .page-hero h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(2rem, 5vw, 3.2rem);
+      font-weight: 800;
+      line-height: 1.08;
+      letter-spacing: -0.02em;
+      margin: 0.7rem 0 1rem;
+    }
+    .feat-section { padding: 2.5rem 0; border-top: 1px solid var(--border); }
+    .feat-section-head {
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      gap: 2rem;
+      align-items: start;
+      margin-bottom: 1.5rem;
+    }
+    .feat-section-head h2 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.4rem;
+      font-weight: 800;
+      line-height: 1.2;
+      position: sticky;
+      top: 1.5rem;
+    }
+    .feat-section-head p { color: var(--muted); font-size: 0.95rem; line-height: 1.65; }
+    .feat-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.85rem; }
+    .feat-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--bg-card);
+      padding: 1.1rem;
+      transition: border-color 180ms, background 180ms;
+    }
+    .feat-card:hover { border-color: var(--border-h); background: var(--bg-card-h); }
+    .feat-card h3 { font-size: 0.95rem; font-weight: 700; margin-bottom: 0.35rem; color: var(--text); }
+    .feat-card p  { font-size: 0.86rem; color: var(--muted); line-height: 1.55; margin: 0; }
+    @media (max-width: 900px) {
+      .feat-section-head { grid-template-columns: 1fr; }
+      .feat-section-head h2 { position: static; }
+      .feat-cards { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
 
-    <header class="container nav">
-      <a class="brand" href="/"><img src="/icon.png" alt="Qudoro logo" /><span>Qudoro</span></a>
-      <div class="nav-links">
-        <a href="/download">Download</a>
-        <a href="/features">Features</a>
-        <a href="/tour">Tour</a>
-        <a href="/why">Why Qudoro</a>
-        <a href="/forum">Forum</a>
+  <header class="container nav">
+    <a class="brand" href="/"><img src="/icon.png" alt="Qudoro" /><span class="brand-name">Qudoro</span></a>
+    <nav class="nav-links">
+      <a href="/download">Download</a>
+      <a href="/features" class="active">Features</a>
+      <a href="/tour">Tour</a>
+      <a href="/why">Why Qudoro</a>
+      <a href="/forum">Forum</a>
+      <a href="/download" class="nav-cta">Get the App</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <div class="page-hero">
+      <span class="pill">Platform Overview</span>
+      <h1>Six workflows.<br /><span class="grad-text">One seamless app.</span></h1>
+      <p style="color:var(--muted); font-size:1rem; line-height:1.65">Every feature is designed to reduce friction between studying and retaining.</p>
+    </div>
+
+    <!-- Question Authoring -->
+    <section class="feat-section">
+      <div class="feat-section-head">
+        <div><div class="glow-line"></div><h2><span class="grad-text">Question Authoring</span></h2></div>
+        <p>Build a personal question bank from scratch or import from any source. Qudoro auto-parses structure so you spend time studying, not formatting.</p>
       </div>
-    </header>
-
-    <main class="container section">
-      <h1 class="page-title">Features</h1>
-      <p class="section-intro">Everything Qudoro offers, grouped by real study workflows.</p>
-
-      <section class="section compact">
-        <h2>Question Authoring</h2>
-        <div class="grid feature-grid">
-          <article class="card"><h3>Fast Set Creation</h3><p>Create sets quickly and keep editing open as content changes.</p></article>
-          <article class="card"><h3>Auto Structure Detection</h3><p>Paste question text and let the system infer question style and structure.</p></article>
-          <article class="card"><h3>Reusable Set Editing</h3><p>Return to any set to add, revise, or reorganize questions over time.</p></article>
-        </div>
-      </section>
-
-      <section class="section compact">
-        <h2>Exam & Practice</h2>
-        <div class="grid feature-grid">
-          <article class="card"><h3>Exam Simulation</h3><p>Practice with exam-like question flow and clean, readable layouts.</p></article>
-          <article class="card"><h3>Long-Stem Support</h3><p>Long questions stay readable without cutoffs in practice sessions.</p></article>
-          <article class="card"><h3>Rationale Review</h3><p>Review incorrect answers and explanations to reinforce weak concepts.</p></article>
-        </div>
-      </section>
-
-      <section class="section compact">
-        <h2>Retention & Organization</h2>
-        <div class="grid feature-grid">
-          <article class="card"><h3>Flashcards + Spaced Review</h3><p>Use spaced repetition-style loops to improve retention.</p></article>
-          <article class="card"><h3>Notes Workflow</h3><p>Create notes and turn note content into flashcards when needed.</p></article>
-          <article class="card"><h3>Profiles + Progress</h3><p>Use profile-based sessions with progress/streak visibility.</p></article>
-        </div>
-      </section>
-
-      <section class="section compact">
-        <h2>Community & Marketplace</h2>
-        <div class="grid feature-grid">
-          <article class="card"><h3>Discover Shared Sets</h3><p>Search and preview community sets before importing.</p></article>
-          <article class="card"><h3>Publish Local Sets</h3><p>Publish your own sets from your local library with author profile metadata.</p></article>
-          <article class="card"><h3>Update Imported Sets</h3><p>Re-import updates when a shared set has a newer version.</p></article>
-        </div>
-      </section>
-    </main>
-
-    <footer class="container footer">
-      <p>&copy; <span id="year"></span> Qudoro. All rights reserved.</p>
-      <div class="footer-links">
-        <a href="/">Home</a>
-        <a href="/forum">Forum</a>
-        <a href="/terms">Terms</a>
-        <a href="/privacy">Privacy</a>
+      <div class="feat-cards">
+        <article class="feat-card"><div class="feat-icon icon-indigo">✍️</div><h3>Fast Set Creation</h3><p>Paste a block of text and let auto-detection split stems, options, answers, and rationales automatically.</p></article>
+        <article class="feat-card"><div class="feat-icon icon-violet">🔍</div><h3>Smart Structure Detection</h3><p>Handles A–E options, numbered lists, SATA questions, and inline rationale markers out of the box.</p></article>
+        <article class="feat-card"><div class="feat-icon icon-blue">🔗</div><h3>Reusable Sets</h3><p>Each question belongs to a set. Reorder, bulk-edit, tag by topic, and reuse across multiple exam sessions.</p></article>
+        <article class="feat-card"><div class="feat-icon icon-cyan">🖼️</div><h3>Image Support</h3><p>Attach clinical images, ECGs, or diagrams to any question. Displayed in practice, flashcard, and exam modes.</p></article>
+        <article class="feat-card"><div class="feat-icon icon-amber">🏷️</div><h3>Tags &amp; Topics</h3><p>Tag questions with topics like "Respiratory". Analytics surface which tags you miss most.</p></article>
+        <article class="feat-card"><div class="feat-icon icon-green">📥</div><h3>Import Anywhere</h3><p>Paste text, upload PDF, or import from Quizlet URLs. Sanitized and structured automatically.</p></article>
       </div>
-    </footer>
+    </section>
 
-    <script>
-      document.getElementById('year').textContent = String(new Date().getFullYear());
-    </script>
-  </body>
+    <!-- Exam & Practice -->
+    <section class="feat-section">
+      <div class="feat-section-head">
+        <div><div class="glow-line"></div><h2><span class="grad-text">Exam &amp; Practice</span></h2></div>
+        <p>Multiple practice modes target different study needs — from full timed exams to cram mode and drill-missed-only sessions.</p>
+      </div>
+      <div class="feat-cards">
+        <article class="feat-card"><div class="feat-icon icon-rose">⏱️</div><h3>Timed Exam Mode</h3><p>Set custom time limits. A live countdown builds exam-day pressure and flags if you're running over pace.</p></article>
+        <article class="feat-card"><div class="feat-icon icon-violet">🔀</div><h3>Cram Mode</h3><p>Shuffle questions randomly for quick no-order review — ideal for last-minute revision.</p></article>
+        <article class="feat-card"><div class="feat-icon icon-amber">🎯</div><h3>Drill Missed Cards</h3><p>After any session, immediately drill only the questions you got wrong. Target weak areas fast.</p></article>
+        <article class="feat-card"><div class="feat-icon icon-blue">📖</div><h3>Long-Stem Support</h3><p>Full paragraph clinical scenarios rendered cleanly. Scroll-in-card layout prevents text overflows.</p></article>
+        <article class="feat-card"><div class="feat-icon icon-green">💡</div><h3>Rationale Review</h3><p>Every answer check shows the rationale inline. Learn the "why" immediately after each question.</p></article>
+        <article class="feat-card"><div class="feat-icon icon-indigo">📈</div><h3>Weak Area Analysis</h3><p>Results show which topic tags you missed most — know exactly where to study next.</p></article>
+      </div>
+    </section>
+
+    <!-- Flashcards -->
+    <section class="feat-section">
+      <div class="feat-section-head">
+        <div><div class="glow-line"></div><h2><span class="grad-text">Spaced Flashcards</span></h2></div>
+        <p>Spaced repetition ensures you review each card at exactly the right interval — no wasted time on what you know, no forgetting what you don't.</p>
+      </div>
+      <div class="feat-cards">
+        <article class="feat-card"><div class="feat-icon icon-cyan">🧠</div><h3>SM-2 Algorithm</h3><p>Industry-standard spaced repetition. Rate Again / Hard / Good / Easy — each updates the next review date.</p></article>
+        <article class="feat-card"><div class="feat-icon icon-indigo">📅</div><h3>Due Cards Queue</h3><p>See exactly how many cards are due today per set. Never let the review queue pile up unseen.</p></article>
+        <article class="feat-card"><div class="feat-icon icon-violet">⌨️</div><h3>Keyboard Shortcuts</h3><p>Spacebar to flip, 1–4 to rate. Review 50 cards in under 5 minutes without touching the mouse.</p></article>
+      </div>
+    </section>
+
+    <!-- Notes -->
+    <section class="feat-section">
+      <div class="feat-section-head">
+        <div><div class="glow-line"></div><h2><span class="grad-text">Notes</span></h2></div>
+        <p>Linked study notes sit alongside your question sets. Write summaries, then convert them directly into flashcard decks.</p>
+      </div>
+      <div class="feat-cards">
+        <article class="feat-card"><div class="feat-icon icon-green">📒</div><h3>Rich Text Notes</h3><p>Bold, italic, lists, headings. Organize by topic and attach to specific sets for contextual reference.</p></article>
+        <article class="feat-card"><div class="feat-icon icon-amber">✨</div><h3>Notes → Flashcards</h3><p>Select any note and convert it into a flashcard deck automatically. Study what you just wrote.</p></article>
+        <article class="feat-card"><div class="feat-icon icon-rose">🔗</div><h3>Profile-Linked</h3><p>Notes are scoped to profiles — switching profiles keeps your workspace clean and focused.</p></article>
+      </div>
+    </section>
+
+    <!-- Community -->
+    <section class="feat-section">
+      <div class="feat-section-head">
+        <div><div class="glow-line"></div><h2><span class="grad-text">Community Marketplace</span></h2></div>
+        <p>Discover high-quality question sets published by other Qudoro users. Import, fork, rate, and share your own.</p>
+      </div>
+      <div class="feat-cards">
+        <article class="feat-card"><div class="feat-icon icon-indigo">🌍</div><h3>Discover Sets</h3><p>Browse community sets filtered by nursing subject, tags, rating, or most downloaded.</p></article>
+        <article class="feat-card"><div class="feat-icon icon-violet">📤</div><h3>Publish Your Sets</h3><p>Share any local set publicly. Your profile (name, country, avatar) appears on every set you publish.</p></article>
+        <article class="feat-card"><div class="feat-icon icon-cyan">🔄</div><h3>Auto-Update Imports</h3><p>When a set you imported gets updated, Qudoro detects it and lets you merge changes seamlessly.</p></article>
+        <article class="feat-card"><div class="feat-icon icon-green">⭐</div><h3>Ratings &amp; Reviews</h3><p>Rate sets after importing. Star ratings surface the community's best content first.</p></article>
+        <article class="feat-card"><div class="feat-icon icon-amber">🔱</div><h3>Fork Sets</h3><p>Import any set as an editable fork. Customise it for your school, your exam, your style.</p></article>
+        <article class="feat-card"><div class="feat-icon icon-rose">👤</div><h3>Author Profiles</h3><p>Follow top contributors. Your existing app profile is your author identity — no second account needed.</p></article>
+      </div>
+    </section>
+
+    <!-- Profiles & Progress -->
+    <section class="feat-section">
+      <div class="feat-section-head">
+        <div><div class="glow-line"></div><h2><span class="grad-text">Profiles &amp; Progress</span></h2></div>
+        <p>Multiple profiles keep different courses separate. XP, achievements, and streak tracking make progress visible and motivating.</p>
+      </div>
+      <div class="feat-cards">
+        <article class="feat-card"><div class="feat-icon icon-indigo">👥</div><h3>Multiple Profiles</h3><p>One account, many subjects. Keep Pharmacology separate from Med-Surg. Data never mixes.</p></article>
+        <article class="feat-card"><div class="feat-icon icon-violet">⚡</div><h3>XP &amp; Levels</h3><p>Earn XP for every session, streak, and achievement. Level up as your mastery grows.</p></article>
+        <article class="feat-card"><div class="feat-icon icon-amber">🏆</div><h3>Achievements</h3><p>Unlock badges for streaks, perfect scores, late-night sessions, and more.</p></article>
+        <article class="feat-card"><div class="feat-icon icon-green">📊</div><h3>Session Analytics</h3><p>Bar charts, mastery breakdowns, and weekly review forecasts show your exact trajectory.</p></article>
+        <article class="feat-card"><div class="feat-icon icon-cyan">🔥</div><h3>Streak Tracking</h3><p>Daily study streaks tracked automatically. Your streak is always visible in the sidebar.</p></article>
+        <article class="feat-card"><div class="feat-icon icon-rose">🌙</div><h3>Dark &amp; Light Mode</h3><p>Follows your system preference by default. Toggle manually in Settings.</p></article>
+      </div>
+    </section>
+
+    <section style="padding:3rem 0 1rem; text-align:center">
+      <h2 class="section-title" style="margin-bottom:0.75rem">Ready to study smarter?</h2>
+      <p class="section-sub" style="margin-inline:auto; margin-bottom:1.5rem">Download free for macOS or Windows and start your first session in minutes.</p>
+      <a class="btn btn-primary btn-lg" href="/download">Download Free</a>
+    </section>
+  </main>
+
+  <footer class="container footer">
+    <p>© 2025 Qudoro</p>
+    <div class="footer-links">
+      <a href="/download">Download</a>
+      <a href="/tour">Tour</a>
+      <a href="/why">Why Qudoro</a>
+      <a href="/forum">Forum</a>
+      <a href="/privacy">Privacy</a>
+      <a href="/terms">Terms</a>
+    </div>
+  </footer>
+</body>
 </html>

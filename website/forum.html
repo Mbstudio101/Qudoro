@@ -3,169 +3,464 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Feature Forum | Qudoro</title>
-    <meta name="description" content="Submit and track requested features for Qudoro." />
+    <title>Community & Feedback | Qudoro</title>
+    <meta name="description" content="Submit and vote on feature requests for Qudoro. Join the conversation and help shape what gets built next." />
     <link rel="icon" href="/icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700;800&family=Manrope:wght@400;500;700&display=swap"
-      rel="stylesheet"
-    />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700;800&family=Manrope:wght@400;500;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css" />
     <style>
-      :root {
-        --text: #0f172a;
-        --muted: #475569;
-        --border: rgba(15, 23, 42, 0.12);
+      /* ── Forum-specific styles ─────────────────────────────────────────── */
+
+      .forum-hero {
+        padding: 2rem 0 1.4rem;
       }
-      * { box-sizing: border-box; }
-      body {
+      .forum-hero h1 {
+        margin: 0 0 0.5rem;
+        font-family: 'Space Grotesk', sans-serif;
+        font-size: clamp(1.8rem, 4.5vw, 2.8rem);
+        line-height: 1.08;
+      }
+      .forum-hero p {
         margin: 0;
-        min-height: 100vh;
-        color: var(--text);
-        font-family: 'Manrope', system-ui, -apple-system, Segoe UI, sans-serif;
-        background:
-          radial-gradient(circle at 12% 12%, rgba(56, 189, 248, 0.24), transparent 38%),
-          radial-gradient(circle at 90% 10%, rgba(99, 102, 241, 0.2), transparent 34%),
-          linear-gradient(180deg, #f8fafc, #eef2ff 60%, #f8fafc);
+        color: var(--muted);
+        max-width: 68ch;
+        font-size: 1.02rem;
       }
-      .container { width: min(1080px, 94vw); margin-inline: auto; }
-      .nav {
-        padding: 1rem 0;
+      .forum-stats {
+        display: flex;
+        gap: 0.6rem;
+        margin-top: 1rem;
+        flex-wrap: wrap;
+      }
+      .forum-stat {
+        display: flex;
+        align-items: center;
+        gap: 0.42rem;
+        padding: 0.32rem 0.7rem;
+        border-radius: 999px;
+        border: 1px solid rgba(15, 23, 42, 0.12);
+        background: rgba(255, 255, 255, 0.75);
+        font-size: 0.82rem;
+        font-weight: 700;
+        color: #334155;
+      }
+      .forum-stat strong { color: #0f172a; }
+
+      /* ── Layout ──────────────────────────────────────────────────────────── */
+      .forum-layout {
+        display: grid;
+        grid-template-columns: 300px 1fr;
+        gap: 1rem;
+        padding-bottom: 3rem;
+        align-items: start;
+      }
+
+      /* ── Sidebar panel ───────────────────────────────────────────────────── */
+      .sidebar-panel {
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.82);
+        backdrop-filter: blur(8px);
+        padding: 1.1rem;
+        position: sticky;
+        top: 1.2rem;
+      }
+      .sidebar-panel h2 {
+        margin: 0 0 0.6rem;
+        font-family: 'Space Grotesk', sans-serif;
+        font-size: 1rem;
+        font-weight: 700;
+      }
+      .sidebar-divider {
+        border: none;
+        border-top: 1px solid var(--border);
+        margin: 1rem 0;
+      }
+      .field { margin-bottom: 0.6rem; }
+      .field label {
+        display: block;
+        font-size: 0.83rem;
+        font-weight: 700;
+        color: #334155;
+        margin-bottom: 0.28rem;
+      }
+      .field input,
+      .field textarea,
+      .field select {
+        width: 100%;
+        border: 1px solid rgba(15, 23, 42, 0.15);
+        border-radius: 10px;
+        padding: 0.58rem 0.65rem;
+        font: inherit;
+        font-size: 0.92rem;
+        background: rgba(255, 255, 255, 0.96);
+        transition: border-color 120ms ease;
+        outline: none;
+      }
+      .field input:focus,
+      .field textarea:focus,
+      .field select:focus {
+        border-color: rgba(14, 165, 233, 0.55);
+        box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.12);
+      }
+      .field textarea { min-height: 100px; resize: vertical; }
+      .char-count {
+        display: block;
+        text-align: right;
+        font-size: 0.74rem;
+        color: #94a3b8;
+        margin-top: 0.2rem;
+      }
+      .char-count.warn { color: #f59e0b; }
+      .char-count.over { color: #ef4444; }
+      .btn-row { display: flex; gap: 0.45rem; flex-wrap: wrap; margin-top: 0.2rem; }
+      .btn { cursor: pointer; font-family: inherit; }
+      .btn:disabled { opacity: 0.55; cursor: default; pointer-events: none; }
+      .status-msg {
+        margin-top: 0.5rem;
+        font-size: 0.83rem;
+        font-weight: 700;
+        min-height: 1.2em;
+      }
+      .status-msg.ok  { color: #0f766e; }
+      .status-msg.err { color: #991b1b; }
+
+      .auth-chip {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 0.7rem;
+        border-radius: 12px;
+        background: rgba(14, 165, 233, 0.08);
+        border: 1px solid rgba(14, 165, 233, 0.2);
+        margin-bottom: 0.7rem;
+      }
+      .auth-chip-avatar {
+        width: 28px;
+        height: 28px;
+        border-radius: 999px;
+        background: linear-gradient(120deg, #0ea5e9, #1d4ed8);
+        color: #fff;
+        font-weight: 800;
+        font-size: 0.78rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+      .auth-chip-text { font-size: 0.83rem; font-weight: 700; color: #0c4a6e; }
+      .auth-chip-email { font-size: 0.76rem; color: #334155; font-weight: 500; }
+
+      .locked-hint {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.65rem 0.75rem;
+        border-radius: 12px;
+        background: rgba(248, 250, 252, 0.9);
+        border: 1px dashed rgba(15, 23, 42, 0.15);
+        color: #64748b;
+        font-size: 0.85rem;
+      }
+
+      /* ── Main list area ──────────────────────────────────────────────────── */
+      .list-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+
+      .controls {
+        display: flex;
+        gap: 0.55rem;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .search-wrap {
+        flex: 1;
+        min-width: 160px;
+        position: relative;
+      }
+      .search-wrap svg {
+        position: absolute;
+        left: 0.7rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #94a3b8;
+        pointer-events: none;
+      }
+      .search-input {
+        width: 100%;
+        border: 1px solid rgba(15, 23, 42, 0.15);
+        border-radius: 10px;
+        padding: 0.52rem 0.65rem 0.52rem 2.2rem;
+        font: inherit;
+        font-size: 0.88rem;
+        background: rgba(255, 255, 255, 0.9);
+        outline: none;
+        transition: border-color 120ms ease;
+      }
+      .search-input:focus {
+        border-color: rgba(14, 165, 233, 0.5);
+        box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+      }
+
+      .tab-bar {
+        display: flex;
+        gap: 0.3rem;
+        background: rgba(255, 255, 255, 0.7);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 0.22rem;
+      }
+      .tab-btn {
+        padding: 0.36rem 0.75rem;
+        border: none;
+        border-radius: 8px;
+        font: inherit;
+        font-size: 0.84rem;
+        font-weight: 700;
+        color: #64748b;
+        background: transparent;
+        cursor: pointer;
+        transition: background 120ms, color 120ms;
+      }
+      .tab-btn.active {
+        background: #fff;
+        color: #0f172a;
+        box-shadow: 0 1px 4px rgba(15, 23, 42, 0.1);
+      }
+
+      .cat-filter {
+        display: flex;
+        gap: 0.35rem;
+        flex-wrap: wrap;
+      }
+      .cat-btn {
+        padding: 0.3rem 0.65rem;
+        border: 1px solid rgba(15, 23, 42, 0.15);
+        border-radius: 999px;
+        font: inherit;
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: #475569;
+        background: rgba(255, 255, 255, 0.78);
+        cursor: pointer;
+        transition: background 120ms, border-color 120ms, color 120ms;
+      }
+      .cat-btn:hover  { background: #f1f5f9; }
+      .cat-btn.active {
+        background: #0f172a;
+        border-color: #0f172a;
+        color: #fff;
+      }
+
+      /* ── Request card ────────────────────────────────────────────────────── */
+      .request-card {
+        display: flex;
+        gap: 0.9rem;
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.84);
+        backdrop-filter: blur(6px);
+        padding: 1rem;
+        transition: border-color 150ms, box-shadow 150ms;
+      }
+      .request-card:hover {
+        border-color: rgba(14, 165, 233, 0.28);
+        box-shadow: 0 6px 20px rgba(15, 23, 42, 0.07);
+      }
+
+      /* Vote column */
+      .vote-col {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.25rem;
+        flex-shrink: 0;
+        min-width: 52px;
+      }
+      .vote-btn {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.15rem;
+        padding: 0.55rem 0.6rem;
+        border: 1.5px solid rgba(15, 23, 42, 0.18);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.9);
+        cursor: pointer;
+        font: inherit;
+        font-weight: 800;
+        font-size: 1rem;
+        color: #334155;
+        transition: background 120ms, border-color 120ms, color 120ms, transform 100ms;
+        line-height: 1;
+        width: 52px;
+      }
+      .vote-btn:hover:not(:disabled) {
+        background: #f0f9ff;
+        border-color: rgba(14, 165, 233, 0.4);
+        transform: translateY(-1px);
+      }
+      .vote-btn.voted {
+        background: linear-gradient(135deg, #dbeafe, #e0f2fe);
+        border-color: rgba(29, 78, 216, 0.35);
+        color: #1d4ed8;
+      }
+      .vote-btn .vote-arrow { font-size: 0.72rem; }
+      .vote-btn .vote-count { font-size: 1.05rem; }
+      .vote-label {
+        font-size: 0.68rem;
+        font-weight: 700;
+        color: #94a3b8;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+      }
+      .vote-btn:disabled { opacity: 0.5; cursor: default; }
+
+      /* Content column */
+      .req-content { flex: 1; min-width: 0; }
+      .req-title {
+        margin: 0 0 0.35rem;
+        font-size: 1rem;
+        font-weight: 700;
+        color: #0f172a;
+      }
+      .req-details {
+        margin: 0 0 0.6rem;
+        color: #334155;
+        font-size: 0.9rem;
+        line-height: 1.55;
+        white-space: pre-wrap;
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+      }
+      .req-details.expanded {
+        -webkit-line-clamp: unset;
+        display: block;
+      }
+      .expand-btn {
+        background: none;
+        border: none;
+        padding: 0;
+        font: inherit;
+        font-size: 0.82rem;
+        font-weight: 700;
+        color: #0ea5e9;
+        cursor: pointer;
+        margin-bottom: 0.55rem;
+      }
+      .expand-btn:hover { text-decoration: underline; }
+
+      .req-meta {
+        display: flex;
+        gap: 0.45rem;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+
+      /* Category pills */
+      .cat-pill {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.2rem 0.52rem;
+        border-radius: 999px;
+        font-size: 0.72rem;
+        font-weight: 700;
+      }
+      .cat-general    { background: #f1f5f9; color: #475569; }
+      .cat-ui-ux      { background: #fdf4ff; color: #7e22ce; }
+      .cat-study-flow { background: #f0fdf4; color: #166534; }
+      .cat-marketplace{ background: #fffbeb; color: #92400e; }
+      .cat-security   { background: #fff1f2; color: #9f1239; }
+
+      /* Status badges */
+      .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.28rem;
+        padding: 0.2rem 0.52rem;
+        border-radius: 999px;
+        font-size: 0.72rem;
+        font-weight: 700;
+      }
+      .status-badge::before {
+        content: '';
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: currentColor;
+        opacity: 0.7;
+      }
+      .status-open      { background: #dbeafe; color: #1d4ed8; }
+      .status-in-review { background: #fef3c7; color: #92400e; }
+      .status-planned   { background: #f3e8ff; color: #6b21a8; }
+      .status-done      { background: #dcfce7; color: #166534; }
+      .status-rejected  { background: #f1f5f9; color: #64748b; }
+
+      .meta-dot { color: #cbd5e1; font-size: 0.78rem; }
+      .meta-text { font-size: 0.78rem; color: #64748b; }
+
+      /* ── Loading / Empty / Error states ─────────────────────────────────── */
+      .skeleton-list { display: flex; flex-direction: column; gap: 0.75rem; }
+      .skeleton-card {
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.6);
+        padding: 1rem;
+        height: 96px;
+        animation: pulse 1.6s ease-in-out infinite;
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50%       { opacity: 0.45; }
+      }
+      .empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.6rem;
+        padding: 3rem 1rem;
+        border: 1px dashed rgba(15, 23, 42, 0.15);
+        border-radius: 16px;
+        color: #64748b;
+        text-align: center;
+      }
+      .empty-state .empty-icon { font-size: 2rem; }
+      .empty-state p { margin: 0; font-size: 0.9rem; }
+
+      /* ── Footer ──────────────────────────────────────────────────────────── */
+      footer.container {
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 1rem;
+        border-top: 1px solid var(--border);
+        padding: 1.4rem 0 2.2rem;
+        margin-top: 0.5rem;
       }
-      .brand {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.55rem;
-        font-family: 'Space Grotesk', sans-serif;
-        font-weight: 800;
-        text-decoration: none;
-        color: inherit;
-      }
-      .brand img { width: 34px; height: 34px; border-radius: 10px; }
-      .nav-links { display: flex; align-items: center; gap: 0.85rem; flex-wrap: wrap; }
-      .nav-links a { text-decoration: none; color: #334155; font-weight: 700; }
-      .hero {
-        border: 1px solid var(--border);
-        border-radius: 18px;
-        background: rgba(255, 255, 255, 0.84);
-        backdrop-filter: blur(8px);
-        padding: 1.1rem;
-      }
-      h1 {
-        margin: 0;
-        font-family: 'Space Grotesk', sans-serif;
-        font-size: clamp(1.4rem, 4vw, 2.2rem);
-      }
-      .hero p { margin: 0.6rem 0 0; color: var(--muted); max-width: 80ch; }
-      .layout {
-        display: grid;
-        grid-template-columns: 340px 1fr;
-        gap: 0.9rem;
-        padding: 0.9rem 0 2rem;
-      }
-      .panel {
-        border: 1px solid var(--border);
-        border-radius: 16px;
-        background: rgba(255, 255, 255, 0.86);
-        padding: 0.9rem;
-      }
-      .panel h2 { margin: 0 0 0.55rem; font-size: 1.1rem; }
-      .muted { color: var(--muted); }
-      label { display: block; margin-bottom: 0.35rem; font-size: 0.88rem; font-weight: 700; color: #334155; }
-      input, textarea, select {
-        width: 100%;
-        border: 1px solid rgba(15, 23, 42, 0.16);
-        border-radius: 10px;
-        padding: 0.6rem 0.65rem;
-        font: inherit;
-        background: rgba(255, 255, 255, 0.95);
-      }
-      textarea { min-height: 110px; resize: vertical; }
-      .field { margin-bottom: 0.65rem; }
-      .row { display: grid; gap: 0.55rem; grid-template-columns: 1fr 1fr; }
-      .btn {
-        border: 1px solid transparent;
-        border-radius: 10px;
-        padding: 0.6rem 0.72rem;
-        cursor: pointer;
-        font-weight: 700;
-      }
-      .btn-primary { color: #fff; background: linear-gradient(120deg, #0ea5e9, #1d4ed8); }
-      .btn-outline { color: #0f172a; background: #fff; border-color: rgba(15, 23, 42, 0.2); }
-      .btn:disabled { opacity: 0.6; cursor: default; }
-      .btn-row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-      .status {
-        margin-top: 0.55rem;
-        font-size: 0.86rem;
-        font-weight: 700;
-      }
-      .status.ok { color: #0f766e; }
-      .status.err { color: #991b1b; }
-      .request-list { display: grid; gap: 0.7rem; }
-      .request-card {
-        border: 1px solid var(--border);
-        border-radius: 14px;
-        background: rgba(255, 255, 255, 0.82);
-        padding: 0.85rem;
-      }
-      .request-head {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 0.8rem;
-      }
-      .request-card h3 { margin: 0 0 0.35rem; font-size: 1.04rem; }
-      .request-card p { margin: 0; color: #334155; white-space: pre-wrap; }
-      .pill {
-        display: inline-flex;
-        align-items: center;
-        border-radius: 999px;
-        padding: 0.24rem 0.58rem;
-        font-size: 0.75rem;
-        font-weight: 700;
-        background: #dbeafe;
-        color: #1e3a8a;
-      }
-      .request-meta {
-        margin-top: 0.55rem;
-        display: flex;
-        gap: 0.55rem;
-        flex-wrap: wrap;
-        font-size: 0.78rem;
-        color: #64748b;
-      }
-      .request-actions {
-        margin-top: 0.6rem;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-      }
-      .vote-btn {
-        border: 1px solid rgba(15, 23, 42, 0.2);
-        background: #fff;
-        border-radius: 999px;
-        padding: 0.28rem 0.62rem;
-        font-size: 0.8rem;
-        font-weight: 700;
-        cursor: pointer;
-      }
-      .vote-btn.voted {
-        border-color: rgba(29, 78, 216, 0.35);
-        background: #dbeafe;
-        color: #1e40af;
-      }
-      .empty { padding: 0.85rem; border: 1px dashed rgba(15, 23, 42, 0.2); border-radius: 12px; color: #64748b; }
-      @media (max-width: 940px) {
-        .layout { grid-template-columns: 1fr; }
+      .footer-links { display: flex; gap: 0.9rem; flex-wrap: wrap; }
+      .footer-links a,
+      footer.container p { margin: 0; color: #334155; text-decoration: none; font-size: 0.9rem; }
+      .footer-links a:hover { text-decoration: underline; }
+
+      @media (max-width: 860px) {
+        .forum-layout { grid-template-columns: 1fr; }
+        .sidebar-panel { position: static; }
+        .controls { gap: 0.45rem; }
       }
     </style>
   </head>
   <body>
+    <div class="bg-shape bg-shape-1"></div>
+    <div class="bg-shape bg-shape-2"></div>
+
     <header class="container nav">
       <a class="brand" href="/"><img src="/icon.png" alt="Qudoro logo" /><span>Qudoro</span></a>
       <nav class="nav-links">
@@ -174,360 +469,536 @@
         <a href="/features">Features</a>
         <a href="/tour">Tour</a>
         <a href="/why">Why Qudoro</a>
+        <a href="/forum" style="color:#0ea5e9">Forum</a>
         <a href="/terms">Terms</a>
         <a href="/privacy">Privacy</a>
       </nav>
     </header>
 
     <main class="container">
-      <section class="hero">
-        <h1>Feature Request Forum</h1>
-        <p>
-          Sign in with the same Qudoro account and submit feature requests. Requests are visible to signed-in users so
-          everyone can align on what should be built next.
-        </p>
+
+      <!-- Hero -->
+      <section class="forum-hero">
+        <span class="pill">Community &amp; Feedback</span>
+        <h1 style="margin-top:0.6rem">Help shape what Qudoro builds next.</h1>
+        <p>Submit feature requests, vote on ideas, and see what's planned. Every vote tells us what matters most to you.</p>
+        <div class="forum-stats">
+          <span class="forum-stat" id="stat-requests"><span>—</span>&nbsp;requests</span>
+          <span class="forum-stat" id="stat-votes"><span>—</span>&nbsp;total votes</span>
+          <span class="forum-stat" id="stat-done">✅&nbsp;<span>—</span>&nbsp;implemented</span>
+        </div>
       </section>
 
-      <section class="layout">
-        <aside class="panel">
-          <h2>Account</h2>
-          <p class="muted" id="auth-summary">Not signed in.</p>
+      <div class="forum-layout">
+
+        <!-- ── Sidebar ─────────────────────────────────────────────────────── -->
+        <aside class="sidebar-panel">
+
+          <!-- Auth section -->
+          <h2>Your Account</h2>
+
+          <div id="auth-chip" style="display:none" class="auth-chip">
+            <div class="auth-chip-avatar" id="auth-initials">?</div>
+            <div>
+              <div class="auth-chip-text">Signed in</div>
+              <div class="auth-chip-email" id="auth-email-label"></div>
+            </div>
+          </div>
 
           <div id="auth-forms">
             <div class="field">
-              <label for="auth-email">Email</label>
-              <input id="auth-email" type="email" placeholder="you@example.com" />
+              <label for="inp-email">Email</label>
+              <input id="inp-email" type="email" placeholder="you@example.com" autocomplete="email" />
             </div>
             <div class="field">
-              <label for="auth-password">Password</label>
-              <input id="auth-password" type="password" placeholder="••••••••" />
+              <label for="inp-password">Password</label>
+              <input id="inp-password" type="password" placeholder="••••••••" autocomplete="current-password" />
             </div>
             <div class="btn-row">
-              <button id="sign-in" class="btn btn-primary">Sign in</button>
-              <button id="sign-up" class="btn btn-outline">Sign up</button>
+              <button id="btn-signin" class="btn btn-primary btn-sm">Sign in</button>
+              <button id="btn-signup" class="btn btn-outline btn-sm">Sign up</button>
             </div>
-            <div class="status" id="auth-status"></div>
+            <div class="status-msg" id="auth-status"></div>
           </div>
 
           <div id="auth-actions" style="display:none">
-            <div class="btn-row">
-              <button id="sign-out" class="btn btn-outline">Sign out</button>
+            <button id="btn-signout" class="btn btn-outline btn-sm">Sign out</button>
+          </div>
+
+          <hr class="sidebar-divider" />
+
+          <!-- Submit form -->
+          <h2>Submit a Request</h2>
+
+          <div id="compose-locked" class="locked-hint">
+            🔒 Sign in to post a feature request.
+          </div>
+
+          <form id="compose-form" style="display:none" autocomplete="off">
+            <div class="field">
+              <label for="req-title">Title <span style="color:#94a3b8;font-weight:500">(required)</span></label>
+              <input id="req-title" maxlength="120" placeholder="e.g. Add filter presets in Discover" required />
+              <span class="char-count" id="title-count">0 / 120</span>
+            </div>
+            <div class="field">
+              <label for="req-category">Category</label>
+              <select id="req-category">
+                <option value="general">General</option>
+                <option value="ui-ux">UI / UX</option>
+                <option value="study-flow">Study Flow</option>
+                <option value="marketplace">Marketplace</option>
+                <option value="security">Security</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="req-details">Details <span style="color:#94a3b8;font-weight:500">(required)</span></label>
+              <textarea id="req-details" maxlength="2000" placeholder="Describe the feature, user need, and expected behavior…" required></textarea>
+              <span class="char-count" id="details-count">0 / 2000</span>
+            </div>
+            <button id="btn-submit" class="btn btn-primary btn-sm" type="submit" style="width:100%">Post Request</button>
+            <div class="status-msg" id="req-status"></div>
+          </form>
+
+        </aside>
+
+        <!-- ── List panel ──────────────────────────────────────────────────── -->
+        <section class="list-panel">
+
+          <!-- Controls row -->
+          <div class="controls">
+            <div class="search-wrap">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input class="search-input" id="search-input" type="search" placeholder="Search requests…" />
+            </div>
+            <div class="tab-bar">
+              <button class="tab-btn active" data-sort="votes" type="button">🔥 Top</button>
+              <button class="tab-btn" data-sort="new"   type="button">✨ New</button>
             </div>
           </div>
 
-          <hr style="border:none;border-top:1px solid var(--border); margin: 0.95rem 0;" />
+          <!-- Category filter -->
+          <div class="cat-filter" id="cat-filter">
+            <button class="cat-btn active" data-cat="" type="button">All</button>
+            <button class="cat-btn" data-cat="general"     type="button">General</button>
+            <button class="cat-btn" data-cat="ui-ux"       type="button">UI / UX</button>
+            <button class="cat-btn" data-cat="study-flow"  type="button">Study Flow</button>
+            <button class="cat-btn" data-cat="marketplace" type="button">Marketplace</button>
+            <button class="cat-btn" data-cat="security"    type="button">Security</button>
+          </div>
 
-          <h2>Submit Request</h2>
-          <div id="composer-locked" class="muted">Sign in to submit a feature request.</div>
-          <form id="composer" style="display:none">
-            <div class="field">
-              <label for="req-title">Title</label>
-              <input id="req-title" maxlength="120" placeholder="Example: Add filter presets in Discover" required />
+          <!-- Request list -->
+          <div id="request-list">
+            <div class="skeleton-list" id="skeleton">
+              <div class="skeleton-card"></div>
+              <div class="skeleton-card"></div>
+              <div class="skeleton-card"></div>
             </div>
-            <div class="row">
-              <div class="field" style="margin:0">
-                <label for="req-category">Category</label>
-                <select id="req-category">
-                  <option value="general">General</option>
-                  <option value="ui-ux">UI/UX</option>
-                  <option value="study-flow">Study Flow</option>
-                  <option value="marketplace">Marketplace</option>
-                  <option value="security">Security</option>
-                </select>
-              </div>
-            </div>
-            <div class="field">
-              <label for="req-details">Details</label>
-              <textarea id="req-details" maxlength="2000" placeholder="Describe the feature, user need, and expected behavior..." required></textarea>
-            </div>
-            <button id="req-submit" class="btn btn-primary" type="submit">Post Request</button>
-            <div class="status" id="req-status"></div>
-          </form>
-        </aside>
+          </div>
 
-        <section class="panel">
-          <h2>Latest Requests</h2>
-          <p class="muted">Only signed-in users can view and post requests.</p>
-          <div id="request-list" class="request-list"></div>
         </section>
-      </section>
+      </div>
     </main>
+
+    <footer class="container">
+      <p>© 2025 Qudoro</p>
+      <div class="footer-links">
+        <a href="/">Home</a>
+        <a href="/download">Download</a>
+        <a href="/features">Features</a>
+        <a href="/privacy">Privacy</a>
+        <a href="/terms">Terms</a>
+      </div>
+    </footer>
 
     <script type="module">
       import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
-      const SUPABASE_URL = 'https://oquvnagftccilrhdfifk.supabase.co';
-      const SUPABASE_ANON_KEY =
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9xdXZuYWdmdGNjaWxyaGRmaWZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0NTQyMjIsImV4cCI6MjA4NzAzMDIyMn0._76GurMKzN2roKM_BVYSHbT0sM4yt1_qtJsYbyQW8Ks';
-      const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      const SUPABASE_URL     = 'https://oquvnagftccilrhdfifk.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9xdXZuYWdmdGNjaWxyaGRmaWZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0NTQyMjIsImV4cCI6MjA4NzAzMDIyMn0._76GurMKzN2roKM_BVYSHbT0sM4yt1_qtJsYbyQW8Ks';
+      const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-      const authSummary = document.getElementById('auth-summary');
-      const authForms = document.getElementById('auth-forms');
-      const authActions = document.getElementById('auth-actions');
-      const authStatus = document.getElementById('auth-status');
-      const composer = document.getElementById('composer');
-      const composerLocked = document.getElementById('composer-locked');
-      const reqStatus = document.getElementById('req-status');
-      const requestList = document.getElementById('request-list');
-
-      const authEmail = document.getElementById('auth-email');
-      const authPassword = document.getElementById('auth-password');
-      const signInBtn = document.getElementById('sign-in');
-      const signUpBtn = document.getElementById('sign-up');
-      const signOutBtn = document.getElementById('sign-out');
-      const reqTitle = document.getElementById('req-title');
-      const reqCategory = document.getElementById('req-category');
-      const reqDetails = document.getElementById('req-details');
-
-      let currentUser = null;
+      // ── State ──────────────────────────────────────────────────────────────
+      let currentUser        = null;
+      let allRows            = [];
       let voteCountsByRequest = new Map();
-      let votedRequestIds = new Set();
+      let votedRequestIds    = new Set();
+      let currentSort        = 'votes';   // 'votes' | 'new'
+      let currentCat         = '';
+      let searchQuery        = '';
+      let pendingVote        = null;      // requestId being processed
 
-      const setStatus = (el, text, isError = false) => {
+      // ── DOM refs ───────────────────────────────────────────────────────────
+      const authChip         = document.getElementById('auth-chip');
+      const authInitials     = document.getElementById('auth-initials');
+      const authEmailLabel   = document.getElementById('auth-email-label');
+      const authForms        = document.getElementById('auth-forms');
+      const authActions      = document.getElementById('auth-actions');
+      const authStatus       = document.getElementById('auth-status');
+      const composeLocked    = document.getElementById('compose-locked');
+      const composeForm      = document.getElementById('compose-form');
+      const reqStatus        = document.getElementById('req-status');
+      const requestList      = document.getElementById('request-list');
+      const skeleton         = document.getElementById('skeleton');
+      const inpEmail         = document.getElementById('inp-email');
+      const inpPassword      = document.getElementById('inp-password');
+      const btnSignin        = document.getElementById('btn-signin');
+      const btnSignup        = document.getElementById('btn-signup');
+      const btnSignout       = document.getElementById('btn-signout');
+      const reqTitle         = document.getElementById('req-title');
+      const reqCategory      = document.getElementById('req-category');
+      const reqDetails       = document.getElementById('req-details');
+      const btnSubmit        = document.getElementById('btn-submit');
+      const searchInput      = document.getElementById('search-input');
+      const titleCount       = document.getElementById('title-count');
+      const detailsCount     = document.getElementById('details-count');
+      const statRequests     = document.getElementById('stat-requests');
+      const statVotes        = document.getElementById('stat-votes');
+      const statDone         = document.getElementById('stat-done');
+
+      // ── Helpers ────────────────────────────────────────────────────────────
+      const esc = (s) => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+      const setMsg = (el, text, isErr = false) => {
         el.textContent = text || '';
-        el.className = `status ${text ? (isError ? 'err' : 'ok') : ''}`;
+        el.className   = `status-msg${text ? (isErr ? ' err' : ' ok') : ''}`;
       };
 
-      const formatDate = (iso) => {
-        const dt = new Date(iso);
-        if (Number.isNaN(dt.getTime())) return '';
-        return dt.toLocaleString();
+      const catClass = (cat) => ({
+        'general':     'cat-general',
+        'ui-ux':       'cat-ui-ux',
+        'study-flow':  'cat-study-flow',
+        'marketplace': 'cat-marketplace',
+        'security':    'cat-security',
+      })[cat] || 'cat-general';
+
+      const catLabel = (cat) => ({
+        'general':     'General',
+        'ui-ux':       'UI / UX',
+        'study-flow':  'Study Flow',
+        'marketplace': 'Marketplace',
+        'security':    'Security',
+      })[cat] || cat;
+
+      const statusClass = (s) => ({
+        'open':      'status-open',
+        'in-review': 'status-in-review',
+        'planned':   'status-planned',
+        'done':      'status-done',
+        'rejected':  'status-rejected',
+      })[s] || 'status-open';
+
+      const statusLabel = (s) => ({
+        'open':      'Open',
+        'in-review': 'In Review',
+        'planned':   'Planned',
+        'done':      'Done',
+        'rejected':  'Closed',
+      })[s] || 'Open';
+
+      const relTime = (iso) => {
+        const d = new Date(iso);
+        if (isNaN(d)) return '';
+        const s = Math.floor((Date.now() - d) / 1000);
+        if (s < 60)      return 'just now';
+        if (s < 3600)    return `${Math.floor(s/60)}m ago`;
+        if (s < 86400)   return `${Math.floor(s/3600)}h ago`;
+        if (s < 2592000) return `${Math.floor(s/86400)}d ago`;
+        return d.toLocaleDateString();
       };
 
-      const renderRequests = (rows) => {
+      // ── Render ─────────────────────────────────────────────────────────────
+      const renderList = () => {
         if (!currentUser) {
-          requestList.innerHTML = '<div class="empty">Sign in to view feature requests.</div>';
+          requestList.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-icon">💬</div>
+              <p><strong>Sign in to view and vote on requests.</strong></p>
+              <p>Use the same Qudoro account you use in the app.</p>
+            </div>`;
+          updateStats([]);
           return;
         }
+
+        let rows = [...allRows];
+
+        // Filter by category
+        if (currentCat) rows = rows.filter(r => r.category === currentCat);
+
+        // Filter by search
+        if (searchQuery) {
+          const q = searchQuery.toLowerCase();
+          rows = rows.filter(r =>
+            (r.title   || '').toLowerCase().includes(q) ||
+            (r.details || '').toLowerCase().includes(q)
+          );
+        }
+
+        // Sort
+        if (currentSort === 'votes') {
+          rows.sort((a, b) => (voteCountsByRequest.get(b.id) || 0) - (voteCountsByRequest.get(a.id) || 0));
+        } else {
+          rows.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        }
+
         if (!rows.length) {
-          requestList.innerHTML = '<div class="empty">No requests yet. Be the first to post one.</div>';
+          requestList.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-icon">🔍</div>
+              <p>${searchQuery || currentCat ? 'No requests match your filters.' : 'No requests yet. Be the first to post one!'}</p>
+            </div>`;
           return;
         }
-        requestList.innerHTML = rows
-          .map((row) => {
-            const safeTitle = String(row.title || '').replace(/</g, '&lt;');
-            const safeDetails = String(row.details || '').replace(/</g, '&lt;');
-            const safeCategory = String(row.category || 'general').replace(/</g, '&lt;');
-            const safeStatus = String(row.status || 'open').replace(/</g, '&lt;');
-            const safeAuthor = String(row.author_label || 'User').replace(/</g, '&lt;');
-            const votes = voteCountsByRequest.get(row.id) || 0;
-            const isVoted = votedRequestIds.has(row.id);
-            return `
-              <article class="request-card">
-                <div class="request-head">
-                  <div>
-                    <h3>${safeTitle}</h3>
-                    <p>${safeDetails}</p>
-                  </div>
-                  <span class="pill">${safeStatus}</span>
+
+        requestList.innerHTML = rows.map(row => {
+          const votes    = voteCountsByRequest.get(row.id) || 0;
+          const isVoted  = votedRequestIds.has(row.id);
+          const isBusy   = pendingVote === row.id;
+          return `
+            <article class="request-card" id="card-${esc(row.id)}">
+              <div class="vote-col">
+                <button
+                  class="vote-btn${isVoted ? ' voted' : ''}"
+                  data-id="${esc(row.id)}"
+                  type="button"
+                  ${isBusy ? 'disabled' : ''}
+                  title="${isVoted ? 'Remove vote' : 'Upvote this request'}"
+                >
+                  <span class="vote-arrow">${isVoted ? '▲' : '△'}</span>
+                  <span class="vote-count">${votes}</span>
+                </button>
+                <span class="vote-label">vote${votes !== 1 ? 's' : ''}</span>
+              </div>
+              <div class="req-content">
+                <h3 class="req-title">${esc(row.title)}</h3>
+                <p class="req-details" id="details-${esc(row.id)}">${esc(row.details)}</p>
+                <button class="expand-btn" data-expand="${esc(row.id)}" type="button">Show more</button>
+                <div class="req-meta">
+                  <span class="cat-pill ${catClass(row.category)}">${catLabel(row.category)}</span>
+                  <span class="status-badge ${statusClass(row.status)}">${statusLabel(row.status)}</span>
+                  <span class="meta-dot">·</span>
+                  <span class="meta-text">${esc(row.author_label || 'Qudoro User')}</span>
+                  <span class="meta-dot">·</span>
+                  <span class="meta-text">${relTime(row.created_at)}</span>
                 </div>
-                <div class="request-meta">
-                  <span>Category: ${safeCategory}</span>
-                  <span>By: ${safeAuthor}</span>
-                  <span>${formatDate(row.created_at)}</span>
-                </div>
-                <div class="request-actions">
-                  <button class="vote-btn ${isVoted ? 'voted' : ''}" data-request-id="${row.id}" type="button">
-                    ${isVoted ? 'Voted' : 'Vote'}
-                  </button>
-                  <span class="muted">${votes} vote${votes === 1 ? '' : 's'}</span>
-                </div>
-              </article>
-            `;
-          })
-          .join('');
+              </div>
+            </article>`;
+        }).join('');
+
+        updateStats(allRows);
       };
 
+      const updateStats = (rows) => {
+        const total      = rows.length;
+        const totalVotes = [...voteCountsByRequest.values()].reduce((a, b) => a + b, 0);
+        const doneCount  = rows.filter(r => r.status === 'done').length;
+        statRequests.innerHTML = `<strong>${total}</strong>&nbsp;requests`;
+        statVotes.innerHTML    = `<strong>${totalVotes}</strong>&nbsp;total votes`;
+        statDone.innerHTML     = `✅&nbsp;<strong>${doneCount}</strong>&nbsp;implemented`;
+      };
+
+      // ── Load data ──────────────────────────────────────────────────────────
       const loadRequests = async () => {
-        if (!currentUser) {
-          renderRequests([]);
-          return;
-        }
-        const { data, error } = await supabase
+        if (!currentUser) { renderList(); return; }
+
+        const { data, error } = await sb
           .from('feature_requests')
           .select('id,title,details,category,status,author_label,created_at')
           .order('created_at', { ascending: false })
-          .limit(100);
-        if (error) {
-          renderRequests([]);
-          setStatus(reqStatus, error.message || 'Could not load requests.', true);
-          return;
-        }
-        const requestIds = (data || []).map((row) => row.id);
+          .limit(200);
+
+        if (error || !data) { renderList(); return; }
+
+        allRows = data;
+
+        const ids = data.map(r => r.id);
         voteCountsByRequest = new Map();
-        votedRequestIds = new Set();
-        if (requestIds.length > 0) {
-          const { data: votesData, error: votesError } = await supabase
+        votedRequestIds     = new Set();
+
+        if (ids.length) {
+          const { data: vd } = await sb
             .from('feature_request_votes')
             .select('request_id,user_id')
-            .in('request_id', requestIds);
-          if (!votesError && Array.isArray(votesData)) {
-            for (const voteRow of votesData) {
-              const requestId = voteRow.request_id;
-              voteCountsByRequest.set(requestId, (voteCountsByRequest.get(requestId) || 0) + 1);
-              if (voteRow.user_id === currentUser.id) {
-                votedRequestIds.add(requestId);
-              }
+            .in('request_id', ids);
+          if (Array.isArray(vd)) {
+            for (const v of vd) {
+              voteCountsByRequest.set(v.request_id, (voteCountsByRequest.get(v.request_id) || 0) + 1);
+              if (v.user_id === currentUser.id) votedRequestIds.add(v.request_id);
             }
           }
         }
 
-        renderRequests(data || []);
+        renderList();
       };
 
-      const updateAuthUi = async () => {
-        const { data } = await supabase.auth.getSession();
+      // ── Auth UI ────────────────────────────────────────────────────────────
+      const refreshAuthUi = async () => {
+        const { data } = await sb.auth.getSession();
         currentUser = data.session?.user || null;
 
         if (!currentUser) {
-          authSummary.textContent = 'Not signed in.';
-          authForms.style.display = '';
+          authChip.style.display   = 'none';
+          authForms.style.display  = '';
           authActions.style.display = 'none';
-          composer.style.display = 'none';
-          composerLocked.style.display = '';
-          renderRequests([]);
+          composeForm.style.display = 'none';
+          composeLocked.style.display = '';
+          renderList();
           return;
         }
 
-        authSummary.textContent = `Signed in as ${currentUser.email}`;
-        authForms.style.display = 'none';
-        authActions.style.display = '';
-        composer.style.display = '';
-        composerLocked.style.display = 'none';
-        setStatus(authStatus, '');
+        const email    = currentUser.email || '';
+        const initials = (currentUser.user_metadata?.full_name || email)
+          .split(/\s+|@/).map(w => w[0] || '').slice(0, 2).join('').toUpperCase() || '?';
+        authInitials.textContent   = initials;
+        authEmailLabel.textContent = email;
+        authChip.style.display     = '';
+        authForms.style.display    = 'none';
+        authActions.style.display  = '';
+        composeForm.style.display  = '';
+        composeLocked.style.display = 'none';
+        setMsg(authStatus, '');
         await loadRequests();
       };
 
-      signInBtn.addEventListener('click', async () => {
-        setStatus(authStatus, '');
-        const email = authEmail.value.trim();
-        const password = authPassword.value;
-        if (!email || !password) {
-          setStatus(authStatus, 'Enter email and password.', true);
-          return;
-        }
-        signInBtn.disabled = true;
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        signInBtn.disabled = false;
-        if (error) {
-          setStatus(authStatus, error.message || 'Sign in failed.', true);
-          return;
-        }
-        setStatus(authStatus, 'Signed in.');
-        await updateAuthUi();
+      // ── Auth events ────────────────────────────────────────────────────────
+      btnSignin.addEventListener('click', async () => {
+        setMsg(authStatus, '');
+        const email = inpEmail.value.trim();
+        const pw    = inpPassword.value;
+        if (!email || !pw) { setMsg(authStatus, 'Enter email and password.', true); return; }
+        btnSignin.disabled = true;
+        const { error } = await sb.auth.signInWithPassword({ email, password: pw });
+        btnSignin.disabled = false;
+        if (error) { setMsg(authStatus, error.message || 'Sign-in failed.', true); return; }
+        setMsg(authStatus, 'Signed in!');
+        await refreshAuthUi();
       });
 
-      signUpBtn.addEventListener('click', async () => {
-        setStatus(authStatus, '');
-        const email = authEmail.value.trim();
-        const password = authPassword.value;
-        if (!email || !password) {
-          setStatus(authStatus, 'Enter email and password.', true);
-          return;
-        }
-        signUpBtn.disabled = true;
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
+      btnSignup.addEventListener('click', async () => {
+        setMsg(authStatus, '');
+        const email = inpEmail.value.trim();
+        const pw    = inpPassword.value;
+        if (!email || !pw) { setMsg(authStatus, 'Enter email and password.', true); return; }
+        btnSignup.disabled = true;
+        const { error } = await sb.auth.signUp({
+          email, password: pw,
           options: { emailRedirectTo: 'https://qudoro.com/confirm-email' },
         });
-        signUpBtn.disabled = false;
-        if (error) {
-          setStatus(authStatus, error.message || 'Sign up failed.', true);
-          return;
-        }
-        setStatus(authStatus, 'Account created. Check your email to confirm, then sign in.');
+        btnSignup.disabled = false;
+        if (error) { setMsg(authStatus, error.message || 'Sign-up failed.', true); return; }
+        setMsg(authStatus, 'Account created — check your email to confirm, then sign in.');
       });
 
-      signOutBtn.addEventListener('click', async () => {
-        await supabase.auth.signOut();
-        await updateAuthUi();
+      btnSignout.addEventListener('click', async () => {
+        await sb.auth.signOut();
+        allRows = [];
+        voteCountsByRequest = new Map();
+        votedRequestIds     = new Set();
+        await refreshAuthUi();
       });
 
-      composer.addEventListener('submit', async (e) => {
+      // ── Submit request ─────────────────────────────────────────────────────
+      composeForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        if (!currentUser) {
-          setStatus(reqStatus, 'Sign in first.', true);
-          return;
-        }
-        const title = reqTitle.value.trim();
+        if (!currentUser) { setMsg(reqStatus, 'Sign in first.', true); return; }
+        const title   = reqTitle.value.trim();
         const details = reqDetails.value.trim();
-        const category = reqCategory.value;
-        if (!title || !details) {
-          setStatus(reqStatus, 'Title and details are required.', true);
-          return;
-        }
-
+        const category= reqCategory.value;
+        if (!title || !details) { setMsg(reqStatus, 'Title and details are required.', true); return; }
         const authorLabel =
           currentUser.user_metadata?.full_name ||
           currentUser.user_metadata?.name ||
-          currentUser.email ||
-          'Qudoro User';
-
-        const submitBtn = document.getElementById('req-submit');
-        submitBtn.disabled = true;
-        const { error } = await supabase.from('feature_requests').insert({
-          title,
-          details,
-          category,
-          created_by: currentUser.id,
-          author_label: authorLabel,
+          currentUser.email || 'Qudoro User';
+        btnSubmit.disabled = true;
+        const { error } = await sb.from('feature_requests').insert({
+          title, details, category, created_by: currentUser.id, author_label: authorLabel,
         });
-        submitBtn.disabled = false;
-
-        if (error) {
-          setStatus(reqStatus, error.message || 'Could not submit request.', true);
-          return;
-        }
-        reqTitle.value = '';
+        btnSubmit.disabled = false;
+        if (error) { setMsg(reqStatus, error.message || 'Could not post request.', true); return; }
+        reqTitle.value   = '';
         reqDetails.value = '';
-        reqCategory.value = 'general';
-        setStatus(reqStatus, 'Request posted.');
+        titleCount.textContent   = '0 / 120';
+        detailsCount.textContent = '0 / 2000';
+        setMsg(reqStatus, '✅ Request posted — thank you!');
         await loadRequests();
       });
 
-      requestList.addEventListener('click', async (event) => {
-        const target = event.target.closest('.vote-btn');
-        if (!target || !currentUser) return;
-        const requestId = target.getAttribute('data-request-id');
-        if (!requestId) return;
-
-        target.disabled = true;
-        setStatus(reqStatus, '');
-        const hasVoted = votedRequestIds.has(requestId);
-
-        if (hasVoted) {
-          const { error } = await supabase
-            .from('feature_request_votes')
-            .delete()
-            .eq('request_id', requestId)
-            .eq('user_id', currentUser.id);
-          if (error) {
-            setStatus(reqStatus, error.message || 'Could not remove vote.', true);
-            target.disabled = false;
-            return;
+      // ── Vote ───────────────────────────────────────────────────────────────
+      requestList.addEventListener('click', async (e) => {
+        // Vote button
+        const voteBtn = e.target.closest('.vote-btn');
+        if (voteBtn && currentUser) {
+          const id = voteBtn.dataset.id;
+          if (!id || pendingVote === id) return;
+          pendingVote = id;
+          voteBtn.disabled = true;
+          const hasVoted = votedRequestIds.has(id);
+          if (hasVoted) {
+            await sb.from('feature_request_votes').delete()
+              .eq('request_id', id).eq('user_id', currentUser.id);
+          } else {
+            await sb.from('feature_request_votes').insert({ request_id: id, user_id: currentUser.id });
           }
-          setStatus(reqStatus, 'Vote removed.');
-        } else {
-          const { error } = await supabase
-            .from('feature_request_votes')
-            .insert({ request_id: requestId, user_id: currentUser.id });
-          if (error) {
-            setStatus(reqStatus, error.message || 'Could not submit vote.', true);
-            target.disabled = false;
-            return;
-          }
-          setStatus(reqStatus, 'Vote added.');
+          pendingVote = null;
+          await loadRequests();
         }
 
-        await loadRequests();
+        // Expand button
+        const expandBtn = e.target.closest('.expand-btn');
+        if (expandBtn) {
+          const id = expandBtn.dataset.expand;
+          const p  = document.getElementById(`details-${id}`);
+          if (!p) return;
+          const expanded = p.classList.toggle('expanded');
+          expandBtn.textContent = expanded ? 'Show less' : 'Show more';
+        }
       });
 
-      supabase.auth.onAuthStateChange(async () => {
-        await updateAuthUi();
+      // ── Sort tabs ──────────────────────────────────────────────────────────
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          currentSort = btn.dataset.sort;
+          renderList();
+        });
       });
 
-      await updateAuthUi();
+      // ── Category filter ────────────────────────────────────────────────────
+      document.getElementById('cat-filter').addEventListener('click', (e) => {
+        const btn = e.target.closest('.cat-btn');
+        if (!btn) return;
+        document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentCat = btn.dataset.cat;
+        renderList();
+      });
+
+      // ── Search ─────────────────────────────────────────────────────────────
+      searchInput.addEventListener('input', () => {
+        searchQuery = searchInput.value.trim();
+        renderList();
+      });
+
+      // ── Character counters ─────────────────────────────────────────────────
+      reqTitle.addEventListener('input', () => {
+        const len = reqTitle.value.length;
+        titleCount.textContent = `${len} / 120`;
+        titleCount.className   = `char-count${len > 100 ? (len >= 120 ? ' over' : ' warn') : ''}`;
+      });
+      reqDetails.addEventListener('input', () => {
+        const len = reqDetails.value.length;
+        detailsCount.textContent = `${len} / 2000`;
+        detailsCount.className   = `char-count${len > 1600 ? (len >= 2000 ? ' over' : ' warn') : ''}`;
+      });
+
+      // ── Auth state listener ────────────────────────────────────────────────
+      sb.auth.onAuthStateChange(async (_event, _session) => {
+        await refreshAuthUi();
+      });
+
+      // ── Init ───────────────────────────────────────────────────────────────
+      skeleton.remove();
+      await refreshAuthUi();
     </script>
   </body>
 </html>

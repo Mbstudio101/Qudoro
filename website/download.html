@@ -1,106 +1,224 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Download Qudoro</title>
-    <meta name="description" content="Download latest Qudoro installers for macOS and Windows." />
-    <link rel="icon" href="/icon.png" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700;800&family=Manrope:wght@400;500;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/styles.css" />
-  </head>
-  <body>
-    <div class="bg-shape bg-shape-1"></div>
-    <div class="bg-shape bg-shape-2"></div>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Download | Qudoro</title>
+  <meta name="description" content="Download Qudoro for macOS (Apple Silicon & Intel) and Windows. Free desktop app for intelligent study, exam simulation, and spaced-repetition flashcards." />
+  <link rel="icon" href="/icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700;800&family=Manrope:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    .page-hero {
+      padding: 3.5rem 0 2.5rem;
+      text-align: center;
+      max-width: 600px;
+      margin-inline: auto;
+    }
+    .page-hero h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 800;
+      line-height: 1.08;
+      letter-spacing: -0.02em;
+      margin: 0.7rem 0 1rem;
+    }
+    .download-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.1rem;
+      margin: 2rem 0;
+    }
+    .dl-card {
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      background: var(--bg-card);
+      backdrop-filter: blur(16px);
+      padding: 2rem;
+      transition: border-color 180ms, background 180ms, box-shadow 180ms;
+    }
+    .dl-card:hover { border-color: var(--border-h); background: var(--bg-card-h); box-shadow: 0 12px 40px rgba(99,102,241,0.12); }
+    .dl-card-icon { font-size: 2.8rem; margin-bottom: 1rem; display: block; }
+    .dl-card h2 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.5rem;
+      font-weight: 800;
+      margin-bottom: 0.4rem;
+    }
+    .dl-card p { color: var(--muted); font-size: 0.92rem; line-height: 1.55; margin-bottom: 1.4rem; }
+    .dl-version { color: var(--subtle); font-size: 0.82rem; margin-top: 0.75rem; }
+    .dl-version a { color: #a5b4fc; text-decoration: none; }
+    .dl-version a:hover { text-decoration: underline; }
 
-    <header class="container nav">
-      <a class="brand" href="/"><img src="/icon.png" alt="Qudoro logo" /><span>Qudoro</span></a>
-      <div class="nav-links">
-        <a href="/download">Download</a>
-        <a href="/features">Features</a>
-        <a href="/tour">Tour</a>
-        <a href="/why">Why Qudoro</a>
-        <a href="/forum">Forum</a>
+    .dl-note {
+      border: 1px solid rgba(99,102,241,0.2);
+      border-radius: 14px;
+      background: rgba(99,102,241,0.06);
+      padding: 1.2rem 1.4rem;
+      color: var(--muted);
+      font-size: 0.88rem;
+      line-height: 1.6;
+      margin-bottom: 3rem;
+    }
+    .dl-note strong { color: var(--text); }
+
+    @media (max-width: 640px) {
+      .download-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+
+  <header class="container nav">
+    <a class="brand" href="/"><img src="/icon.png" alt="Qudoro" /><span class="brand-name">Qudoro</span></a>
+    <nav class="nav-links">
+      <a href="/download" class="active">Download</a>
+      <a href="/features">Features</a>
+      <a href="/tour">Tour</a>
+      <a href="/why">Why Qudoro</a>
+      <a href="/forum">Forum</a>
+      <a href="/download" class="nav-cta">Get the App</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <div class="page-hero">
+      <span class="pill">Free Desktop App</span>
+      <h1><span class="grad-text">Download Qudoro</span></h1>
+      <p style="color:var(--muted); font-size:1rem; line-height:1.65">Available for macOS and Windows. No subscription, no paywall — just install and study.</p>
+    </div>
+
+    <div class="download-grid">
+      <!-- macOS -->
+      <div class="dl-card">
+        <span class="dl-card-icon"></span>
+        <h2>macOS</h2>
+        <p>Apple Silicon (M1/M2/M3) and Intel builds. Requires macOS 12 Monterey or later.</p>
+        <div style="display:flex; flex-direction:column; gap:0.6rem">
+          <a id="mac-arm-btn" class="btn btn-primary" href="#" style="width:100%">
+             Apple Silicon (.dmg)
+          </a>
+          <a id="mac-x64-btn" class="btn btn-outline" href="#" style="width:100%">
+             Intel (.dmg)
+          </a>
+        </div>
+        <p class="dl-version" id="mac-version">Checking latest release…</p>
       </div>
-    </header>
 
-    <main class="container section">
-      <h1 class="page-title">Download Qudoro</h1>
-      <p class="section-intro">Always linked to the latest GitHub release artifacts.</p>
-
-      <div class="download-grid">
-        <article class="download-card">
-          <h3>macOS</h3>
-          <p>Apple Silicon / Intel installer (.dmg)</p>
-          <a id="download-macos" class="btn btn-primary btn-block btn-disabled" href="https://github.com/Mbstudio101/Qudoro/releases/latest" target="_blank" rel="noreferrer">Fetching latest...</a>
-        </article>
-        <article class="download-card">
-          <h3>Windows</h3>
-          <p>Installer package (.exe)</p>
-          <a id="download-windows" class="btn btn-primary btn-block btn-disabled" href="https://github.com/Mbstudio101/Qudoro/releases/latest" target="_blank" rel="noreferrer">Fetching latest...</a>
-        </article>
+      <!-- Windows -->
+      <div class="dl-card">
+        <span class="dl-card-icon">🪟</span>
+        <h2>Windows</h2>
+        <p>64-bit installer for Windows 10 and later. Install from the .exe and launch from the Start menu.</p>
+        <div style="display:flex; flex-direction:column; gap:0.6rem">
+          <a id="win-btn" class="btn btn-primary" href="#" style="width:100%">
+            🪟 Windows (.exe)
+          </a>
+        </div>
+        <p class="dl-version" id="win-version">Checking latest release…</p>
       </div>
+    </div>
 
-      <p id="download-version" class="download-version">Latest release: loading...</p>
-    </main>
+    <div class="dl-note">
+      <strong>macOS security note:</strong> If macOS shows "app can't be opened because it's from an unidentified developer", right-click the app → Open, then click Open again. This is standard for apps distributed outside the App Store.
+    </div>
 
-    <footer class="container footer">
-      <p>&copy; <span id="year"></span> Qudoro. All rights reserved.</p>
-      <div class="footer-links">
-        <a href="/">Home</a>
-        <a href="/terms">Terms</a>
-        <a href="/privacy">Privacy</a>
+    <!-- Why desktop -->
+    <section style="padding:0 0 3rem">
+      <div class="section-label">Why desktop?</div>
+      <h2 class="section-title" style="margin-bottom:0.9rem">Built to work <span class="grad-text">offline-first</span></h2>
+      <div class="grid-3" style="margin-top:1.5rem">
+        <div class="card">
+          <div class="feat-icon icon-indigo">🔒</div>
+          <h3>Your data stays local</h3>
+          <p>Question banks and study sessions are stored on your device, encrypted with IDB. No cloud required to study.</p>
+        </div>
+        <div class="card">
+          <div class="feat-icon icon-green">⚡</div>
+          <h3>No latency</h3>
+          <p>Instant navigation between decks, sessions, and notes. No loading spinners, no server round-trips.</p>
+        </div>
+        <div class="card">
+          <div class="feat-icon icon-violet">📴</div>
+          <h3>Works anywhere</h3>
+          <p>Study on a plane, in a hospital, or anywhere with no internet. Marketplace sync is optional.</p>
+        </div>
       </div>
-    </footer>
+    </section>
+  </main>
 
-    <script>
-      document.getElementById('year').textContent = String(new Date().getFullYear());
+  <footer class="container footer">
+    <p>© 2025 Qudoro</p>
+    <div class="footer-links">
+      <a href="/features">Features</a>
+      <a href="/tour">Tour</a>
+      <a href="/why">Why Qudoro</a>
+      <a href="/forum">Forum</a>
+      <a href="/privacy">Privacy</a>
+      <a href="/terms">Terms</a>
+    </div>
+  </footer>
 
-      (async function loadReleaseDownloads() {
-        const macBtn = document.getElementById('download-macos');
-        const winBtn = document.getElementById('download-windows');
-        const versionEl = document.getElementById('download-version');
-        const fallback = 'https://github.com/Mbstudio101/Qudoro/releases/latest';
+  <script type="module">
+    const REPO = 'DeMarveyy/qudoro-releases';
+    const macArm = document.getElementById('mac-arm-btn');
+    const macX64 = document.getElementById('mac-x64-btn');
+    const winBtn  = document.getElementById('win-btn');
+    const macVer  = document.getElementById('mac-version');
+    const winVer  = document.getElementById('win-version');
 
-        const setFallbackState = () => {
-          macBtn.textContent = 'Download for macOS';
-          winBtn.textContent = 'Download for Windows';
-          macBtn.href = fallback;
-          winBtn.href = fallback;
-          macBtn.classList.remove('btn-disabled');
-          winBtn.classList.remove('btn-disabled');
-          versionEl.textContent = 'Latest release: open GitHub release page';
-        };
+    const setDisabled = (el, text) => {
+      el.href = '#';
+      el.textContent = text;
+      el.classList.add('btn-disabled');
+    };
 
-        try {
-          const response = await fetch('https://api.github.com/repos/Mbstudio101/Qudoro/releases/latest', {
-            headers: { Accept: 'application/vnd.github+json' },
-          });
-          if (!response.ok) {
-            setFallbackState();
-            return;
-          }
+    try {
+      const res  = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`);
+      const data = await res.json();
+      if (!data?.assets) throw new Error('No assets');
 
-          const release = await response.json();
-          const assets = Array.isArray(release.assets) ? release.assets : [];
-          const findAsset = (matcher) => assets.find((a) => matcher(String(a.name || '').toLowerCase()));
-          const macAsset = findAsset((name) => name.endsWith('.dmg'));
-          const winAsset = findAsset((name) => name.endsWith('.exe'));
+      const assets = data.assets;
+      const tag    = data.tag_name || 'latest';
 
-          macBtn.textContent = macAsset ? 'Download for macOS (.dmg)' : 'Open macOS Release';
-          winBtn.textContent = winAsset ? 'Download for Windows (.exe)' : 'Open Windows Release';
-          macBtn.href = macAsset?.browser_download_url || release.html_url || fallback;
-          winBtn.href = winAsset?.browser_download_url || release.html_url || fallback;
-          macBtn.classList.remove('btn-disabled');
-          winBtn.classList.remove('btn-disabled');
+      const armAsset = assets.find(a => /arm64.*\.dmg$/i.test(a.name) || /darwin.*arm64.*\.dmg$/i.test(a.name));
+      const x64Asset = assets.find(a => /x64.*\.dmg$/i.test(a.name)   || /darwin.*x64.*\.dmg$/i.test(a.name)  || (!(/arm/i.test(a.name)) && /\.dmg$/i.test(a.name)));
+      const winAsset = assets.find(a => /\.exe$/i.test(a.name));
 
-          versionEl.textContent = `Latest release: ${release.tag_name || 'latest'}`;
-        } catch (_err) {
-          setFallbackState();
-        }
-      })();
-    </script>
-  </body>
+      if (armAsset) {
+        macArm.href = armAsset.browser_download_url;
+        macArm.classList.remove('btn-disabled');
+      } else { setDisabled(macArm, ' Apple Silicon — coming soon'); }
+
+      if (x64Asset) {
+        macX64.href = x64Asset.browser_download_url;
+        macX64.classList.remove('btn-disabled');
+      } else { setDisabled(macX64, ' Intel — coming soon'); }
+
+      if (winAsset) {
+        winBtn.href = winAsset.browser_download_url;
+        winBtn.classList.remove('btn-disabled');
+      } else { setDisabled(winBtn, '🪟 Windows — coming soon'); }
+
+      const rel = data.published_at ? new Date(data.published_at).toLocaleDateString() : '';
+      const ghUrl = data.html_url || `https://github.com/${REPO}/releases`;
+      macVer.innerHTML = `Version ${tag}${rel ? ' · ' + rel : ''} · <a href="${ghUrl}" target="_blank" rel="noopener">Release notes</a>`;
+      winVer.innerHTML = macVer.innerHTML;
+    } catch {
+      macVer.textContent = 'Could not load release info.';
+      winVer.textContent = 'Could not load release info.';
+      setDisabled(macArm, ' Fetch release on GitHub');
+      setDisabled(macX64, ' Fetch release on GitHub');
+      setDisabled(winBtn,  '🪟 Fetch release on GitHub');
+      macArm.href = `https://github.com/${REPO}/releases`;
+      macX64.href = `https://github.com/${REPO}/releases`;
+      winBtn.href  = `https://github.com/${REPO}/releases`;
+      [macArm, macX64, winBtn].forEach(b => { b.classList.remove('btn-disabled'); b.classList.add('btn-outline'); });
+    }
+  </script>
+</body>
 </html>

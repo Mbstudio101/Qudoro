@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { useStore, Question } from '../store/useStore';
 import { calculateSM2 } from '../utils/sm2';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -33,6 +33,7 @@ const Flashcards = () => {
   const [incorrectIds, setIncorrectIds] = useState<string[]>([]);
   const [startTime, setStartTime] = useState(Date.now());
   const [isDrillMode, setIsDrillMode] = useState(false);
+  const sessionSaved = useRef(false);
 
   const getDueQuestionsForSet = (setId: string) => {
     const now = Date.now();
@@ -56,6 +57,7 @@ const Flashcards = () => {
     setIncorrectIds([]);
     setStartTime(Date.now());
     setIsDrillMode(false);
+    sessionSaved.current = false;
   };
 
   const currentQuestion = dueQuestions[currentIndex];
@@ -102,16 +104,21 @@ const Flashcards = () => {
       const finalIncorrectIds = (rating === 'again' || rating === 'hard') ? [...incorrectIds, currentQuestion.id] : incorrectIds;
       const duration = (Date.now() - startTime) / 1000;
 
-      // Note: real-time stats (streak, XP, time) are handled by reviewQuestion per card.
-      // addSession here just logs the historical session record and ensures consistency.
-      addSession({
-        setId: selectedSetId || '',
-        date: startTime, // Use start time as session date
-        score: finalCorrectCount,
-        totalQuestions: dueQuestions.length,
-        incorrectQuestionIds: finalIncorrectIds,
-        duration: duration
-      });
+      if (!sessionSaved.current) {
+        try {
+          addSession({
+            setId: selectedSetId || '',
+            date: startTime,
+            score: finalCorrectCount,
+            totalQuestions: dueQuestions.length,
+            incorrectQuestionIds: finalIncorrectIds,
+            duration: duration
+          });
+          sessionSaved.current = true;
+        } catch (err) {
+          console.error('Failed to save flashcard session:', err);
+        }
+      }
       setSessionComplete(true);
     }
   };
@@ -131,6 +138,7 @@ const Flashcards = () => {
     setIncorrectIds([]);
     setStartTime(Date.now());
     setIsDrillMode(true);
+    sessionSaved.current = false;
   };
 
   useEffect(() => {

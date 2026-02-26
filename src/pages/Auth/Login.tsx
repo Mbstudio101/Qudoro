@@ -8,10 +8,9 @@ import AuthTitleBar from '../../components/AuthTitleBar';
 import { motion } from 'framer-motion';
 import { requestPasswordReset, signInWithSupabase } from '../../services/auth/supabaseAuth';
 import Toast, { type ToastVariant } from '../../components/ui/Toast';
+import { REMEMBER_ME_KEY, LOGIN_GUARD_KEY } from '../../utils/storageKeys';
 
-const REMEMBER_ME_KEY = 'qudoro-remember-me';
 const REMEMBER_ME_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
-const LOGIN_GUARD_KEY = 'qudoro-login-guard-v1';
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 const LOGIN_LOCKOUT_MS = 15 * 60 * 1000;
 const MAX_FAILED_LOGIN_ATTEMPTS = 5;

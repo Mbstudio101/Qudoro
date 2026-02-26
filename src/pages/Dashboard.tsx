@@ -224,6 +224,15 @@ const Dashboard = () => {
     setIsEditingName(false);
   };
 
+  if (!activeProfileId) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-4 text-muted-foreground">
+        <p>No profile selected.</p>
+        <Button onClick={() => navigate('/profiles')}>Select a Profile</Button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 pb-20">
       {/* Header */}

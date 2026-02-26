@@ -98,19 +98,20 @@ const Practice = () => {
   // Save session when results are shown
   useEffect(() => {
     if (showResults && currentSet && !sessionSaved.current) {
-      sessionSaved.current = true;
-      const duration = (Date.now() - startTime) / 1000; // duration in seconds
-      
-      // Note: Practice mode doesn't use reviewQuestion, so stats like Streak/XP 
-      // are calculated in addSession. This is correct and consistent.
-      addSession({
-        setId: currentSet.id,
-        date: startTime, // use start time as session date
-        score: score,
-        totalQuestions: setQuestions.length,
-        incorrectQuestionIds: incorrectQuestionIds,
-        duration: duration
-      });
+      try {
+        const duration = (Date.now() - startTime) / 1000;
+        addSession({
+          setId: currentSet.id,
+          date: startTime,
+          score: score,
+          totalQuestions: setQuestions.length,
+          incorrectQuestionIds: incorrectQuestionIds,
+          duration: duration
+        });
+        sessionSaved.current = true;
+      } catch (err) {
+        console.error('Failed to save practice session:', err);
+      }
     }
   }, [showResults, currentSet, score, setQuestions.length, incorrectQuestionIds, addSession, startTime]);
 

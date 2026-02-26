@@ -1,67 +1,260 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Why Qudoro</title>
-    <meta name="description" content="Why Qudoro exists and how students use it effectively." />
-    <link rel="icon" href="/icon.png" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700;800&family=Manrope:wght@400;500;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/styles.css" />
-  </head>
-  <body>
-    <div class="bg-shape bg-shape-1"></div>
-    <div class="bg-shape bg-shape-2"></div>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Why Qudoro | Qudoro</title>
+  <meta name="description" content="Why choose Qudoro? Offline-first, privacy-respecting, community-driven, and purpose-built for nursing and exam-heavy study workflows." />
+  <link rel="icon" href="/icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700;800&family=Manrope:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    .page-hero {
+      padding: 3.5rem 0 2.5rem;
+      text-align: center;
+      max-width: 680px;
+      margin-inline: auto;
+    }
+    .page-hero h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(2rem, 5vw, 3.2rem);
+      font-weight: 800;
+      line-height: 1.08;
+      letter-spacing: -0.02em;
+      margin: 0.7rem 0 1rem;
+    }
 
-    <header class="container nav">
-      <a class="brand" href="/"><img src="/icon.png" alt="Qudoro logo" /><span>Qudoro</span></a>
-      <div class="nav-links">
-        <a href="/download">Download</a>
-        <a href="/features">Features</a>
-        <a href="/tour">Tour</a>
-        <a href="/why">Why Qudoro</a>
-        <a href="/forum">Forum</a>
+    /* comparison table */
+    .compare-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 2rem 0;
+      font-size: 0.9rem;
+    }
+    .compare-table thead th {
+      padding: 0.75rem 1rem;
+      text-align: left;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--subtle);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      border-bottom: 1px solid var(--border);
+    }
+    .compare-table thead th:not(:first-child) { text-align: center; }
+    .compare-table tbody tr { border-bottom: 1px solid var(--border); }
+    .compare-table tbody tr:last-child { border-bottom: none; }
+    .compare-table tbody td {
+      padding: 0.75rem 1rem;
+      color: var(--muted);
+    }
+    .compare-table tbody td:not(:first-child) { text-align: center; }
+    .compare-table tbody td strong { color: var(--text); font-weight: 600; }
+    .check { color: #34d399; font-size: 1.1rem; }
+    .cross { color: #64748b; font-size: 1rem; }
+    .qudoro-col { background: rgba(99,102,241,0.06); }
+    .qudoro-head { color: #a5b4fc !important; }
+
+    /* flow steps */
+    .flow-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.9rem;
+      margin-top: 1.5rem;
+    }
+    .flow-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--bg-card);
+      padding: 1.2rem;
+      transition: border-color 180ms, background 180ms;
+    }
+    .flow-card:hover { border-color: var(--border-h); background: var(--bg-card-h); }
+    .flow-card h3 { font-size: 0.98rem; font-weight: 700; margin-bottom: 0.4rem; }
+    .flow-card p  { font-size: 0.86rem; color: var(--muted); line-height: 1.55; margin: 0; }
+
+    /* trust grid */
+    .trust-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin-top: 1.5rem;
+    }
+
+    @media (max-width: 900px) {
+      .flow-grid  { grid-template-columns: 1fr; }
+      .trust-grid { grid-template-columns: 1fr; }
+      .compare-table thead th:nth-child(3),
+      .compare-table tbody td:nth-child(3) { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+
+  <header class="container nav">
+    <a class="brand" href="/"><img src="/icon.png" alt="Qudoro" /><span class="brand-name">Qudoro</span></a>
+    <nav class="nav-links">
+      <a href="/download">Download</a>
+      <a href="/features">Features</a>
+      <a href="/tour">Tour</a>
+      <a href="/why" class="active">Why Qudoro</a>
+      <a href="/forum">Forum</a>
+      <a href="/download" class="nav-cta">Get the App</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <div class="page-hero">
+      <span class="pill">The Honest Case</span>
+      <h1>Why students choose<br /><span class="grad-text">Qudoro</span></h1>
+      <p style="color:var(--muted); font-size:1rem; line-height:1.65">There are plenty of study tools. Here's why Qudoro fits nursing and exam-heavy tracks better than generic alternatives.</p>
+    </div>
+
+    <!-- Comparison table -->
+    <section style="padding:0 0 3rem">
+      <div class="section-label">How it compares</div>
+      <h2 class="section-title" style="margin-bottom:1.5rem">Built for <span class="grad-text">your workflow</span></h2>
+      <div style="overflow-x:auto">
+        <table class="compare-table">
+          <thead>
+            <tr>
+              <th style="width:35%">Feature</th>
+              <th class="qudoro-col qudoro-head">Qudoro</th>
+              <th>Flashcard Apps</th>
+              <th>LMS / Web Tools</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Auto-parse MCQs from text/PDF</strong></td>
+              <td class="qudoro-col"><span class="check">✔</span></td>
+              <td><span class="cross">✗</span></td>
+              <td><span class="cross">✗</span></td>
+            </tr>
+            <tr>
+              <td><strong>Timed exam simulation</strong></td>
+              <td class="qudoro-col"><span class="check">✔</span></td>
+              <td><span class="cross">✗</span></td>
+              <td>Partial</td>
+            </tr>
+            <tr>
+              <td><strong>Spaced-repetition (SM-2)</strong></td>
+              <td class="qudoro-col"><span class="check">✔</span></td>
+              <td><span class="check">✔</span></td>
+              <td><span class="cross">✗</span></td>
+            </tr>
+            <tr>
+              <td><strong>Works fully offline</strong></td>
+              <td class="qudoro-col"><span class="check">✔</span></td>
+              <td>Partial</td>
+              <td><span class="cross">✗</span></td>
+            </tr>
+            <tr>
+              <td><strong>Community question marketplace</strong></td>
+              <td class="qudoro-col"><span class="check">✔</span></td>
+              <td>Partial</td>
+              <td><span class="cross">✗</span></td>
+            </tr>
+            <tr>
+              <td><strong>Weak area analytics by topic tag</strong></td>
+              <td class="qudoro-col"><span class="check">✔</span></td>
+              <td><span class="cross">✗</span></td>
+              <td>Partial</td>
+            </tr>
+            <tr>
+              <td><strong>Notes → flashcard conversion</strong></td>
+              <td class="qudoro-col"><span class="check">✔</span></td>
+              <td><span class="cross">✗</span></td>
+              <td><span class="cross">✗</span></td>
+            </tr>
+            <tr>
+              <td><strong>Free, no subscription</strong></td>
+              <td class="qudoro-col"><span class="check">✔</span></td>
+              <td>Freemium</td>
+              <td>Paid/Institution</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
-    </header>
+    </section>
 
-    <main class="container section">
-      <h1 class="page-title">Why Qudoro</h1>
-      <p class="section-intro">Qudoro was designed to reduce tool-switching and keep serious exam prep structured.</p>
-
-      <section class="section compact">
-        <h2>Student Workflow</h2>
-        <div class="flow-grid">
-          <article class="flow-item"><span>1</span><h3>Build</h3><p>Create or import question sets.</p></article>
-          <article class="flow-item"><span>2</span><h3>Practice</h3><p>Run exams and identify weak areas.</p></article>
-          <article class="flow-item"><span>3</span><h3>Reinforce</h3><p>Use flashcards and notes for retention.</p></article>
-          <article class="flow-item"><span>4</span><h3>Improve</h3><p>Return to sets and iterate continuously.</p></article>
+    <!-- Workflow -->
+    <section style="padding:0 0 3rem; border-top:1px solid var(--border); padding-top:2.5rem">
+      <div class="section-label">The study loop</div>
+      <h2 class="section-title" style="margin-bottom:0.6rem">Four steps, <span class="grad-text">endless improvement</span></h2>
+      <p class="section-sub" style="margin-bottom:0">Qudoro is designed around a repeating cycle that compounds your retention over time.</p>
+      <div class="flow-grid">
+        <div class="flow-card">
+          <div class="step-num">1</div>
+          <h3>Build</h3>
+          <p>Create or import question sets. Tag by topic. Add rationales and images. Your bank grows over time.</p>
         </div>
-      </section>
-
-      <section class="section compact section-why">
-        <h2>Trust & Reliability</h2>
-        <div class="trust-grid">
-          <article><h3>Secure Auth</h3><p>Supabase auth with confirmation and password reset flows.</p></article>
-          <article><h3>RLS-Protected Data</h3><p>Marketplace and forum tables are governed by row-level security policies.</p></article>
-          <article><h3>Community-Driven Roadmap</h3><p>Forum requests and voting prioritize features users actually need.</p></article>
+        <div class="flow-card">
+          <div class="step-num">2</div>
+          <h3>Practice</h3>
+          <p>Run timed exams, cram mode, or drill missed only. Rationale review happens inline — not after.</p>
         </div>
-      </section>
-    </main>
-
-    <footer class="container footer">
-      <p>&copy; <span id="year"></span> Qudoro. All rights reserved.</p>
-      <div class="footer-links">
-        <a href="/">Home</a>
-        <a href="/forum">Forum</a>
-        <a href="/terms">Terms</a>
-        <a href="/privacy">Privacy</a>
+        <div class="flow-card">
+          <div class="step-num">3</div>
+          <h3>Reinforce</h3>
+          <p>Spaced flashcards keep weak areas in rotation. Notes convert directly into review decks.</p>
+        </div>
+        <div class="flow-card">
+          <div class="step-num">4</div>
+          <h3>Improve</h3>
+          <p>Analytics surface your weakest topics. Return to those sets, rebuild, and watch mastery climb.</p>
+        </div>
       </div>
-    </footer>
+    </section>
 
-    <script>
-      document.getElementById('year').textContent = String(new Date().getFullYear());
-    </script>
-  </body>
+    <!-- Trust -->
+    <section style="padding:0 0 3rem; border-top:1px solid var(--border); padding-top:2.5rem">
+      <div class="section-label">Trust &amp; Privacy</div>
+      <h2 class="section-title" style="margin-bottom:0.6rem">Your data, <span class="grad-text">your control</span></h2>
+      <div class="trust-grid">
+        <div class="card">
+          <div class="feat-icon icon-indigo">🔐</div>
+          <h3>Encrypted local storage</h3>
+          <p>Question banks are stored in IndexedDB with encryption. No server has access to your study data unless you choose to publish to the marketplace.</p>
+        </div>
+        <div class="card">
+          <div class="feat-icon icon-green">🛡️</div>
+          <h3>RLS-protected sync</h3>
+          <p>Marketplace and community features use Supabase Row-Level Security. You only see and modify your own data — enforced at the database level.</p>
+        </div>
+        <div class="card">
+          <div class="feat-icon icon-violet">🗳️</div>
+          <h3>Community-driven roadmap</h3>
+          <p>Features are voted on by users in the public forum. What gets built is driven by what the community actually needs — not by a product manager's guess.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Final CTA -->
+    <section style="padding:3rem 0 1rem; text-align:center">
+      <h2 class="section-title" style="margin-bottom:0.75rem">Try it for yourself.</h2>
+      <p class="section-sub" style="margin-inline:auto; margin-bottom:1.5rem">Free desktop app. No account required to start studying. macOS and Windows.</p>
+      <div style="display:flex; justify-content:center; gap:0.75rem; flex-wrap:wrap">
+        <a class="btn btn-primary btn-lg" href="/download">Download Free</a>
+        <a class="btn btn-outline btn-lg" href="/forum">Join the Forum</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="container footer">
+    <p>© 2025 Qudoro</p>
+    <div class="footer-links">
+      <a href="/download">Download</a>
+      <a href="/features">Features</a>
+      <a href="/tour">Tour</a>
+      <a href="/forum">Forum</a>
+      <a href="/privacy">Privacy</a>
+      <a href="/terms">Terms</a>
+    </div>
+  </footer>
+</body>
 </html>

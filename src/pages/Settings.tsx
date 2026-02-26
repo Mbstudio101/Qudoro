@@ -63,6 +63,7 @@ const Settings = () => {
       const worker = new Worker(new URL('../workers/importSanitizer.worker.ts', import.meta.url), { type: 'module' });
       const sanitized = await new Promise<ImportedTerm[]>((resolve) => {
         const timeout = window.setTimeout(() => {
+          console.warn('Import sanitizer worker timed out — falling back to main thread processing.');
           worker.terminate();
           resolve(sanitizeImportedTerms(rawTerms));
         }, 4000);
@@ -74,7 +75,8 @@ const Settings = () => {
           resolve(terms.length === rawTerms.length ? terms : sanitizeImportedTerms(rawTerms));
         };
 
-        worker.onerror = () => {
+        worker.onerror = (err) => {
+          console.warn('Import sanitizer worker error — falling back to main thread processing:', err);
           window.clearTimeout(timeout);
           worker.terminate();
           resolve(sanitizeImportedTerms(rawTerms));
