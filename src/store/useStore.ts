@@ -53,6 +53,7 @@ export interface Profile {
   theme: 'light' | 'dark' | 'system';
   stats: UserStats;
   achievements: Achievement[];
+  dailyChallenge?: DailyChallenge;
   blackboard?: {
     isConnected: boolean;
     token?: BlackboardToken;
@@ -137,6 +138,16 @@ export interface UserStats {
   level: number;
   perfectedSetIds: string[];
   importedSetsCount: number;
+  studyHistory?: Record<string, number>; // "YYYY-MM-DD" → questions answered that day
+}
+
+export interface DailyChallenge {
+  date: string;            // "YYYY-MM-DD"
+  setId: string;
+  setTitle: string;
+  questionIds: string[];
+  completedAt?: number;
+  bonusXpClaimed?: boolean;
 }
 
 // Legacy support: We keep UserProfile as an alias for Profile for now, 
@@ -174,6 +185,8 @@ interface AppState {
   deleteSet: (id: string) => void;
   addQuestionToSet: (setId: string, questionId: string) => void;
   addSession: (session: Omit<StudySession, 'id'>) => void;
+  getDailyChallenge: () => DailyChallenge | null;
+  completeDailyChallenge: (bonusXp: number) => void;
   // Calendar Actions
   addCalendarEvent: (event: Omit<CalendarEvent, 'id'>) => void;
   updateCalendarEvent: (id: string, event: Partial<CalendarEvent>) => void;
@@ -926,6 +939,11 @@ export const useStore = create<AppState>()(
             
             newStats.lastStudyDate = Date.now();
 
+            // Track daily study history for heat-map
+            const todayKey = new Date().toISOString().slice(0, 10);
+            const existingHistory = newStats.studyHistory || {};
+            newStats.studyHistory = { ...existingHistory, [todayKey]: (existingHistory[todayKey] || 0) + session.totalQuestions };
+
             const profileId = state.activeProfileId || '';
 
             const updatedProfile = { ...state.userProfile, stats: newStats };
@@ -942,6 +960,61 @@ export const useStore = create<AppState>()(
             };
         });
         get().checkAchievements();
+      },
+      getDailyChallenge: () => {
+        const state = get();
+        const today = new Date().toISOString().slice(0, 10);
+
+        // Return existing challenge if it's already generated for today
+        if (state.userProfile.dailyChallenge?.date === today) {
+          return state.userProfile.dailyChallenge;
+        }
+
+        // Find the set with most questions for this profile
+        const profileSets = state.sets.filter(s => !s.profileId || s.profileId === state.activeProfileId);
+        if (profileSets.length === 0) return null;
+
+        const bestSet = profileSets.reduce((a, b) => a.questionIds.length >= b.questionIds.length ? a : b);
+        if (bestSet.questionIds.length === 0) return null;
+
+        // Pick 10 lowest-box questions (hardest / least mastered)
+        const setQs = bestSet.questionIds
+          .map(id => state.questions.find(q => q.id === id))
+          .filter(Boolean) as Question[];
+        setQs.sort((a, b) => (a.box || 0) - (b.box || 0));
+        const challengeQs = setQs.slice(0, Math.min(10, setQs.length));
+
+        const challenge: DailyChallenge = {
+          date: today,
+          setId: bestSet.id,
+          setTitle: bestSet.title,
+          questionIds: challengeQs.map(q => q.id),
+        };
+
+        // Persist to profile
+        const updatedProfile = { ...state.userProfile, dailyChallenge: challenge };
+        const updatedAccounts = state.accounts.map(a =>
+          a.id === state.currentAccountId
+            ? { ...a, profiles: a.profiles.map(p => p.id === state.activeProfileId ? updatedProfile : p) }
+            : a
+        );
+        set({ userProfile: updatedProfile, accounts: updatedAccounts });
+        return challenge;
+      },
+      completeDailyChallenge: (bonusXp) => {
+        const state = get();
+        const challenge = state.userProfile.dailyChallenge;
+        if (!challenge || challenge.completedAt) return;
+
+        const updatedChallenge: DailyChallenge = { ...challenge, completedAt: Date.now(), bonusXpClaimed: true };
+        const updatedProfile = { ...state.userProfile, dailyChallenge: updatedChallenge };
+        const updatedAccounts = state.accounts.map(a =>
+          a.id === state.currentAccountId
+            ? { ...a, profiles: a.profiles.map(p => p.id === state.activeProfileId ? updatedProfile : p) }
+            : a
+        );
+        set({ userProfile: updatedProfile, accounts: updatedAccounts });
+        get().addXp(bonusXp);
       },
       addCalendarEvent: (event) => {
         const profileId = get().activeProfileId || '';

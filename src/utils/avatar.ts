@@ -1,27 +1,31 @@
 export const getAvatarUrl = (avatarString: string) => {
   if (!avatarString) return '';
-  
-  let url = '';
-  // Check for new format with options (style:seed|options)
-  if (avatarString.includes('|')) {
-      const [base, optionsStr] = avatarString.split('|');
-      let style = 'adventurer';
-      let seed = base;
-      
-      if (base.includes(':')) {
-          [style, seed] = base.split(':');
-      }
-      
-      // Ensure parameters are properly encoded
-      const params = new URLSearchParams(optionsStr);
-      url = `https://api.dicebear.com/7.x/${style}/svg?seed=${encodeURIComponent(seed)}&${params.toString()}`;
-  } else if (avatarString.includes(':')) {
-    const [style, seed] = avatarString.split(':');
-    url = `https://api.dicebear.com/7.x/${style}/svg?seed=${encodeURIComponent(seed)}`;
+
+  // Strip the optional third segment (overlays) — only first two segments go to DiceBear
+  const segments = avatarString.split('|');
+  const base = segments[0];
+  const optionsStr = segments[1] || '';
+
+  if (optionsStr) {
+    let style = 'adventurer';
+    let seed = base;
+    if (base.includes(':')) {
+      [style, seed] = base.split(':');
+    }
+    const params = new URLSearchParams(optionsStr);
+    return `https://api.dicebear.com/9.x/${style}/svg?seed=${encodeURIComponent(seed)}&${params.toString()}`;
+  } else if (base.includes(':')) {
+    const [style, seed] = base.split(':');
+    return `https://api.dicebear.com/9.x/${style}/svg?seed=${encodeURIComponent(seed)}`;
   } else {
-    // Legacy support for adventurer style
-    url = `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(avatarString)}`;
+    return `https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(base)}`;
   }
-  
-  return url;
+};
+
+/** Returns the list of overlay IDs stored in the third segment of an avatar string. */
+export const getAvatarOverlays = (avatarString: string): string[] => {
+  if (!avatarString) return [];
+  const parts = avatarString.split('|');
+  if (parts.length < 3 || !parts[2]) return [];
+  return parts[2].split(',').filter(Boolean);
 };

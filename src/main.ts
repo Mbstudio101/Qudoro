@@ -1,6 +1,6 @@
 import path from 'path';
 import fs from 'fs';
-import { app, BrowserWindow, ipcMain, shell, session, safeStorage } from 'electron';
+import { app, BrowserWindow, ipcMain, shell, session, safeStorage, net } from 'electron';
 import started from 'electron-squirrel-startup';
 import Store from 'electron-store';
 import { UpdateService } from './services/UpdateService';
@@ -373,78 +373,151 @@ ipcMain.handle('parse-pdf', async (event, buffer) => {
 });
 
 // Fetch URL (for Quizlet Import)
-ipcMain.handle('fetch-url', async (event, url) => {
-  let win: BrowserWindow | null = null;
-  const OVERALL_TIMEOUT_MS = 35000;
+ipcMain.handle('fetch-url', async (_event, url) => {
+  const BROWSER_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    'Accept': 'application/json, text/html, */*',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'sec-fetch-site': 'same-origin',
+    'sec-fetch-mode': 'cors',
+  };
 
+  const setId = url.match(/quizlet\.com\/(\d+)/)?.[1];
+
+  // ── Strategy A: Direct Quizlet webapi via net.fetch (fast, no bot detection) ──
+  if (setId) {
+    try {
+      const apiUrl =
+        `https://quizlet.com/webapi/3.4/studiable-item-documents` +
+        `?filters[studiableContainerId]=${setId}&filters[studiableContainerType]=1&perPage=1000&page=1`;
+
+      const resp = await Promise.race([
+        net.fetch(apiUrl, {
+          headers: {
+            ...BROWSER_HEADERS,
+            'Referer': `https://quizlet.com/${setId}/`,
+          },
+        }),
+        new Promise<null>((_, reject) => setTimeout(() => reject(new Error('timeout')), 12000)),
+      ]);
+
+      if (resp && 'ok' in resp && resp.ok) {
+        const json = await (resp as Response).text();
+        if (json && json.length > 50 && json.includes('studiableItem')) {
+          const escaped = json.replace(/</g, '\\u003c').replace(/>/g, '\\u003e');
+          const html = `<!doctype html><html><head><title>Quizlet Set ${setId}</title></head><body>` +
+            `<script id="__QUIZLET_WEBAPI__" type="application/json">${escaped}</script></body></html>`;
+          console.log(`[fetch-url] webapi success for set ${setId}, length=${json.length}`);
+          return { success: true, data: html };
+        }
+      }
+    } catch (e) {
+      console.warn('[fetch-url] Strategy A (direct webapi) failed:', e);
+    }
+  }
+
+  // ── Strategy B: Hidden BrowserWindow — loads page, then calls webapi in-page ──
+  let win: BrowserWindow | null = null;
   try {
     win = new BrowserWindow({
       show: false,
       width: 1000,
       height: 800,
-      webPreferences: {
-        offscreen: false,
-      }
+      webPreferences: { offscreen: false },
     });
+    win.webContents.setUserAgent(BROWSER_HEADERS['User-Agent']);
 
-    win.webContents.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-
-    // Wrap entire fetch in an overall timeout so it never hangs forever
-    const fetchWithTimeout = new Promise<{ success: boolean; data?: string; error?: string }>(async (resolve) => {
-      const overallTimer = setTimeout(() => {
-        resolve({ success: false, error: 'Fetch timed out after 35 seconds' });
-      }, OVERALL_TIMEOUT_MS);
-
-      try {
+    const result = await Promise.race<{ success: boolean; data?: string; error?: string }>([
+      (async () => {
         await win!.loadURL(url);
 
-        let attempts = 0;
         let content = '';
-
-        while (attempts < 30) {
+        for (let i = 0; i < 30; i++) {
           await new Promise(r => setTimeout(r, 1000));
           content = await win!.webContents.executeJavaScript('document.documentElement.outerHTML');
-          const title = await win!.webContents.executeJavaScript('document.title');
-
-          if (!content.includes('<title>Just a moment...</title>') &&
-             (content.includes('SetPageTerms-term') ||
-              content.includes('__NEXT_DATA__') ||
-              content.includes('window.Quizlet') ||
-              content.includes('application/ld+json') ||
-              content.includes('StudiableItem') ||
-              content.includes('TermText') ||
-              (title && !title.includes('Just a moment') && content.length > 50000))) {
-            await new Promise(r => setTimeout(r, 3000));
+          const title = await win!.webContents.executeJavaScript('document.title') as string;
+          const ready = !content.includes('Just a moment') &&
+            (content.includes('__NEXT_DATA__') || content.includes('SetPageTerms-term') ||
+             content.includes('TermText') || content.includes('studiableItem') ||
+             (title && content.length > 50000));
+          if (ready) {
+            await new Promise(r => setTimeout(r, 2000));
             content = await win!.webContents.executeJavaScript('document.documentElement.outerHTML');
             break;
           }
-
-          if (!content.includes('<title>Just a moment...</title>')) {
-            await win!.webContents.executeJavaScript('window.scrollTo(0, document.body.scrollHeight)');
-            if (win!.webContents) {
-              win!.webContents.sendInputEvent({ type: 'mouseMove', x: 100, y: 100 });
-            }
-          }
-
-          attempts++;
+          await win!.webContents.executeJavaScript('window.scrollTo(0, document.body.scrollHeight)');
         }
 
-        clearTimeout(overallTimer);
-        resolve({ success: true, data: content });
-      } catch (innerError: any) {
-        clearTimeout(overallTimer);
-        resolve({ success: false, error: innerError?.message || 'Unknown error' });
-      }
-    });
+        if (setId && win && !win.isDestroyed()) {
+          // Try webapi from within page context (has session cookies + cf_clearance)
+          try {
+            const apiJson = await Promise.race<string | null>([
+              win.webContents.executeJavaScript(`(async()=>{try{const r=await fetch('/webapi/3.4/studiable-item-documents?filters[studiableContainerId]=${setId}&filters[studiableContainerType]=1&perPage=1000&page=1',{credentials:'include',headers:{'Accept':'application/json'}});if(!r.ok){console.log('webapi status:'+r.status);return null;}const d=await r.json();return JSON.stringify(d);}catch(e){console.log('webapi err:'+e);return null;}})()`) as Promise<string | null>,
+              new Promise<null>(r => setTimeout(() => r(null), 10000)),
+            ]);
+            if (typeof apiJson === 'string' && apiJson.length > 50) {
+              // Debug: save to file
+              fs.writeFileSync('/tmp/quizlet-webapi-dump.json', apiJson.substring(0, 500000));
+              if (apiJson.includes('studiableItem') || apiJson.includes('cardSides')) {
+                const escaped = apiJson.replace(/</g, '\\u003c').replace(/>/g, '\\u003e');
+                content = content.replace('</body>', `<script id="__QUIZLET_WEBAPI__" type="application/json">${escaped}</script></body>`);
+                console.log(`[fetch-url] in-page webapi injected, length=${apiJson.length}`);
+              }
+            }
+          } catch (e) { console.warn('[fetch-url] in-page webapi failed:', e); }
 
-    return await fetchWithTimeout;
+          // DOM scraping fallback: extract cards directly from rendered page
+          try {
+            const domCards = await Promise.race<string | null>([
+              win.webContents.executeJavaScript(`(()=>{
+                const results=[];
+                // Try data-testid based selectors (Quizlet 2024+)
+                const termEls=document.querySelectorAll('[data-testid="set-page-card-side-word"] .TermText,[class*="SetPageTerm-wordText"] .TermText,.SetPageTerm-wordText');
+                const defEls=document.querySelectorAll('[data-testid="set-page-card-side-definition"] .TermText,[class*="SetPageTerm-definitionText"] .TermText,.SetPageTerm-definitionText');
+                if(termEls.length>0&&termEls.length===defEls.length){
+                  termEls.forEach((el,i)=>{if(defEls[i])results.push({term:el.innerText.trim(),def:defEls[i].innerText.trim()});});
+                }
+                // Fallback: all TermText elements in pairs
+                if(results.length===0){
+                  const all=document.querySelectorAll('.TermText');
+                  for(let i=0;i<all.length-1;i+=2)results.push({term:all[i].innerText.trim(),def:all[i+1].innerText.trim()});
+                }
+                // Debug: dump __NEXT_DATA__ keys
+                const nd=document.getElementById('__NEXT_DATA__');
+                const ndKeys=nd?Object.keys(JSON.parse(nd.textContent||'{}')).join(','):'none';
+                console.log('[DOM] cards found:'+results.length+' __NEXT_DATA__ keys:'+ndKeys);
+                return results.length>0?JSON.stringify(results):null;
+              })()`) as Promise<string | null>,
+              new Promise<null>(r => setTimeout(() => r(null), 5000)),
+            ]);
+            if (typeof domCards === 'string' && domCards.length > 10) {
+              fs.writeFileSync('/tmp/quizlet-dom-cards.json', domCards);
+              const escaped = domCards.replace(/</g, '\\u003c').replace(/>/g, '\\u003e');
+              content = content.replace('</body>', `<script id="__QUIZLET_DOM_CARDS__" type="application/json">${escaped}</script></body>`);
+              console.log('[fetch-url] DOM cards injected');
+            }
+          } catch (e) { console.warn('[fetch-url] DOM scraping failed:', e); }
+
+          // Debug: save __NEXT_DATA__ structure
+          try {
+            const ndRaw = await win.webContents.executeJavaScript(`document.getElementById('__NEXT_DATA__')?.textContent||''`) as string;
+            if (ndRaw) fs.writeFileSync('/tmp/quizlet-next-data.json', ndRaw.substring(0, 1000000));
+          } catch { /* ignore */ }
+        }
+
+        return { success: true, data: content };
+      })(),
+      new Promise<{ success: boolean; error: string }>(r =>
+        setTimeout(() => r({ success: false, error: 'Fetch timed out after 35 seconds' }), 35000)
+      ),
+    ]);
+
+    return result;
   } catch (error: any) {
-    console.error('Fetch error:', error);
+    console.error('[fetch-url] Strategy B failed:', error);
     return { success: false, error: error?.message || 'Unknown error' };
   } finally {
-    if (win && !win.isDestroyed()) {
-      win.destroy();
-    }
+    if (win && !win.isDestroyed()) win.destroy();
   }
 });
 

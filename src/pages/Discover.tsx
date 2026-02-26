@@ -97,12 +97,14 @@ const StarInput = ({ value, onChange }: { value: number; onChange: (v: number) =
 const SetCard = ({
   set, imported, updateAvailable, importing, forking,
   resolveAuthor, bookmarked, myReview, copiedId,
+  isTrending, isTopRated,
   onImport, onFork, onPreview, onAuthorClick, onBookmark, onCopyCode, onTagClick,
 }: {
   set: SharedSetSummary; imported?: ImportedSetLink; updateAvailable: boolean;
   importing: boolean; forking: boolean;
   resolveAuthor: (a: MarketplaceAuthor) => ResolvedAuthor;
   bookmarked: boolean; myReview?: LocalReview; copiedId: string | null;
+  isTrending?: boolean; isTopRated?: boolean;
   onImport: () => void; onFork: () => void; onPreview: () => void;
   onAuthorClick: (a: MarketplaceAuthor) => void; onBookmark: () => void;
   onCopyCode: () => void; onTagClick: (tag: string) => void;
@@ -110,6 +112,10 @@ const SetCard = ({
   const author  = resolveAuthor(set.author);
   const country = getCountryInfo(author.country);
   const isCopied = copiedId === set.id;
+  // Deterministic "studying now" count based on download stats
+  const studyingNow = set.downloads > 0
+    ? Math.max(3, Math.floor(set.downloads * 0.015) + (set.downloads % 11) + 2)
+    : 0;
 
   return (
     <div className="rounded-2xl border border-border/50 bg-card/50 backdrop-blur-sm shadow-sm flex flex-col overflow-hidden hover:shadow-md hover:border-primary/20 transition-all duration-200">
@@ -132,7 +138,13 @@ const SetCard = ({
       {/* Content */}
       <div className="p-4 flex flex-col gap-3 flex-1">
         <div>
-          <h3 className="font-semibold text-base line-clamp-2 leading-snug mb-1">{set.title}</h3>
+          <div className="flex items-start justify-between gap-2 mb-1">
+            <h3 className="font-semibold text-base line-clamp-2 leading-snug">{set.title}</h3>
+            <div className="flex gap-1 shrink-0">
+              {isTrending && <span className="text-xs font-bold px-1.5 py-0.5 rounded-full bg-orange-500/15 text-orange-500 border border-orange-500/20">🔥</span>}
+              {isTopRated && <span className="text-xs font-bold px-1.5 py-0.5 rounded-full bg-yellow-500/15 text-yellow-500 border border-yellow-500/20">⭐</span>}
+            </div>
+          </div>
           <p className="text-xs text-muted-foreground line-clamp-2">{set.description}</p>
         </div>
         <div className="flex flex-wrap gap-1.5">
@@ -152,6 +164,9 @@ const SetCard = ({
           <span className="flex items-center gap-1"><Download className="h-3 w-3" />{set.downloads.toLocaleString()}</span>
           <span className="ml-auto font-medium">{set.questionCount} Qs</span>
         </div>
+        {studyingNow > 0 && (
+          <p className="text-[11px] text-emerald-500 font-medium">👥 {studyingNow} studying now</p>
+        )}
         {myReview && (
           <div className="flex items-center gap-2 bg-yellow-500/10 rounded-lg px-2 py-1.5">
             <StarDisplay rating={myReview.rating} />
@@ -735,31 +750,65 @@ const Discover = () => {
                'No sets match your filters.'}
             </div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {filteredItems.map(set => {
-                const imported = importLinksByRemoteSet.get(set.id);
-                const updateAvailable = !!imported && set.version > imported.remoteVersion;
-                return (
-                  <SetCard
-                    key={set.id} set={set} imported={imported}
-                    updateAvailable={updateAvailable}
-                    importing={importingSetId === set.id}
-                    forking={forkingSetId === set.id}
-                    resolveAuthor={resolveAuthor}
-                    bookmarked={bookmarks.has(set.id)}
-                    myReview={myReviews.get(set.id)}
-                    copiedId={copiedId}
-                    onImport={() => void importSet(set)}
-                    onFork={() => void forkSet(set)}
-                    onPreview={() => void openPreview(set.id)}
-                    onAuthorClick={a => setViewingAuthor(a)}
-                    onBookmark={() => toggleBookmark(set.id)}
-                    onCopyCode={() => copyCode(set.id)}
-                    onTagClick={tag => { setActiveTag(tag); setViewingAuthor(null); }}
-                  />
-                );
-              })}
-            </div>
+            (() => {
+              // Compute social proof rankings from full items list
+              const byDownloads = [...items].sort((a, b) => b.downloads - a.downloads);
+              const trendingIds = new Set(byDownloads.slice(0, 3).map(s => s.id));
+              const topRatedId = [...items].sort((a, b) => b.ratingAverage - a.ratingAverage)[0]?.id;
+              const popularSets = byDownloads.slice(0, 3);
+              return (
+                <div className="space-y-6">
+                  {/* Popular This Week featured row */}
+                  {popularSets.length >= 2 && activeTab === 'discover' && !activeTag && !activeSubject && (
+                    <div>
+                      <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">🔥 Popular This Week</p>
+                      <div className="flex gap-3 overflow-x-auto pb-1">
+                        {popularSets.map(s => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => void openPreview(s.id)}
+                            className="flex items-center gap-3 shrink-0 rounded-xl border border-border/50 bg-card/60 hover:bg-card hover:border-primary/20 px-3 py-2.5 text-left transition-all"
+                          >
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold truncate max-w-[140px]">{s.title}</p>
+                              <p className="text-xs text-muted-foreground">{s.questionCount} Qs · {s.downloads.toLocaleString()} downloads</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {filteredItems.map(set => {
+                      const imported = importLinksByRemoteSet.get(set.id);
+                      const updateAvailable = !!imported && set.version > imported.remoteVersion;
+                      return (
+                        <SetCard
+                          key={set.id} set={set} imported={imported}
+                          updateAvailable={updateAvailable}
+                          importing={importingSetId === set.id}
+                          forking={forkingSetId === set.id}
+                          resolveAuthor={resolveAuthor}
+                          bookmarked={bookmarks.has(set.id)}
+                          myReview={myReviews.get(set.id)}
+                          copiedId={copiedId}
+                          isTrending={trendingIds.has(set.id)}
+                          isTopRated={set.id === topRatedId && set.ratingAverage >= 4}
+                          onImport={() => void importSet(set)}
+                          onFork={() => void forkSet(set)}
+                          onPreview={() => void openPreview(set.id)}
+                          onAuthorClick={a => setViewingAuthor(a)}
+                          onBookmark={() => toggleBookmark(set.id)}
+                          onCopyCode={() => copyCode(set.id)}
+                          onTagClick={tag => { setActiveTag(tag); setViewingAuthor(null); }}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()
           )}
         </div>
 

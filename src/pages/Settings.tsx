@@ -334,10 +334,50 @@ const Settings = () => {
 
         // Extract Terms
         const terms: { term: string, def: string }[] = [];
-        
-        // Strategy 0: JSON Extraction (Most Reliable)
+
+        // Strategy -2: Direct DOM scraping (injected by Electron fetch-url — most reliable)
+        const domScript = doc.getElementById('__QUIZLET_DOM_CARDS__');
+        if (domScript?.textContent) {
+            try {
+                const domCards = JSON.parse(domScript.textContent) as Array<{ term: string; def: string }>;
+                if (Array.isArray(domCards) && domCards.length > 0) {
+                    domCards.forEach(c => { if (c.term || c.def) terms.push({ term: c.term || '', def: c.def || '' }); });
+                    if (terms.length > 0) console.log(`Extracted ${terms.length} terms via DOM scraping`);
+                }
+            } catch (e) { console.warn('DOM cards parsing failed:', e); }
+        }
+
+        // Strategy -1: Quizlet internal webapi (injected by Electron fetch-url — most reliable)
+        const webapiScript = doc.getElementById('__QUIZLET_WEBAPI__');
+        if (webapiScript?.textContent) {
+            try {
+                const apiData = JSON.parse(webapiScript.textContent) as LooseRecord;
+                const responses = asRecordArray(apiData.responses);
+                const models = responses[0] ? asRecord(responses[0].models) : null;
+                const studiableItems = models ? asRecordArray((models as LooseRecord).studiableItem) : [];
+                studiableItems.forEach((item) => {
+                    const sides = asRecordArray(item.cardSides);
+                    let term = '';
+                    let def = '';
+                    sides.forEach((side) => {
+                        const sideId = Number(side.sideId);
+                        const media = asRecordArray(side.media);
+                        const plainText = media[0] && typeof (media[0] as LooseRecord).plainText === 'string'
+                            ? String((media[0] as LooseRecord).plainText) : '';
+                        if (sideId === 1) term = plainText;
+                        else if (sideId === 2) def = plainText;
+                    });
+                    if (term || def) terms.push({ term, def });
+                });
+                if (terms.length > 0) console.log(`Extracted ${terms.length} terms via Quizlet webapi`);
+            } catch (e) {
+                console.warn('Quizlet webapi parsing failed:', e);
+            }
+        }
+
+        // Strategy 0: JSON Extraction (__NEXT_DATA__)
         const nextDataScript = doc.getElementById('__NEXT_DATA__');
-        if (nextDataScript && nextDataScript.textContent) {
+        if (terms.length === 0 && nextDataScript && nextDataScript.textContent) {
             try {
                 const json: unknown = JSON.parse(nextDataScript.textContent);
                 
@@ -387,19 +427,21 @@ const Settings = () => {
                         def = String(t.definition || t.def || '');
                     } 
                     // Handle "studiableItems" structure (cardSides)
+                    // sideId 1 = term/word, sideId 2 = definition
                     else if (Array.isArray(t.cardSides)) {
                         t.cardSides.forEach((sideRaw) => {
                             const side = asRecord(sideRaw);
                             if (!side) return;
                             const label = String(side.label || '');
+                            const sideId = Number(side.sideId);
                             const media = asRecordArray(side.media);
                             const firstMedia = media[0];
                             const plainText = firstMedia && typeof firstMedia.plainText === 'string' ? firstMedia.plainText : '';
 
-                            if (label === 'word') {
-                                term = plainText;
-                            } else if (label === 'definition') {
-                                def = plainText;
+                            if (label === 'word' || sideId === 1) {
+                                if (!term) term = plainText;
+                            } else if (label === 'definition' || sideId === 2) {
+                                if (!def) def = plainText;
                             }
                         });
                     }
@@ -409,6 +451,35 @@ const Settings = () => {
                     }
                 });
                 
+                // Fallback: termIdToTermsMap (older Quizlet format embedded in __NEXT_DATA__)
+                if (terms.length === 0) {
+                    const findTermMap = (obj: unknown): LooseRecord | null => {
+                        const rec = asRecord(obj);
+                        if (!rec) return null;
+                        if (rec.termIdToTermsMap && typeof rec.termIdToTermsMap === 'object') {
+                            return rec.termIdToTermsMap as LooseRecord;
+                        }
+                        for (const key in rec) {
+                            if (typeof rec[key] === 'object' && rec[key] !== null) {
+                                const found = findTermMap(rec[key]);
+                                if (found) return found;
+                            }
+                        }
+                        return null;
+                    };
+                    const termMap = findTermMap(json);
+                    if (termMap) {
+                        Object.values(termMap).forEach((entry) => {
+                            const e = asRecord(entry);
+                            if (!e) return;
+                            const term = String(e.word || e.term || '');
+                            const def = String(e.definition || e.def || '');
+                            if (term || def) terms.push({ term, def });
+                        });
+                        if (terms.length > 0) console.log(`Extracted ${terms.length} terms via termIdToTermsMap`);
+                    }
+                }
+
                 if (terms.length > 0) console.log('Extracted terms via JSON');
             } catch (e) {
                 console.warn('JSON parsing failed:', e);

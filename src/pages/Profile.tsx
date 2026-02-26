@@ -5,19 +5,62 @@ import { Trophy, Flame, Award, User, Clock, Star, Layers, BookOpen, HelpCircle, 
 import { GameBadge } from '../components/ui/GameBadge';
 import { getAvatarUrl } from '../utils/avatar';
 
-// Options for custom avatar builder
+// ─── Avatar option data ───────────────────────────────────────────────────────
+const MALE_HAIR   = ['shortFlat', 'shortRound', 'shortCurly', 'shortWaved', 'sides', 'theCaesar', 'theCaesarAndSidePart', 'shavedSides'];
+const FEMALE_HAIR = ['bigHair', 'bob', 'bun', 'curvy', 'frida', 'longButNotTooLong', 'miaWallace', 'straight01', 'straight02', 'straightAndStrand'];
+const NATURAL_HAIR = ['curly', 'dreads', 'dreads01', 'dreads02', 'fro', 'frizzle', 'shaggy', 'shaggyMullet'];
+const HAIR_STYLES = [...MALE_HAIR, ...FEMALE_HAIR, ...NATURAL_HAIR];
+const HAT_STYLES  = ['hat', 'hijab', 'turban'];
+
+
 const AVATAR_OPTIONS = {
-  skinColor: ['ffdbac', 'edb98a', 'd08b5b', 'ae5d29', '614335', 'fdecce'], // pale, light, brown, darkBrown, black, yellow
-  top: [
-    'bigHair', 'bob', 'bun', 'curly', 'curvy', 'dreads', 'frida', 'fro', 'longButNotTooLong', 
-    'miaWallace', 'shavedSides', 'straight01', 'straight02', 'straightAndStrand', 
-    'dreads01', 'dreads02', 'frizzle', 'shaggy', 'shaggyMullet', 'shortCurly', 'shortFlat', 
-    'shortRound', 'shortWaved', 'sides', 'theCaesar', 'theCaesarAndSidePart'
-  ],
-  hairColor: ['a55728', '2c1b18', 'b58143', 'd6b370', '724133', '4a312c', 'f59797', 'ecdcbf', 'c93305', 'e8e1e1'], // auburn, black, blonde, blondeGolden, brown, brownDark, pastelPink, platinum, red, silverGray
-  facialHair: ['beardMedium', 'beardLight', 'beardMajestic', 'moustacheFancy', 'moustacheMagnum', ''],
-  clothing: ['blazerAndShirt', 'blazerAndSweater', 'collarAndSweater', 'graphicShirt', 'hoodie', 'overall', 'shirtCrewNeck', 'shirtScoopNeck', 'shirtVNeck'],
-  clothingColor: ['262e33', '65c9ff', '5199e4', '25557c', '929598', '3c4f5c', '3c4f5c', 'b1e2ff', 'a7ffc4', 'ff488e', 'ff5c5c', 'ffffff'] // black, blue01, blue02, blue03, gray01, gray02, heather, pastelBlue, pastelGreen, pink, red, white
+  skinColor:        ['ffdbac', 'edb98a', 'd08b5b', 'ae5d29', '614335', 'fdecce'],
+  top:              [...HAIR_STYLES, ...HAT_STYLES],
+  hairColor:        ['a55728', '2c1b18', 'b58143', 'd6b370', '724133', '4a312c', 'f59797', 'ecdcbf', 'c93305', 'e8e1e1'],
+  facialHair:       ['beardMedium', 'beardLight', 'beardMajestic', 'moustacheFancy', 'moustacheMagnum'],
+  facialHairColor:  ['a55728', '2c1b18', 'b58143', 'd6b370', '724133', '4a312c', 'f59797', 'ecdcbf', 'c93305', 'e8e1e1'],
+  eyes:             ['closed', 'cry', 'default', 'dizzy', 'eyeRoll', 'happy', 'hearts', 'side', 'squint', 'surprised', 'wink', 'winkWacky', 'xDizzy'],
+  eyebrows:         ['angryNatural', 'default', 'defaultNatural', 'flatNatural', 'frownNatural', 'raisedExcited', 'raisedExcitedNatural', 'sadConcerned', 'sadConcernedNatural', 'unibrowNatural', 'upDown', 'upDownNatural'],
+  mouth:            ['concerned', 'default', 'disbelief', 'eating', 'grimace', 'sad', 'screamOpen', 'serious', 'smile', 'tongue', 'twinkle', 'vomit'],
+  clothing:         ['blazerAndShirt', 'blazerAndSweater', 'collarAndSweater', 'graphicShirt', 'hoodie', 'overall', 'shirtCrewNeck', 'shirtScoopNeck', 'shirtVNeck'],
+  clothingColor:    ['262e33', '65c9ff', '5199e4', '25557c', '929598', '3c4f5c', 'b1e2ff', 'a7ffc4', 'ff488e', 'ff5c5c', 'ffffff'],
+  accessories:      ['kurt', 'prescription01', 'prescription02', 'round', 'sunglasses', 'wayfarers'],
+  accessoriesColor: ['262e33', '65c9ff', '5199e4', '25557c', '929598', '3c4f5c', 'b1e2ff', 'a7ffc4', 'ff488e', 'ff5c5c', 'ffffff'],
+  hatColor:         ['262e33', '65c9ff', '5199e4', '25557c', '929598', '3c4f5c', 'b1e2ff', 'a7ffc4', 'ff488e', 'ff5c5c', 'ffffff'],
+};
+
+const LABELS: Record<string, string> = {
+  bigHair: 'Big Hair', longButNotTooLong: 'Long', miaWallace: 'Mia Wallace',
+  straightAndStrand: 'Loose Strand', theCaesar: 'Caesar', theCaesarAndSidePart: 'Caesar Side',
+  shavedSides: 'Shaved Sides', shaggyMullet: 'Mullet', fro: 'Afro', frida: 'Frida',
+  shortWaved: 'Short Waves',
+  eyeRoll: 'Eye Roll', xDizzy: 'X Eyes', winkWacky: 'Wacky Wink',
+  defaultNatural: 'Natural', angryNatural: 'Angry Natural', flatNatural: 'Flat',
+  frownNatural: 'Frown', raisedExcited: 'Raised', raisedExcitedNatural: 'Raised Natural',
+  sadConcerned: 'Sad', sadConcernedNatural: 'Sad Natural', unibrowNatural: 'Unibrow',
+  upDown: 'Up & Down', upDownNatural: 'Up-Down',
+  screamOpen: 'Scream', disbelief: 'Disbelief',
+  prescription01: 'Classic', prescription02: 'Thin Frames', wayfarers: 'Wayfarers',
+  blazerAndShirt: 'Blazer & Shirt', blazerAndSweater: 'Blazer & Sweater',
+  collarAndSweater: 'Collar & Sweater', graphicShirt: 'Graphic Tee',
+  shirtCrewNeck: 'Crew Neck', shirtScoopNeck: 'Scoop Neck', shirtVNeck: 'V-Neck',
+  beardMedium: 'Beard Med.', beardLight: 'Beard Light', beardMajestic: 'Full Beard',
+  moustacheFancy: 'Fancy Moustache', moustacheMagnum: 'Magnum Moustache',
+};
+const getLabel = (s: string) =>
+  LABELS[s] || s.replace(/([A-Z])/g, ' $1').replace(/(\d+)/, ' $1').replace(/^./, c => c.toUpperCase()).trim();
+
+const SKIN_NAMES: Record<string, string> = {
+  ffdbac: 'Pale', edb98a: 'Light', d08b5b: 'Tan', ae5d29: 'Brown', '614335': 'Dark', fdecce: 'Fair',
+};
+const HAIR_COLOR_NAMES: Record<string, string> = {
+  a55728: 'Auburn', '2c1b18': 'Black', b58143: 'Blonde', d6b370: 'Golden', '724133': 'Brown',
+  '4a312c': 'Dark Brown', f59797: 'Pink', ecdcbf: 'Platinum', c93305: 'Red', e8e1e1: 'Silver',
+};
+const CLOTH_COLOR_NAMES: Record<string, string> = {
+  '262e33': 'Midnight', '65c9ff': 'Sky Blue', '5199e4': 'Blue', '25557c': 'Navy',
+  '929598': 'Gray', '3c4f5c': 'Slate', b1e2ff: 'Pastel Blue', a7ffc4: 'Mint',
+  ff488e: 'Pink', ff5c5c: 'Red', ffffff: 'White',
 };
 
 interface AvatarSeed {
@@ -115,279 +158,434 @@ const AVATAR_CATEGORIES: {
 ];
 
 interface AvatarBuilderOptions {
-    style: string;
-    seed: string;
-    skinColor: string;
-    top: string;
-    hairColor: string;
-    facialHair: string;
-    clothing: string;
-    clothingColor: string;
+  style: string;
+  seed: string;
+  skinColor: string;
+  top: string;
+  hairColor: string;
+  facialHair: string;
+  facialHairColor: string;
+  clothing: string;
+  clothingColor: string;
+  eyes: string;
+  eyebrows: string;
+  mouth: string;
+  accessories: string;
+  accessoriesColor: string;
+  hatColor: string;
 }
 
-const CustomAvatarBuilder = ({ initialAvatar, onSave }: { initialAvatar?: string, onSave: (url: string) => void, onCancel: () => void }) => {
+// ─── Tiny shared sub-components ──────────────────────────────────────────────
+const AvatarSection = ({ label, children }: { label: string; children: React.ReactNode }) => (
+  <div className="space-y-2">
+    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{label}</p>
+    {children}
+  </div>
+);
+
+const AvatarChip = ({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`px-2.5 py-1.5 text-xs rounded-lg border transition-all ${
+      active ? 'bg-primary text-primary-foreground border-primary shadow-sm' : 'bg-card border-border hover:bg-secondary'
+    }`}
+  >
+    {label}
+  </button>
+);
+
+const AvatarChips = ({ values, current, onSelect }: { values: string[]; current: string; onSelect: (v: string) => void }) => (
+  <div className="flex flex-wrap gap-1.5">
+    {values.map(v => <AvatarChip key={v} label={getLabel(v)} active={current === v} onClick={() => onSelect(v)} />)}
+  </div>
+);
+
+// ─── Custom Avatar Builder ────────────────────────────────────────────────────
+const CustomAvatarBuilder = ({ initialAvatar, onSave, onCancel }: {
+  initialAvatar?: string;
+  onSave: (avatarString: string) => void;
+  onCancel: () => void;
+}) => {
+  const defaults: AvatarBuilderOptions = {
+    style: 'avataaars',
+    seed: Math.random().toString(36).substring(7),
+    skinColor: 'edb98a',
+    top: 'straight01',
+    hairColor: '724133',
+    facialHair: '',
+    facialHairColor: '724133',
+    clothing: 'shirtVNeck',
+    clothingColor: '65c9ff',
+    eyes: 'default',
+    eyebrows: 'defaultNatural',
+    mouth: 'smile',
+    accessories: '',
+    accessoriesColor: '262e33',
+    hatColor: '262e33',
+  };
+
   const [options, setOptions] = useState<AvatarBuilderOptions>(() => {
-    const defaultOptions = {
-        style: 'avataaars',
-        seed: Math.random().toString(36).substring(7),
-        skinColor: 'edb98a', // light
-        top: 'straight01',
-        hairColor: '724133', // brown
-        facialHair: '',
-        clothing: 'shirtVNeck',
-        clothingColor: '65c9ff' // blue01
-    };
-
-    if (!initialAvatar) return defaultOptions;
-
+    if (!initialAvatar) return defaults;
     try {
-        let style = 'avataaars';
-        let seed = '';
-        let paramsString = '';
-
-        if (initialAvatar.includes('|')) {
-            const [base, params] = initialAvatar.split('|');
-            paramsString = params;
-            if (base.includes(':')) {
-                [style, seed] = base.split(':');
-            } else {
-                seed = base;
-            }
-        } else if (initialAvatar.includes(':')) {
-            [style, seed] = initialAvatar.split(':');
-        } else {
-            seed = initialAvatar;
-            style = 'adventurer'; 
-        }
-
-        // Only support avataaars editing for now
-        if (style !== 'avataaars') return defaultOptions;
-
-        const parsedOptions: AvatarBuilderOptions = { ...defaultOptions, style, seed };
-        
-        if (paramsString) {
-            const searchParams = new URLSearchParams(paramsString);
-            
-            // Helper to get value, checking both key and key[]
-            const getValue = (key: string) => {
-                return searchParams.get(key) || searchParams.get(`${key}[]`);
-            };
-
-            // Validation helper to ensure we don't load legacy/broken values
-            const validate = (key: keyof typeof AVATAR_OPTIONS, value: string) => {
-                // Check exact match
-                if (AVATAR_OPTIONS[key].includes(value)) return value;
-                
-                // Legacy mappings for skinColor (names to hex)
-                if (key === 'skinColor') {
-                    const map: Record<string, string> = {
-                        'light': 'edb98a', 'pale': 'ffdbac', 'brown': 'd08b5b', 
-                        'darkBrown': 'ae5d29', 'black': '614335', 'yellow': 'fdecce'
-                    };
-                    if (map[value]) return map[value];
-                }
-
-                // If invalid/legacy, return default (first option)
-                return AVATAR_OPTIONS[key][0];
-            };
-
-            const skinColor = getValue('skinColor');
-            if (skinColor) parsedOptions.skinColor = validate('skinColor', skinColor);
-
-            const top = getValue('top');
-            if (top) parsedOptions.top = validate('top', top);
-
-            const hairColor = getValue('hairColor');
-            if (hairColor) parsedOptions.hairColor = validate('hairColor', hairColor);
-
-            const facialHair = getValue('facialHair');
-            if (facialHair !== null) parsedOptions.facialHair = validate('facialHair', facialHair);
-
-            const clothing = getValue('clothing');
-            if (clothing) parsedOptions.clothing = validate('clothing', clothing);
-
-            const clothingColor = getValue('clothingColor');
-            if (clothingColor) parsedOptions.clothingColor = validate('clothingColor', clothingColor);
-        }
-
-        return parsedOptions;
+      let style = 'avataaars', seed = '', paramsString = '';
+      const segments = initialAvatar.split('|');
+      if (segments.length >= 2) {
+        const base = segments[0];
+        paramsString = segments[1];
+        [style, seed] = base.includes(':') ? base.split(':') : ['avataaars', base];
+      } else if (initialAvatar.includes(':')) {
+        [style, seed] = initialAvatar.split(':');
+      } else {
+        seed = initialAvatar; style = 'adventurer';
+      }
+      if (style !== 'avataaars') return defaults;
+      const result = { ...defaults, style, seed };
+      if (paramsString) {
+        const sp = new URLSearchParams(paramsString);
+        const get = (k: string) => sp.get(k) || sp.get(`${k}[]`) || null;
+        const pick = (key: keyof typeof AVATAR_OPTIONS, val: string) =>
+          (AVATAR_OPTIONS[key] as string[]).includes(val) ? val : (AVATAR_OPTIONS[key] as string[])[0];
+        const skinColorVal = get('skinColor'); if (skinColorVal) result.skinColor = pick('skinColor', skinColorVal);
+        const topVal = get('top'); if (topVal) result.top = pick('top', topVal);
+        const hairColorVal = get('hairColor'); if (hairColorVal) result.hairColor = pick('hairColor', hairColorVal);
+        const fhVal = get('facialHair');
+        if (fhVal !== null) result.facialHair = AVATAR_OPTIONS.facialHair.includes(fhVal) ? fhVal : '';
+        const fhcVal = get('facialHairColor'); if (fhcVal) result.facialHairColor = pick('facialHairColor', fhcVal);
+        const clothingVal = get('clothing'); if (clothingVal) result.clothing = pick('clothing', clothingVal);
+        const ccVal = get('clothingColor'); if (ccVal) result.clothingColor = pick('clothingColor', ccVal);
+        const eyesVal = get('eyes'); if (eyesVal) result.eyes = pick('eyes', eyesVal);
+        const ebVal = get('eyebrows'); if (ebVal) result.eyebrows = pick('eyebrows', ebVal);
+        const mouthVal = get('mouth'); if (mouthVal) result.mouth = pick('mouth', mouthVal);
+        const accVal = get('accessories');
+        if (accVal !== null) result.accessories = AVATAR_OPTIONS.accessories.includes(accVal) ? accVal : '';
+        const acVal = get('accessoriesColor'); if (acVal) result.accessoriesColor = pick('accessoriesColor', acVal);
+        const hcVal = get('hatColor'); if (hcVal) result.hatColor = pick('hatColor', hcVal);
+      }
+      return result;
     } catch (e) {
-        console.error("Failed to parse avatar string", e);
-        return defaultOptions;
+      console.error('Failed to parse avatar string', e);
+      return defaults;
     }
   });
 
-  const previewUrl = useMemo(() => {
-    const params = new URLSearchParams();
-    params.append('seed', options.seed);
-    if (options.skinColor) params.append('skinColor[]', options.skinColor);
-    if (options.top) params.append('top[]', options.top);
-    if (options.hairColor) params.append('hairColor[]', options.hairColor);
-    if (options.facialHair) {
-      params.append('facialHair[]', options.facialHair);
-      params.append('facialHairProbability', '100');
-    } else {
-        params.append('facialHairProbability', '0');
-    }
-    if (options.clothing) params.append('clothing[]', options.clothing);
-    if (options.clothingColor) params.append('clothingColor[]', options.clothingColor);
-    
-    // Ensure eyes/mouth are standard/happy
-    params.append('mouth[]', 'smile');
-    params.append('eyebrows[]', 'defaultNatural');
+  const [activeTab, setActiveTab] = useState<'face' | 'hair' | 'outfit' | 'extras'>('face');
+  const set = (key: keyof AvatarBuilderOptions, val: string) => setOptions(prev => ({ ...prev, [key]: val }));
+  const isHat = HAT_STYLES.includes(options.top);
 
-    const url = `https://api.dicebear.com/9.x/${options.style}/svg?${params.toString()}`;
-    // console.log('[AvatarBuilder] Preview URL:', url);
-    return url;
+  const buildParams = (o: AvatarBuilderOptions) => {
+    const p = new URLSearchParams();
+    p.append('skinColor[]', o.skinColor);
+    p.append('top[]', o.top);
+    p.append('hairColor[]', o.hairColor);
+    if (HAT_STYLES.includes(o.top)) p.append('hatColor[]', o.hatColor);
+    if (o.facialHair) {
+      p.append('facialHair[]', o.facialHair);
+      p.append('facialHairProbability', '100');
+      p.append('facialHairColor[]', o.facialHairColor);
+    } else {
+      p.append('facialHairProbability', '0');
+    }
+    p.append('clothing[]', o.clothing);
+    p.append('clothingColor[]', o.clothingColor);
+    p.append('eyes[]', o.eyes);
+    p.append('eyebrows[]', o.eyebrows);
+    p.append('mouth[]', o.mouth);
+    if (o.accessories) {
+      p.append('accessories[]', o.accessories);
+      p.append('accessoriesProbability', '100');
+      p.append('accessoriesColor[]', o.accessoriesColor);
+    } else {
+      p.append('accessoriesProbability', '0');
+    }
+    return p;
+  };
+
+  const previewUrl = useMemo(() => {
+    const p = buildParams(options);
+    p.append('seed', options.seed);
+    return `https://api.dicebear.com/9.x/avataaars/svg?${p.toString()}`;
   }, [options]);
 
   const handleSave = () => {
-    // Construct the storage string using URLSearchParams to ensure consistent encoding
-    // This matches exactly how the preview URL is generated
-    const params = new URLSearchParams();
-    
-    if (options.skinColor) params.append('skinColor[]', options.skinColor);
-    if (options.top) params.append('top[]', options.top);
-    if (options.hairColor) params.append('hairColor[]', options.hairColor);
-    
-    if (options.facialHair) {
-        params.append('facialHair[]', options.facialHair);
-        params.append('facialHairProbability', '100');
-    } else {
-        params.append('facialHairProbability', '0');
-    }
-    
-    if (options.clothing) params.append('clothing[]', options.clothing);
-    if (options.clothingColor) params.append('clothingColor[]', options.clothingColor);
-    
-    // Always happy
-    params.append('mouth[]', 'smile');
-    params.append('eyebrows[]', 'defaultNatural');
-
-    const avatarString = `${options.style}:${options.seed}|${params.toString()}`;
-    onSave(avatarString);
+    const p = buildParams(options);
+    onSave(`avataaars:${options.seed}|${p.toString()}`);
   };
 
-  const randomize = () => {
-    setOptions((prev: AvatarBuilderOptions) => ({
-        ...prev,
-        seed: Math.random().toString(36).substring(7),
-        skinColor: AVATAR_OPTIONS.skinColor[Math.floor(Math.random() * AVATAR_OPTIONS.skinColor.length)],
-        top: AVATAR_OPTIONS.top[Math.floor(Math.random() * AVATAR_OPTIONS.top.length)],
-        hairColor: AVATAR_OPTIONS.hairColor[Math.floor(Math.random() * AVATAR_OPTIONS.hairColor.length)],
-        clothing: AVATAR_OPTIONS.clothing[Math.floor(Math.random() * AVATAR_OPTIONS.clothing.length)],
-        clothingColor: AVATAR_OPTIONS.clothingColor[Math.floor(Math.random() * AVATAR_OPTIONS.clothingColor.length)],
-    }));
-  };
+  const rand = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
+  const randomize = () => setOptions(prev => ({
+    ...prev,
+    seed: Math.random().toString(36).substring(7),
+    skinColor: rand(AVATAR_OPTIONS.skinColor),
+    top: rand(AVATAR_OPTIONS.top),
+    hairColor: rand(AVATAR_OPTIONS.hairColor),
+    facialHair: Math.random() < 0.4 ? rand(AVATAR_OPTIONS.facialHair) : '',
+    facialHairColor: rand(AVATAR_OPTIONS.facialHairColor),
+    clothing: rand(AVATAR_OPTIONS.clothing),
+    clothingColor: rand(AVATAR_OPTIONS.clothingColor),
+    eyes: rand(AVATAR_OPTIONS.eyes),
+    eyebrows: rand(AVATAR_OPTIONS.eyebrows),
+    mouth: rand(AVATAR_OPTIONS.mouth),
+    accessories: Math.random() < 0.35 ? rand(AVATAR_OPTIONS.accessories) : '',
+    accessoriesColor: rand(AVATAR_OPTIONS.accessoriesColor),
+    hatColor: rand(AVATAR_OPTIONS.hatColor),
+  }));
+
+  const TABS = [
+    { id: 'face' as const,   emoji: '👤', label: 'Face'   },
+    { id: 'hair' as const,   emoji: '💇', label: 'Hair'   },
+    { id: 'outfit' as const, emoji: '👕', label: 'Outfit' },
+    { id: 'extras' as const, emoji: '🕶️', label: 'Extras' },
+  ];
+
+  const ColorRow = ({ colors, value, names, onPick }: {
+    colors: string[]; value: string; names: Record<string, string>; onPick: (c: string) => void;
+  }) => (
+    <div className="flex flex-wrap gap-2">
+      {colors.map(c => (
+        <button key={c} type="button" onClick={() => onPick(c)}
+          className={`w-7 h-7 rounded-full border-2 transition-transform ${value === c ? 'border-primary scale-110 ring-2 ring-primary/30' : 'border-transparent hover:scale-105'}`}
+          style={{ backgroundColor: `#${c}`, ...(c === 'ffffff' ? { border: '2px solid #d1d5db' } : {}) }}
+          title={names[c] || c}
+        />
+      ))}
+    </div>
+  );
 
   return (
-    <div className="flex flex-col md:flex-row h-full gap-6 p-4">
-        <div className="flex-1 flex flex-col items-center justify-center bg-secondary/10 rounded-xl p-8 relative">
-            <img src={previewUrl} alt="Preview" className="w-64 h-64 rounded-full bg-white shadow-lg" />
-            <button 
-                type="button"
-                onClick={randomize}
-                className="absolute top-4 right-4 p-2 rounded-full bg-white shadow-md hover:bg-gray-50 text-gray-600"
-                title="Randomize"
+    <div className="flex gap-5 h-full min-h-0">
+      {/* Left: preview + nav + save */}
+      <div className="flex flex-col gap-3 w-44 shrink-0">
+        <div className="relative">
+          <div className="relative w-full aspect-square rounded-2xl bg-white shadow-lg border border-border overflow-hidden">
+            <img
+              src={previewUrl}
+              alt="Avatar preview"
+              className="w-full h-full object-cover"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={randomize}
+            title="Randomize"
+            className="absolute -top-2 -right-2 p-1.5 rounded-full bg-background border border-border shadow-sm hover:bg-secondary text-muted-foreground transition-colors"
+          >
+            <Shuffle size={13} />
+          </button>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          {TABS.map(tab => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-left transition-colors ${
+                activeTab === tab.id
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
+              }`}
             >
-                <Shuffle size={20} />
+              <span className="text-base">{tab.emoji}</span> {tab.label}
             </button>
+          ))}
         </div>
-        
-        <div className="flex-1 overflow-y-auto space-y-6 pr-2">
-            <div className="space-y-3">
-                <label className="text-sm font-medium text-muted-foreground">Skin Tone</label>
-                <div className="flex flex-wrap gap-2">
-                    {AVATAR_OPTIONS.skinColor.map(color => (
-                        <button
-                            type="button"
-                            key={color}
-                            onClick={() => setOptions({...options, skinColor: color})}
-                            className={`w-8 h-8 rounded-full border-2 ${options.skinColor === color ? 'border-primary scale-110' : 'border-transparent hover:scale-105'}`}
-                            style={{ backgroundColor: `#${color}` }}
-                            title={color}
-                        />
-                    ))}
-                </div>
-            </div>
 
-            <div className="space-y-3">
-                <label className="text-sm font-medium text-muted-foreground">Hair Style</label>
-                <div className="grid grid-cols-3 gap-2">
-                    {AVATAR_OPTIONS.top.map(style => (
-                        <button
-                            type="button"
-                            key={style}
-                            onClick={() => setOptions({...options, top: style})}
-                            className={`px-2 py-1 text-xs rounded border ${options.top === style ? 'bg-primary text-primary-foreground border-primary' : 'bg-card hover:bg-secondary'}`}
-                        >
-                            {style.replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase())}
-                        </button>
-                    ))}
-                </div>
-            </div>
+        <button
+          type="button"
+          onClick={handleSave}
+          className="mt-auto w-full bg-primary text-primary-foreground py-2.5 rounded-xl font-semibold hover:bg-primary/90 transition-colors shadow-sm text-sm"
+        >
+          Save Avatar
+        </button>
+      </div>
 
-            <div className="space-y-3">
-                <label className="text-sm font-medium text-muted-foreground">Hair Color</label>
-                <div className="flex flex-wrap gap-2">
-                    {AVATAR_OPTIONS.hairColor.map(color => (
-                        <button
-                            type="button"
-                            key={color}
-                            onClick={() => setOptions({...options, hairColor: color})}
-                            className={`w-6 h-6 rounded-full border-2 ${options.hairColor === color ? 'border-primary scale-110' : 'border-transparent'}`}
-                            style={{ backgroundColor: `#${color}` }}
-                            title={color}
-                        />
-                    ))}
-                </div>
-            </div>
+      {/* Right: option panels */}
+      <div className="flex-1 overflow-y-auto space-y-5 pr-1 min-h-0">
 
-            <div className="space-y-3">
-                <label className="text-sm font-medium text-muted-foreground">Facial Hair</label>
-                <div className="flex flex-wrap gap-2">
-                    <button
-                        type="button"
-                        onClick={() => setOptions({...options, facialHair: ''})}
-                        className={`px-3 py-1 text-xs rounded border ${options.facialHair === '' ? 'bg-primary text-primary-foreground' : 'bg-card'}`}
-                    >
-                        None
-                    </button>
-                    {AVATAR_OPTIONS.facialHair.filter(Boolean).map(style => (
-                        <button
-                            type="button"
-                            key={style}
-                            onClick={() => setOptions({...options, facialHair: style})}
-                            className={`px-3 py-1 text-xs rounded border ${options.facialHair === style ? 'bg-primary text-primary-foreground' : 'bg-card'}`}
-                        >
-                            {style.replace('beard', 'Beard ').replace('moustache', 'Moustache ')}
-                        </button>
-                    ))}
-                </div>
-            </div>
+        {/* ── Face ── */}
+        {activeTab === 'face' && (
+          <>
+            <AvatarSection label="Skin Tone">
+              <div className="flex flex-wrap gap-2">
+                {AVATAR_OPTIONS.skinColor.map(c => (
+                  <button key={c} type="button" onClick={() => set('skinColor', c)}
+                    className={`w-8 h-8 rounded-full border-2 transition-transform ${options.skinColor === c ? 'border-primary scale-110 ring-2 ring-primary/30' : 'border-transparent hover:scale-105'}`}
+                    style={{ backgroundColor: `#${c}` }} title={SKIN_NAMES[c]} />
+                ))}
+              </div>
+            </AvatarSection>
+            <AvatarSection label="Eyes">
+              <AvatarChips values={AVATAR_OPTIONS.eyes} current={options.eyes} onSelect={v => set('eyes', v)} />
+            </AvatarSection>
+            <AvatarSection label="Eyebrows">
+              <AvatarChips values={AVATAR_OPTIONS.eyebrows} current={options.eyebrows} onSelect={v => set('eyebrows', v)} />
+            </AvatarSection>
+            <AvatarSection label="Mouth">
+              <AvatarChips values={AVATAR_OPTIONS.mouth} current={options.mouth} onSelect={v => set('mouth', v)} />
+            </AvatarSection>
+          </>
+        )}
 
-            <div className="space-y-3">
-                <label className="text-sm font-medium text-muted-foreground">Clothing</label>
-                <div className="grid grid-cols-2 gap-2">
-                    {AVATAR_OPTIONS.clothing.map(style => (
-                        <button
-                            type="button"
-                            key={style}
-                            onClick={() => setOptions({...options, clothing: style})}
-                            className={`px-2 py-1 text-xs rounded border ${options.clothing === style ? 'bg-primary text-primary-foreground' : 'bg-card'}`}
-                        >
-                            {style.replace('shirt', '').replace('And', ' & ')}
-                        </button>
-                    ))}
-                </div>
-            </div>
+        {/* ── Hair ── */}
+        {activeTab === 'hair' && (
+          <>
+            <AvatarSection label="Men's Styles">
+              <AvatarChips values={MALE_HAIR} current={options.top} onSelect={v => set('top', v)} />
+            </AvatarSection>
+            <AvatarSection label="Women's Styles">
+              <AvatarChips values={FEMALE_HAIR} current={options.top} onSelect={v => set('top', v)} />
+            </AvatarSection>
+            <AvatarSection label="Natural / Shared">
+              <AvatarChips values={NATURAL_HAIR} current={options.top} onSelect={v => set('top', v)} />
+            </AvatarSection>
+            <AvatarSection label="Headwear">
+              <AvatarChips values={HAT_STYLES} current={options.top} onSelect={v => set('top', v)} />
+            </AvatarSection>
+            {!isHat && (
+              <AvatarSection label="Hair Color">
+                <ColorRow colors={AVATAR_OPTIONS.hairColor} value={options.hairColor} names={HAIR_COLOR_NAMES} onPick={c => set('hairColor', c)} />
+              </AvatarSection>
+            )}
+            {isHat && (
+              <AvatarSection label="Hat Color">
+                <ColorRow colors={AVATAR_OPTIONS.hatColor} value={options.hatColor} names={CLOTH_COLOR_NAMES} onPick={c => set('hatColor', c)} />
+              </AvatarSection>
+            )}
+            <AvatarSection label="Facial Hair">
+              <div className="flex flex-wrap gap-1.5">
+                <AvatarChip label="None" active={options.facialHair === ''} onClick={() => set('facialHair', '')} />
+                {AVATAR_OPTIONS.facialHair.map(v => (
+                  <AvatarChip key={v} label={getLabel(v)} active={options.facialHair === v} onClick={() => set('facialHair', v)} />
+                ))}
+              </div>
+            </AvatarSection>
+            {options.facialHair && (
+              <AvatarSection label="Facial Hair Color">
+                <ColorRow colors={AVATAR_OPTIONS.facialHairColor} value={options.facialHairColor} names={HAIR_COLOR_NAMES} onPick={c => set('facialHairColor', c)} />
+              </AvatarSection>
+            )}
+          </>
+        )}
 
-            <div className="pt-4 flex gap-3">
-                <button type="button" onClick={handleSave} className="flex-1 bg-primary text-primary-foreground py-2 rounded-lg font-medium hover:bg-primary/90 transition-colors">
-                    Save Avatar
-                </button>
-            </div>
+        {/* ── Outfit ── */}
+        {activeTab === 'outfit' && (
+          <>
+            <AvatarSection label="Clothing Style">
+              <AvatarChips values={AVATAR_OPTIONS.clothing} current={options.clothing} onSelect={v => set('clothing', v)} />
+            </AvatarSection>
+            <AvatarSection label="Clothing Color">
+              <ColorRow colors={AVATAR_OPTIONS.clothingColor} value={options.clothingColor} names={CLOTH_COLOR_NAMES} onPick={c => set('clothingColor', c)} />
+            </AvatarSection>
+          </>
+        )}
+
+        {/* ── Extras ── */}
+        {activeTab === 'extras' && (
+          <>
+            <AvatarSection label="Glasses">
+              <div className="flex flex-wrap gap-1.5">
+                <AvatarChip label="None" active={options.accessories === ''} onClick={() => set('accessories', '')} />
+                {AVATAR_OPTIONS.accessories.map(v => (
+                  <AvatarChip key={v} label={getLabel(v)} active={options.accessories === v} onClick={() => set('accessories', v)} />
+                ))}
+              </div>
+            </AvatarSection>
+            {options.accessories && (
+              <AvatarSection label="Glasses Color">
+                <ColorRow colors={AVATAR_OPTIONS.accessoriesColor} value={options.accessoriesColor} names={CLOTH_COLOR_NAMES} onPick={c => set('accessoriesColor', c)} />
+              </AvatarSection>
+            )}
+
+          </>
+        )}
+
+      </div>
+    </div>
+  );
+};
+
+// ─── Study Heat-map ───────────────────────────────────────────────────────────
+const StudyHeatmap = ({ history }: { history?: Record<string, number> }) => {
+  const [tooltip, setTooltip] = React.useState<{ date: string; count: number; x: number; y: number } | null>(null);
+  const WEEKS = 17;
+  const DAYS = 7;
+  const totalDays = WEEKS * DAYS;
+
+  // Build array of last `totalDays` days, oldest first
+  const days = React.useMemo(() => {
+    const result: { dateKey: string; count: number; weekday: number }[] = [];
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    for (let i = totalDays - 1; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(now.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      result.push({ dateKey: key, count: history?.[key] || 0, weekday: d.getDay() });
+    }
+    return result;
+  }, [history]);
+
+  const getColor = (count: number) => {
+    if (count === 0) return 'bg-secondary/60';
+    if (count < 5) return 'bg-primary/25';
+    if (count < 10) return 'bg-primary/55';
+    if (count < 20) return 'bg-primary/80';
+    return 'bg-primary';
+  };
+
+  // Build weeks: array of 7-day columns
+  const weeks: typeof days[] = [];
+  for (let w = 0; w < WEEKS; w++) {
+    weeks.push(days.slice(w * DAYS, w * DAYS + DAYS));
+  }
+
+  const dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+  return (
+    <div className="relative">
+      {tooltip && (
+        <div
+          className="absolute z-20 pointer-events-none bg-popover border border-border rounded-lg px-2.5 py-1.5 text-xs shadow-md whitespace-nowrap"
+          style={{ left: tooltip.x, top: tooltip.y - 36 }}
+        >
+          <span className="font-semibold">{tooltip.date}</span>
+          {' — '}
+          {tooltip.count > 0 ? <span>{tooltip.count} questions</span> : <span className="text-muted-foreground">No study</span>}
         </div>
+      )}
+      <div className="flex gap-1">
+        {/* Day-of-week labels */}
+        <div className="flex flex-col gap-1 mr-1">
+          {dayLabels.map((l, i) => (
+            <div key={i} className="h-3 w-3 text-[8px] text-muted-foreground/60 flex items-center justify-center">
+              {i % 2 === 1 ? l : ''}
+            </div>
+          ))}
+        </div>
+        {weeks.map((week, wi) => (
+          <div key={wi} className="flex flex-col gap-1">
+            {week.map((day, di) => (
+              <div
+                key={di}
+                className={`h-3 w-3 rounded-sm cursor-default transition-opacity hover:opacity-80 ${getColor(day.count)}`}
+                onMouseEnter={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const container = e.currentTarget.closest('.relative');
+                  const cRect = container?.getBoundingClientRect();
+                  setTooltip({
+                    date: day.dateKey,
+                    count: day.count,
+                    x: rect.left - (cRect?.left || 0),
+                    y: rect.top - (cRect?.top || 0),
+                  });
+                }}
+                onMouseLeave={() => setTooltip(null)}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
@@ -529,11 +727,13 @@ const Profile = () => {
               <div className="h-32 w-32 rounded-full bg-linear-to-tr from-primary to-purple-500 p-1 shadow-lg group-hover:scale-105 transition-transform duration-300">
                 <div className="h-full w-full rounded-full bg-card flex items-center justify-center overflow-hidden relative">
                     {userProfile.avatar ? (
-                      <img 
-                        src={getAvatarUrl(userProfile.avatar)}
-                        alt="Avatar"
-                        className="h-full w-full object-cover"
-                      />
+                      <>
+                        <img
+                          src={getAvatarUrl(userProfile.avatar)}
+                          alt="Avatar"
+                          className="h-full w-full object-cover"
+                        />
+                      </>
                     ) : (
                       <User size={64} className="text-muted-foreground" />
                     )}
@@ -663,6 +863,26 @@ const Profile = () => {
         </div>
       </div>
 
+
+      {/* Study Activity Heat-map */}
+      <div className="space-y-3 px-1">
+        <h3 className="text-xl font-bold flex items-center gap-2">
+          <Flame className="h-5 w-5 text-orange-500" /> Study Activity
+        </h3>
+        <div className="rounded-2xl border border-border/50 bg-card/50 p-5 backdrop-blur-sm shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm text-muted-foreground">Last 17 weeks</span>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span>Less</span>
+              {['bg-secondary/60', 'bg-primary/25', 'bg-primary/55', 'bg-primary/80', 'bg-primary'].map(c => (
+                <div key={c} className={`h-3 w-3 rounded-sm ${c}`} />
+              ))}
+              <span>More</span>
+            </div>
+          </div>
+          <StudyHeatmap history={userProfile.stats?.studyHistory} />
+        </div>
+      </div>
 
       {/* Achievements Row (Horizontal Scroll) */}
       <div className="space-y-4">

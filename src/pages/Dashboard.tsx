@@ -30,7 +30,8 @@ import { getHolidayForToday } from '../utils/holidays';
 import { getQuotesByField } from '../utils/quotes';
 
 const Dashboard = () => {
-  const { questions: allQuestions, sets: allSets, userProfile, setUserProfile, updateLastVisit, activeProfileId } = useStore();
+  const { questions: allQuestions, sets: allSets, userProfile, setUserProfile, updateLastVisit, activeProfileId, getDailyChallenge } = useStore();
+  const dailyChallenge = allSets.length > 0 ? getDailyChallenge() : null;
   
   const questions = useMemo(() => allQuestions.filter(q => !q.profileId || q.profileId === activeProfileId), [allQuestions, activeProfileId]);
   const sets = useMemo(() => allSets.filter(s => !s.profileId || s.profileId === activeProfileId), [allSets, activeProfileId]);
@@ -302,6 +303,46 @@ const Dashboard = () => {
             </motion.div>
         )}
       </div>
+
+      {/* Daily Challenge Widget */}
+      {dailyChallenge && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className={`rounded-2xl border p-5 flex items-center justify-between gap-4 ${
+            dailyChallenge.completedAt
+              ? 'border-green-500/20 bg-green-500/5'
+              : 'border-primary/25 bg-linear-to-r from-primary/10 to-purple-500/5'
+          }`}
+        >
+          <div className="flex items-center gap-4 min-w-0">
+            <div className={`p-3 rounded-xl shrink-0 ${dailyChallenge.completedAt ? 'bg-green-500/15' : 'bg-primary/15'}`}>
+              <Zap className={`h-5 w-5 ${dailyChallenge.completedAt ? 'text-green-500' : 'text-primary'}`} />
+            </div>
+            <div className="min-w-0">
+              <p className="font-bold text-sm">{dailyChallenge.completedAt ? 'Daily Challenge Complete!' : 'Daily Challenge'}</p>
+              <p className="text-xs text-muted-foreground truncate">{dailyChallenge.setTitle} · {dailyChallenge.questionIds.length} questions</p>
+              {!dailyChallenge.completedAt && (
+                <span className="text-xs font-semibold text-yellow-500">2× XP Bonus</span>
+              )}
+              {dailyChallenge.completedAt && (
+                <span className="text-xs font-semibold text-green-500">+{(dailyChallenge.questionIds.length * 20)} bonus XP earned</span>
+              )}
+            </div>
+          </div>
+          {!dailyChallenge.completedAt ? (
+            <Button
+              size="sm"
+              className="shrink-0"
+              onClick={() => navigate(`/practice/${dailyChallenge.setId}?mode=cram&challenge=1`)}
+            >
+              Start
+            </Button>
+          ) : (
+            <span className="text-green-500 font-bold text-sm shrink-0">✓ Done</span>
+          )}
+        </motion.div>
+      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

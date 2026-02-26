@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useStore, Question } from '../store/useStore';
-import { ArrowLeft, CheckCircle2, XCircle, BookOpen, Target, Brain, ArrowRight, AlertCircle, Clock3 } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, XCircle, BookOpen, Target, Brain, ArrowRight, AlertCircle, Clock3, Zap, Star, Trophy } from 'lucide-react';
 
 import Button from '../components/ui/Button';
+import Modal from '../components/ui/Modal';
 import RichText from '../components/ui/RichText';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -12,7 +13,8 @@ const Practice = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const mode = searchParams.get('mode');
-  const { sets: allSets, questions, addSession, userProfile, activeProfileId } = useStore();
+  const isChallenge = searchParams.get('challenge') === '1';
+  const { sets: allSets, questions, addSession, completeDailyChallenge, userProfile, activeProfileId } = useStore();
   
   const sets = useMemo(() => allSets.filter(s => !s.profileId || s.profileId === activeProfileId), [allSets, activeProfileId]);
   
@@ -30,6 +32,15 @@ const Practice = () => {
   const timedDurationSeconds = isTimedMode ? ((Number.isFinite(timedMinutesParam) && timedMinutesParam > 0 ? timedMinutesParam : 60) * 60) : null;
   const [timeRemainingSec, setTimeRemainingSec] = useState<number | null>(timedDurationSeconds);
   const sessionSaved = useRef(false);
+
+  // Engagement state
+  const [xpFloat, setXpFloat] = useState<{ id: number; amount: number } | null>(null);
+  const preLevelRef = useRef(userProfile.stats?.level || 1);
+  const [levelUp, setLevelUp] = useState<number | null>(null);
+  const [showFiveMore, setShowFiveMore] = useState(false);
+  const [fiveMoreDismissed, setFiveMoreDismissed] = useState(false);
+  const [fiveMoreActive, setFiveMoreActive] = useState(false);
+  const [bonusXpEarned, setBonusXpEarned] = useState(0);
   
   const currentSet = sets.find((s) => s.id === setId);
   
@@ -99,6 +110,7 @@ const Practice = () => {
   useEffect(() => {
     if (showResults && currentSet && !sessionSaved.current) {
       try {
+        preLevelRef.current = userProfile.stats?.level || 1;
         const duration = (Date.now() - startTime) / 1000;
         addSession({
           setId: currentSet.id,
@@ -109,11 +121,28 @@ const Practice = () => {
           duration: duration
         });
         sessionSaved.current = true;
+
+        // Check for daily challenge completion
+        if (isChallenge && score > 0) {
+          const bonus = score * 20;
+          completeDailyChallenge(bonus);
+          setBonusXpEarned(bonus);
+        }
       } catch (err) {
         console.error('Failed to save practice session:', err);
       }
     }
-  }, [showResults, currentSet, score, setQuestions.length, incorrectQuestionIds, addSession, startTime]);
+  }, [showResults, currentSet, score, setQuestions.length, incorrectQuestionIds, addSession, startTime, isChallenge, completeDailyChallenge]);
+
+  // Level-up detection — runs after addSession updates the store
+  useEffect(() => {
+    if (!sessionSaved.current) return;
+    const newLevel = userProfile.stats?.level || 1;
+    if (newLevel > preLevelRef.current) {
+      setLevelUp(newLevel);
+      preLevelRef.current = newLevel;
+    }
+  }, [userProfile.stats?.level]);
 
   if (!currentSet || !currentQuestion) {
     return (
@@ -165,6 +194,9 @@ const Practice = () => {
     // Update score
     if (isCorrect) {
         setScore(s => s + 1);
+        // Trigger XP float animation
+        setXpFloat({ id: Date.now(), amount: 20 });
+        setTimeout(() => setXpFloat(null), 900);
     } else {
         setIncorrectQuestionIds(prev => [...prev, currentQuestion.id]);
     }
@@ -191,7 +223,32 @@ const Practice = () => {
     setUserSelections({});
     setStartTime(Date.now());
     setIsDrillMode(true);
+    setShowFiveMore(false);
     setTimeRemainingSec(isTimedMode ? timedDurationSeconds : null);
+    sessionSaved.current = false;
+  };
+
+  const handleFiveMore = () => {
+    // Pick 5 random questions from the full set not already answered in this session
+    const answeredIds = new Set(setQuestions.map(q => q.id));
+    const fullSetQs = (currentSet?.questionIds || [])
+      .map(id => questions.find(q => q.id === id))
+      .filter((q): q is Question => !!q && !answeredIds.has(q.id));
+    // Shuffle and take up to 5
+    const shuffled = [...fullSetQs].sort(() => Math.random() - 0.5).slice(0, 5);
+    if (shuffled.length === 0) return;
+    setSetQuestions(shuffled);
+    setCurrentQuestionIndex(0);
+    setSelectedOptions([]);
+    setIsChecked(false);
+    setShowResults(false);
+    setScore(0);
+    setIncorrectQuestionIds([]);
+    setUserSelections({});
+    setStartTime(Date.now());
+    setFiveMoreActive(true);
+    setShowFiveMore(false);
+    setTimeRemainingSec(null);
     sessionSaved.current = false;
   };
 
@@ -230,9 +287,73 @@ const Practice = () => {
         .sort(([, a], [, b]) => b - a)
         .slice(0, 3); // Top 3 weak areas
 
+    // Check whether we should offer "5 more" (only once, not in drill/5more mode)
+    const fullSetQs = (currentSet?.questionIds || []).map(id => questions.find(q => q.id === id)).filter(Boolean);
+    const canFiveMore = !isDrillMode && !fiveMoreActive && !fiveMoreDismissed && score >= 3
+      && fullSetQs.length > setQuestions.length;
+
     return (
         <div className="flex flex-col h-full overflow-y-auto pb-10">
+          {/* Level-up celebration modal */}
+          <Modal isOpen={levelUp !== null} onClose={() => setLevelUp(null)} title="">
+            <div className="flex flex-col items-center gap-4 py-4 text-center">
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: [0, 1.2, 1] }}
+                transition={{ duration: 0.5, ease: 'easeOut' }}
+                className="w-24 h-24 rounded-full bg-yellow-500/20 border-4 border-yellow-400 flex items-center justify-center"
+              >
+                <Trophy className="h-12 w-12 text-yellow-400" />
+              </motion.div>
+              <div>
+                <h2 className="text-2xl font-bold text-yellow-400">Level Up!</h2>
+                <p className="text-4xl font-black mt-1">Level {levelUp}</p>
+                <p className="text-muted-foreground mt-2">You reached a new level. Keep it up!</p>
+              </div>
+              <Button onClick={() => setLevelUp(null)} className="mt-2 w-full">
+                <Star className="mr-2 h-4 w-4" /> Awesome!
+              </Button>
+            </div>
+          </Modal>
+
             <div className="max-w-4xl mx-auto w-full space-y-8 animate-in fade-in zoom-in duration-300 p-4">
+
+                {/* Daily challenge completion banner */}
+                {isChallenge && bonusXpEarned > 0 && (
+                  <div className="flex items-center gap-3 rounded-2xl border border-yellow-500/30 bg-yellow-500/10 px-5 py-3">
+                    <Zap className="h-5 w-5 text-yellow-400 shrink-0" />
+                    <div>
+                      <p className="font-semibold text-yellow-300">Daily Challenge Complete!</p>
+                      <p className="text-sm text-muted-foreground">+{bonusXpEarned} bonus XP earned</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* "Just 5 more" prompt */}
+                {canFiveMore && !showFiveMore && (
+                  <div className="flex items-center justify-between gap-3 rounded-2xl border border-primary/30 bg-primary/10 px-5 py-4">
+                    <div className="flex items-center gap-3">
+                      <Zap className="h-5 w-5 text-primary shrink-0" />
+                      <div>
+                        <p className="font-semibold text-sm">You're on a roll!</p>
+                        <p className="text-xs text-muted-foreground">5 more questions = +50 bonus XP</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      <Button size="sm" onClick={handleFiveMore}>Keep going</Button>
+                      <Button size="sm" variant="ghost" onClick={() => setFiveMoreDismissed(true)}>Skip</Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* "5 more" bonus complete banner */}
+                {fiveMoreActive && (
+                  <div className="flex items-center gap-3 rounded-2xl border border-green-500/30 bg-green-500/10 px-5 py-3">
+                    <CheckCircle2 className="h-5 w-5 text-green-400 shrink-0" />
+                    <p className="font-semibold text-green-300 text-sm">+50 bonus XP earned — great work!</p>
+                  </div>
+                )}
+
                 <div className="text-center space-y-2">
                     <h2 className={`text-3xl font-bold ${feedback.color}`}>{feedback.title}</h2>
                     <p className="text-muted-foreground">{feedback.message}</p>
@@ -394,7 +515,23 @@ const Practice = () => {
   const isMCQ = currentQuestion.options && currentQuestion.options.length > 0;
 
   return (
-    <div className="flex flex-col h-full max-w-4xl mx-auto pb-10 px-4 overflow-y-auto min-h-0">
+    <div className="flex flex-col h-full max-w-4xl mx-auto pb-10 px-4 overflow-y-auto min-h-0 relative">
+      {/* XP Float Animation */}
+      <AnimatePresence>
+        {xpFloat && (
+          <motion.div
+            key={xpFloat.id}
+            initial={{ opacity: 1, y: 0 }}
+            animate={{ opacity: 0, y: -50 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.8, ease: 'easeOut' }}
+            className="absolute top-20 right-8 text-yellow-400 font-bold text-xl pointer-events-none z-20 drop-shadow-lg"
+          >
+            +{xpFloat.amount} XP
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <Button variant="ghost" size="sm" onClick={() => navigate('/sets')} className="hover:bg-secondary/50 rounded-full h-10 w-10 p-0 flex items-center justify-center">
@@ -439,19 +576,30 @@ const Practice = () => {
             exit={{ opacity: 0, x: -20 }}
             className="flex-1 flex flex-col min-h-0"
         >
-            <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-2xl p-8 shadow-sm mb-6 min-h-[200px] flex flex-col items-center justify-center text-center">
-                {currentQuestion.imageUrl && (
-                    <div className="mb-6 w-full max-w-lg rounded-lg overflow-hidden shadow-lg">
-                         <img 
-                            src={currentQuestion.imageUrl} 
-                            alt="Question Reference" 
-                            className="w-full h-auto max-h-[400px] object-contain bg-black/5"
-                        />
+            <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-2xl shadow-sm mb-6 flex flex-col overflow-hidden">
+                {/* Scrollable content area */}
+                <div className="overflow-y-auto max-h-[42vh] p-8 flex flex-col items-center justify-center text-center">
+                    {currentQuestion.imageUrl && (
+                        <div className="mb-6 w-full max-w-lg rounded-lg overflow-hidden shadow-lg">
+                             <img
+                                src={currentQuestion.imageUrl}
+                                alt="Question Reference"
+                                className="w-full h-auto max-h-[300px] object-contain bg-black/5"
+                            />
+                        </div>
+                    )}
+                    <div className="text-lg font-medium leading-relaxed w-full">
+                        <RichText content={currentQuestion.content} className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]" />
+                    </div>
+                </div>
+                {/* Sticky footer inside card */}
+                {!isMCQ && (
+                    <div className="shrink-0 border-t border-border/40 px-8 py-3 flex items-center justify-center">
+                        <span className="text-xs text-muted-foreground tracking-wide select-none">
+                            Click below to flip
+                        </span>
                     </div>
                 )}
-                <div className="text-2xl font-medium leading-relaxed w-full">
-                    <RichText content={currentQuestion.content} className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]" />
-                </div>
             </div>
 
             {isMCQ ? (
@@ -493,26 +641,45 @@ const Practice = () => {
                     })}
                 </div>
             ) : (
-                // Fallback for non-MCQ (Flashcard style but simplified)
-                <div className="flex flex-col items-center justify-center p-8 border border-dashed border-border rounded-2xl bg-secondary/10">
-                    <p className="text-muted-foreground mb-4">This question has no options. Flip to see answer.</p>
-                    {!isChecked ? (
-                        <Button onClick={() => setIsChecked(true)}>Show Answer</Button>
-                    ) : (
-                        <div className="text-center animate-in fade-in slide-in-from-bottom-2">
-                            <div className="text-xl font-bold mb-4">
-                                {Array.isArray(currentQuestion.answer) 
-                                    ? currentQuestion.answer.map((a, i) => <div key={i}><RichText content={a} className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]" /></div>) 
+                // Flashcard flip view
+                !isChecked ? (
+                    <Button
+                        size="lg"
+                        className="w-full"
+                        onClick={() => setIsChecked(true)}
+                    >
+                        Flip — Show Answer
+                    </Button>
+                ) : (
+                    <motion.div
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-2xl overflow-hidden"
+                    >
+                        <div className="overflow-y-auto max-h-[30vh] px-8 py-6 text-center">
+                            <div className="text-lg font-semibold leading-relaxed">
+                                {Array.isArray(currentQuestion.answer)
+                                    ? currentQuestion.answer.map((a, i) => <div key={i}><RichText content={a} className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]" /></div>)
                                     : <RichText content={currentQuestion.answer} className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]" />
                                 }
                             </div>
-                            <div className="flex gap-4">
-                                <Button variant="destructive" onClick={() => { setIncorrectQuestionIds(prev => [...prev, currentQuestion.id]); handleNext(); }}>I was wrong</Button>
-                                <Button className="bg-green-600 hover:bg-green-700" onClick={() => { setScore(s => s+1); handleNext(); }}>I was right</Button>
-                            </div>
+                            {currentQuestion.rationale && (
+                                <div className="mt-4 pt-4 border-t border-border/40 text-sm text-muted-foreground leading-relaxed text-left">
+                                    <span className="font-semibold text-foreground block mb-1">Rationale</span>
+                                    <RichText content={currentQuestion.rationale} className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]" />
+                                </div>
+                            )}
                         </div>
-                    )}
-                </div>
+                        <div className="shrink-0 border-t border-border/40 px-8 py-4 flex gap-3 justify-center">
+                            <Button variant="destructive" onClick={() => { setIncorrectQuestionIds(prev => [...prev, currentQuestion.id]); handleNext(); }}>
+                                <XCircle className="mr-2 h-4 w-4" /> Got it wrong
+                            </Button>
+                            <Button className="bg-green-600 hover:bg-green-700" onClick={() => { setScore(s => s + 1); handleNext(); }}>
+                                <CheckCircle2 className="mr-2 h-4 w-4" /> Got it right
+                            </Button>
+                        </div>
+                    </motion.div>
+                )
             )}
 
             {/* Actions / Feedback */}

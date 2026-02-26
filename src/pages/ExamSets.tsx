@@ -11,7 +11,7 @@ import { CARD_GRADIENT_OPTIONS, getCardGradientClasses } from '../utils/cardGrad
 
 const ExamSets = () => {
   const navigate = useNavigate();
-  const { sets: allSets, deleteSet, updateSet, activeProfileId } = useStore();
+  const { sets: allSets, questions: allQuestions, deleteSet, updateSet, activeProfileId } = useStore();
   
   const sets = useMemo(() => allSets.filter(s => !s.profileId || s.profileId === activeProfileId), [allSets, activeProfileId]);
 
@@ -113,8 +113,25 @@ const ExamSets = () => {
                   <Layers className="h-5 w-5" />
                 </div>
               </div>
-              <div className="mt-4">
+              <div className="mt-4 space-y-2">
                 <span className="text-sm font-medium">{set.questionIds.length} Questions</span>
+                {(() => {
+                  const setQs = allQuestions.filter(q => set.questionIds.includes(q.id));
+                  const mastered = setQs.filter(q => (q.box || 0) >= 5).length;
+                  const pct = setQs.length > 0 ? Math.round((mastered / setQs.length) * 100) : 0;
+                  return (
+                    <div>
+                      <div className="flex justify-between text-[11px] text-muted-foreground mb-1">
+                        <span>Mastery</span>
+                        <span className={pct === 100 ? 'text-green-500 font-semibold' : ''}>{mastered}/{setQs.length} {pct === 100 ? '✓' : `${pct}%`}</span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
+                        <div className={`h-full rounded-full transition-all duration-500 ${pct === 100 ? 'bg-green-500' : 'bg-primary'}`}
+                             style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
               <div className="mt-3 space-y-1">
                 <label className="text-[11px] font-medium text-muted-foreground">Card Color</label>

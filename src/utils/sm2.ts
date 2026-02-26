@@ -35,11 +35,22 @@ export const calculateSM2 = (
   if (quality >= 3) {
     // Correct response
     if (repetitions === 0) {
-      interval = 1;
+      // First time seeing card — differentiate by rating
+      if (quality === 5) interval = 4;       // Easy: 4 days
+      else interval = 1;                      // Hard / Good: 1 day
     } else if (repetitions === 1) {
-      interval = 6;
+      if (quality === 3) interval = 3;        // Hard: 3 days
+      else if (quality === 5) interval = 8;   // Easy: 8 days
+      else interval = 6;                      // Good: 6 days
     } else {
-      interval = Math.round(interval * easeFactor);
+      // Hard uses a fixed 1.2× multiplier; Good uses easeFactor; Easy adds a 1.3 bonus
+      if (quality === 3) {
+        interval = Math.round(interval * 1.2);
+      } else if (quality === 5) {
+        interval = Math.round(interval * easeFactor * 1.3);
+      } else {
+        interval = Math.round(interval * easeFactor);
+      }
     }
     
     repetitions += 1;

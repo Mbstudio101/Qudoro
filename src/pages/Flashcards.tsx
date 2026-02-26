@@ -73,12 +73,13 @@ const Flashcards = () => {
 
   const getIntervalLabel = (rating: 'again' | 'hard' | 'good' | 'easy') => {
     if (!currentQuestion) return '-';
+    if (rating === 'again') return '<1 day';
     const { interval } = calculateSM2({
         easeFactor: currentQuestion.easeFactor || 2.5,
         repetitions: currentQuestion.repetitions || 0,
         interval: currentQuestion.interval || 0
     }, rating);
-    
+
     return interval === 1 ? '1 day' : `${interval} days`;
   };
 
