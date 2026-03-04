@@ -253,7 +253,7 @@ const CustomAvatarBuilder = ({ initialAvatar, onSave, onCancel }: {
         if (fhVal !== null) result.facialHair = AVATAR_OPTIONS.facialHair.includes(fhVal) ? fhVal : '';
         const fhcVal = get('facialHairColor'); if (fhcVal) result.facialHairColor = pick('facialHairColor', fhcVal);
         const clothingVal = get('clothing'); if (clothingVal) result.clothing = pick('clothing', clothingVal);
-        const ccVal = get('clothingColor'); if (ccVal) result.clothingColor = pick('clothingColor', ccVal);
+        const ccVal = get('clothesColor') ?? get('clothingColor'); if (ccVal) result.clothingColor = pick('clothingColor', ccVal);
         const eyesVal = get('eyes'); if (eyesVal) result.eyes = pick('eyes', eyesVal);
         const ebVal = get('eyebrows'); if (ebVal) result.eyebrows = pick('eyebrows', ebVal);
         const mouthVal = get('mouth'); if (mouthVal) result.mouth = pick('mouth', mouthVal);
@@ -287,7 +287,7 @@ const CustomAvatarBuilder = ({ initialAvatar, onSave, onCancel }: {
       p.append('facialHairProbability', '0');
     }
     p.append('clothing[]', o.clothing);
-    p.append('clothingColor[]', o.clothingColor);
+    p.append('clothesColor[]', o.clothingColor);
     p.append('eyes[]', o.eyes);
     p.append('eyebrows[]', o.eyebrows);
     p.append('mouth[]', o.mouth);
