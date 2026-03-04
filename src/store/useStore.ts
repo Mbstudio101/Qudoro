@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { get, set as idbSet, del } from 'idb-keyval'; // IndexedDB for performance
 import { calculateSM2 } from '../utils/sm2';
 import { BlackboardCourse, BlackboardAssignment, BlackboardGrade, BlackboardToken } from '../types/blackboard';
+import { getSupabaseClient } from '../services/marketplace/supabaseClient';
 
 
 export interface Question {
@@ -432,6 +433,43 @@ const verifyPassword = async (password: string, storedHash: string): Promise<boo
   return mismatch === 0;
 };
 
+// ── Supabase cloud sync ────────────────────────────────────────────────────
+let _supabaseSyncTimer: ReturnType<typeof setTimeout> | null = null;
+
+const pushToSupabase = async (json: string) => {
+  const supabase = getSupabaseClient();
+  if (!supabase) return;
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData?.session?.user?.id;
+    if (!userId) return;
+    await supabase.from('user_sync').upsert({ user_id: userId, data: JSON.parse(json) });
+  } catch { /* network offline or not authenticated — silently skip */ }
+};
+
+const schedulePushToSupabase = (json: string) => {
+  if (_supabaseSyncTimer) clearTimeout(_supabaseSyncTimer);
+  // Debounce: wait 4s of inactivity before syncing to avoid hammering Supabase
+  _supabaseSyncTimer = setTimeout(() => pushToSupabase(json), 4000);
+};
+
+const pullFromSupabase = async (): Promise<string | null> => {
+  const supabase = getSupabaseClient();
+  if (!supabase) return null;
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData?.session?.user?.id;
+    if (!userId) return null;
+    const { data } = await supabase
+      .from('user_sync')
+      .select('data')
+      .eq('user_id', userId)
+      .single();
+    if (data?.data) return JSON.stringify(data.data);
+  } catch { /* not found or offline */ }
+  return null;
+};
+
 const hasSecureStorageBridge = (): boolean =>
   typeof window !== 'undefined' &&
   typeof window.electron !== 'undefined' &&
@@ -493,15 +531,42 @@ const storage: StateStorage = {
             console.error('Electron Store Read Error:', e);
         }
     }
+
+    // 3. Last resort: pull from Supabase cloud sync
+    // Covers fresh installs, device switches, and data loss scenarios.
+    try {
+      const cloudJson = await pullFromSupabase();
+      if (cloudJson) {
+        // Restore locally so next launch is fast
+        const encryptedValue = await encryptPersistedValue(cloudJson);
+        await idbSet(name, encryptedValue);
+        if (typeof window !== 'undefined' && window.electron) {
+          window.electron.store.set(name, cloudJson);
+        }
+        return cloudJson;
+      }
+    } catch (e) {
+      console.error('Supabase pull error:', e);
+    }
+
     return null;
   },
   setItem: async (name: string, value: string): Promise<void> => {
+    // Write to IDB (fast, large capacity)
     try {
       const encryptedValue = await encryptPersistedValue(value);
       await idbSet(name, encryptedValue);
     } catch (e) {
       console.error('IDB Write Error — data may not have been saved:', e);
     }
+    // Also write to electron-store so data persists across dev/prod builds
+    // (IDB is origin-partitioned: localhost:5173 ≠ file://, so without this
+    //  switching between dev and packaged app loses all data)
+    if (typeof window !== 'undefined' && window.electron) {
+      window.electron.store.set(name, value);
+    }
+    // Schedule a debounced push to Supabase for cloud sync
+    schedulePushToSupabase(value);
   },
   removeItem: async (name: string): Promise<void> => {
     await del(name);

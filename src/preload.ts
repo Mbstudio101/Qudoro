@@ -43,4 +43,15 @@ contextBridge.exposeInMainWorld('electron', {
     encrypt: (plaintext: string) => ipcRenderer.invoke('encrypt-sensitive', plaintext),
     decrypt: (encryptedBase64: string) => ipcRenderer.invoke('decrypt-sensitive', encryptedBase64),
   },
+  backup: {
+    selectFolder: () => ipcRenderer.invoke('select-backup-folder'),
+    save: (json: string) => ipcRenderer.invoke('save-backup-file', json),
+    getFolder: () => ipcRenderer.invoke('get-backup-folder'),
+    onRequestBackupData: (cb: () => void) =>
+      ipcRenderer.on('request-backup-data', () => cb()),
+    sendBackupData: (json: string) =>
+      ipcRenderer.send('backup-data-response', json),
+    removeBackupDataListener: () =>
+      ipcRenderer.removeAllListeners('request-backup-data'),
+  },
 });

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { RefreshCw, Download, Check, AlertCircle, Package, User, Save, Upload, Trash2, Database, MessageSquare, Moon, Sun, Laptop, Shield, FileText, Lock, Users, ExternalLink, Mail } from 'lucide-react';
+import { RefreshCw, Download, Check, AlertCircle, Package, User, Save, Upload, Trash2, Database, MessageSquare, Moon, Sun, Laptop, Shield, FileText, Lock, Users, ExternalLink, Mail, FolderOpen, Clock } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
@@ -40,7 +40,14 @@ const Settings = () => {
 
   // Data State
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
+  // Auto-Backup State
+  const [backupFolder, setBackupFolder] = useState<string | null>(null);
+  const [backupIntervalHours, setBackupIntervalHours] = useState<number>(24);
+  const [lastBackupTime, setLastBackupTime] = useState<number | null>(null);
+  const [backupStatus, setBackupStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
+  const [backupMsg, setBackupMsg] = useState('');
+
   // Quizlet Import State
   const [quizletUrl, setQuizletUrl] = useState('');
   const [isImporting, setIsImporting] = useState(false);
@@ -680,6 +687,48 @@ const Settings = () => {
     };
   }, []);
 
+  // Load backup config on mount
+  useEffect(() => {
+    window.electron.backup.getFolder().then(f => { if (f) setBackupFolder(f); });
+    window.electron.store.get('lastBackupTime').then((t: number) => { if (t) setLastBackupTime(t); });
+    window.electron.store.get('backupIntervalHours').then((h: number) => { if (h) setBackupIntervalHours(h); });
+  }, []);
+
+  // Scheduled backup interval
+  useEffect(() => {
+    if (!backupFolder || backupIntervalHours <= 0) return;
+    const id = setInterval(async () => {
+      const { questions: q, sets: s } = useStore.getState();
+      const json = JSON.stringify({ questions: q, sets: s }, null, 2);
+      const result = await window.electron.backup.save(json);
+      if (result.success) setLastBackupTime(Date.now());
+    }, backupIntervalHours * 60 * 60 * 1000);
+    return () => clearInterval(id);
+  }, [backupFolder, backupIntervalHours]);
+
+  const handleChooseFolder = async () => {
+    const folder = await window.electron.backup.selectFolder();
+    if (folder) setBackupFolder(folder);
+  };
+
+  const handleBackupNow = async () => {
+    if (!backupFolder) return;
+    setBackupStatus('saving');
+    setBackupMsg('');
+    const { questions: q, sets: s } = useStore.getState();
+    const json = JSON.stringify({ questions: q, sets: s }, null, 2);
+    const result = await window.electron.backup.save(json);
+    if (result.success) {
+      setLastBackupTime(Date.now());
+      setBackupStatus('success');
+      setBackupMsg('Backup saved successfully.');
+      setTimeout(() => setBackupStatus('idle'), 3000);
+    } else {
+      setBackupStatus('error');
+      setBackupMsg(result.error ?? 'Backup failed.');
+    }
+  };
+
   const checkForUpdates = async () => {
     setStatus('checking');
     setError(null);
@@ -1106,6 +1155,88 @@ const Settings = () => {
               </p>
             </div>
           </div>
+
+          {/* Auto Backup */}
+          <div className="rounded-2xl border border-border/50 bg-card overflow-hidden">
+            <div className="flex items-center gap-3 px-6 py-4 border-b border-border/40 bg-linear-to-r from-violet-500/8 via-purple-500/5 to-transparent">
+              <div className="p-2 rounded-lg bg-violet-500/15 text-violet-500">
+                <Shield className="h-4 w-4" />
+              </div>
+              <div>
+                <h2 className="font-semibold text-sm">Auto Backup</h2>
+                <p className="text-xs text-muted-foreground">Automatically save your data to a folder on your device.</p>
+              </div>
+            </div>
+            <div className="p-6 space-y-5">
+              {/* Folder picker */}
+              <div className="flex items-center gap-3">
+                <div className="flex-1 min-w-0 px-3 py-2 rounded-xl border border-border/40 bg-secondary/30 text-sm text-muted-foreground truncate">
+                  {backupFolder ?? 'No folder selected'}
+                </div>
+                <button
+                  onClick={handleChooseFolder}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl border border-violet-500/25 bg-violet-500/8 hover:bg-violet-500/15 text-violet-500 text-sm font-medium transition-all shrink-0"
+                >
+                  <FolderOpen className="h-4 w-4" /> Choose Folder
+                </button>
+              </div>
+
+              {/* Interval */}
+              <div className="flex items-center gap-3">
+                <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="text-sm text-muted-foreground">Auto-backup every</span>
+                <select
+                  value={backupIntervalHours}
+                  onChange={e => {
+                    const v = Number(e.target.value);
+                    setBackupIntervalHours(v);
+                    window.electron.store.set('backupIntervalHours', v);
+                  }}
+                  className="px-3 py-1.5 rounded-lg border border-border/40 bg-secondary/30 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-violet-500/50"
+                >
+                  <option value={1}>1 hour</option>
+                  <option value={6}>6 hours</option>
+                  <option value={12}>12 hours</option>
+                  <option value={24}>24 hours</option>
+                  <option value={48}>48 hours</option>
+                </select>
+              </div>
+
+              {/* Last backup + Backup Now */}
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs text-muted-foreground">
+                  {lastBackupTime
+                    ? `Last backed up: ${new Date(lastBackupTime).toLocaleString()}`
+                    : 'No backup saved yet.'}
+                </p>
+                <button
+                  onClick={handleBackupNow}
+                  disabled={!backupFolder || backupStatus === 'saving'}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl border border-border/40 bg-secondary/30 hover:bg-secondary/60 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium transition-all shrink-0"
+                >
+                  {backupStatus === 'saving'
+                    ? <RefreshCw className="h-4 w-4 animate-spin" />
+                    : <Download className="h-4 w-4" />}
+                  {backupStatus === 'saving' ? 'Saving...' : 'Backup Now'}
+                </button>
+              </div>
+
+              {backupStatus === 'success' && (
+                <div className="flex items-center gap-2 text-emerald-500 bg-emerald-500/8 border border-emerald-500/20 p-3 rounded-xl text-xs">
+                  <Check className="h-3.5 w-3.5 shrink-0" />{backupMsg}
+                </div>
+              )}
+              {backupStatus === 'error' && (
+                <div className="flex items-center gap-2 text-destructive bg-destructive/8 border border-destructive/20 p-3 rounded-xl text-xs">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />{backupMsg}
+                </div>
+              )}
+
+              <p className="text-xs text-muted-foreground">
+                Saves as <code className="text-foreground">qudoro-backup-YYYY-MM-DD.json</code> in your chosen folder. A backup is also created automatically when you close the app.
+              </p>
+            </div>
+          </div>
         </motion.div>
       )}
 
@@ -1142,7 +1273,7 @@ const Settings = () => {
                   Have an idea? Post it on our board — other users vote on what gets built next.
                 </p>
                 <Button
-                  onClick={() => void handleOpenExternal('https://github.com/Mbstudio101/Qudoro/discussions')}
+                  onClick={() => void handleOpenExternal('https://qudoro.com/forum')}
                   className="w-full gap-2 bg-fuchsia-600 hover:bg-fuchsia-700 text-white border-0"
                 >
                   <ExternalLink className="h-3.5 w-3.5" />

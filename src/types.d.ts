@@ -51,6 +51,14 @@ declare global {
         onUpdateStatus: (callback: (status: string) => void) => void;
         removeAllListeners: () => void;
       };
+      backup: {
+        selectFolder: () => Promise<string | null>;
+        save: (json: string) => Promise<{ success: boolean; filePath?: string; error?: string }>;
+        getFolder: () => Promise<string | null>;
+        onRequestBackupData: (cb: () => void) => void;
+        sendBackupData: (json: string) => void;
+        removeBackupDataListener: () => void;
+      };
     };
   }
 }

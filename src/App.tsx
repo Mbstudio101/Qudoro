@@ -58,6 +58,17 @@ const AnimatedRoutes = () => {
 
 const App = () => {
   const { userProfile, isAuthenticated, authenticateWithSupabase } = useStore();
+
+  // On-close backup listener — registered at root so it's always active
+  useEffect(() => {
+    if (!window.electron?.backup) return;
+    window.electron.backup.onRequestBackupData(() => {
+      const { questions, sets } = useStore.getState();
+      const json = JSON.stringify({ questions, sets }, null, 2);
+      window.electron.backup.sendBackupData(json);
+    });
+    return () => window.electron.backup.removeBackupDataListener();
+  }, []);
   
   // Initialize notification scheduler
   useNotificationScheduler();

@@ -1,6 +1,6 @@
 import path from 'path';
 import fs from 'fs';
-import { app, BrowserWindow, ipcMain, shell, session, safeStorage, net } from 'electron';
+import { app, BrowserWindow, ipcMain, shell, session, safeStorage, net, dialog } from 'electron';
 import started from 'electron-squirrel-startup';
 import Store from 'electron-store';
 import { UpdateService } from './services/UpdateService';
@@ -327,6 +327,41 @@ ipcMain.on('set-store-value', (event, key, value) => {
   store.set(key, value);
 });
 
+// ── Auto-Backup IPC ──────────────────────────────────────────────────────────
+ipcMain.handle('select-backup-folder', async (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  const result = await dialog.showOpenDialog(win ?? mainWindow!, {
+    title: 'Choose Auto-Backup Folder',
+    properties: ['openDirectory', 'createDirectory'],
+  });
+  if (result.canceled || result.filePaths.length === 0) return null;
+  const folderPath = result.filePaths[0];
+  store.set('backupFolder', folderPath);
+  return folderPath;
+});
+
+ipcMain.handle('save-backup-file', async (_event, jsonContent: string) => {
+  const folderPath = store.get('backupFolder') as string | undefined;
+  if (!folderPath) return { success: false, error: 'No backup folder configured.' };
+  try {
+    const dateStr = new Date().toISOString().split('T')[0];
+    const filePath = path.join(folderPath, `qudoro-backup-${dateStr}.json`);
+    fs.writeFileSync(filePath, jsonContent, 'utf-8');
+    store.set('lastBackupTime', Date.now());
+    return { success: true, filePath };
+  } catch (error: any) {
+    return { success: false, error: error?.message ?? 'Write failed.' };
+  }
+});
+
+ipcMain.handle('get-backup-folder', () => {
+  const saved = store.get('backupFolder') as string | undefined;
+  if (saved) return saved;
+  // Default to Documents folder on first use
+  const docs = app.getPath('documents');
+  return docs;
+});
+
 let PDFParseCtor: null | (new (data: Uint8Array) => { getText: () => Promise<{ text: string }> }) =
   null;
 
@@ -519,6 +554,32 @@ ipcMain.handle('fetch-url', async (_event, url) => {
   } finally {
     if (win && !win.isDestroyed()) win.destroy();
   }
+});
+
+// ── On-close backup ──────────────────────────────────────────────────────────
+app.on('before-quit', (event) => {
+  const folderPath = store.get('backupFolder') as string | undefined;
+  if (!folderPath || !mainWindow || mainWindow.isDestroyed()) return;
+
+  event.preventDefault();
+  mainWindow.webContents.send('request-backup-data');
+
+  const forceQuitTimer = setTimeout(() => app.exit(0), 5000);
+
+  ipcMain.once('backup-data-response', (_evt, jsonContent: string) => {
+    clearTimeout(forceQuitTimer);
+    try {
+      const dateStr = new Date().toISOString().split('T')[0];
+      fs.writeFileSync(
+        path.join(folderPath, `qudoro-backup-${dateStr}.json`),
+        jsonContent,
+        'utf-8'
+      );
+      store.set('lastBackupTime', Date.now());
+    } catch { /* silent */ } finally {
+      app.exit(0);
+    }
+  });
 });
 
 // This method will be called when Electron has finished
