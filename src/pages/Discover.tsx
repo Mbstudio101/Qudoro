@@ -15,6 +15,7 @@ import type {
   NursingSubject, PublishSetInput, SharedSetDetail, SharedSetSummary, SharedSetVisibility,
 } from '../types/marketplace';
 import { NURSING_SUBJECTS } from '../types/marketplace';
+import { alignAnswersToOptions } from '../utils/answerMatch';
 import { getSupabaseClient } from '../services/marketplace/supabaseClient';
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { getAvatarUrl } from '../utils/avatar';
@@ -486,11 +487,11 @@ const Discover = () => {
           const lid = qMap.get(rq.remoteQuestionId);
           const lq  = lid ? questions.find(q => q.id === lid) : undefined;
           if (lq) {
-            updateQuestion(lq.id, { content: rq.content, rationale: rq.rationale, answer: rq.answers, options: rq.options, tags: rq.tags });
+            updateQuestion(lq.id, { content: rq.content, rationale: rq.rationale, answer: alignAnswersToOptions(rq.options, rq.answers), options: rq.options, tags: rq.tags });
             nextLinks.push({ remoteQuestionId: rq.remoteQuestionId, localQuestionId: lq.id });
             orderedIds.push(lq.id);
           } else {
-            const lqId = addQuestion({ content: rq.content, rationale: rq.rationale, answer: rq.answers, options: rq.options, tags: rq.tags });
+            const lqId = addQuestion({ content: rq.content, rationale: rq.rationale, answer: alignAnswersToOptions(rq.options, rq.answers), options: rq.options, tags: rq.tags });
             addQuestionToSet(localSet.id, lqId);
             nextLinks.push({ remoteQuestionId: rq.remoteQuestionId, localQuestionId: lqId });
             orderedIds.push(lqId);
@@ -506,7 +507,7 @@ const Discover = () => {
       const localSetId = addSet({ title: detail.title, description: `${detail.description} (Imported)`, questionIds: [] });
       const qLinks: { remoteQuestionId: string; localQuestionId: string }[] = [];
       for (const q of detail.questions) {
-        const lqId = addQuestion({ content: q.content, rationale: q.rationale, answer: q.answers, options: q.options, tags: q.tags });
+        const lqId = addQuestion({ content: q.content, rationale: q.rationale, answer: alignAnswersToOptions(q.options, q.answers), options: q.options, tags: q.tags });
         addQuestionToSet(localSetId, lqId);
         qLinks.push({ remoteQuestionId: q.remoteQuestionId, localQuestionId: lqId });
       }
@@ -524,7 +525,7 @@ const Discover = () => {
       const authorName = resolveAuthor(detail.author).displayName;
       const localSetId = addSet({ title: `${detail.title} (Fork)`, description: `Forked from ${authorName}. ${detail.description}`, questionIds: [] });
       for (const q of detail.questions) {
-        const lqId = addQuestion({ content: q.content, rationale: q.rationale, answer: q.answers, options: q.options, tags: q.tags });
+        const lqId = addQuestion({ content: q.content, rationale: q.rationale, answer: alignAnswersToOptions(q.options, q.answers), options: q.options, tags: q.tags });
         addQuestionToSet(localSetId, lqId);
       }
     } finally { setForkingSetId(null); }

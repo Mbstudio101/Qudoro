@@ -8,6 +8,7 @@ import Textarea from '../components/ui/Textarea';
 import RichText from '../components/ui/RichText';
 import { motion } from 'framer-motion';
 import { classifyQuestion } from '../utils/nursingConstants';
+import { isAnswerMatch, alignAnswersToOptions } from '../utils/answerMatch';
 import { CARD_GRADIENT_OPTIONS, getCardGradientClasses } from '../utils/cardGradients';
 import { cleanMcqText, parseLabeledMcq } from '../utils/mcqParser';
 import { draftKey as makeDraftKey } from '../utils/storageKeys';
@@ -356,15 +357,12 @@ const Questions = () => {
     setIsModalOpen(true);
   };
 
-  // Keep the stored correct answers in sync with the cleaned (trimmed) options.
-  // Options are trimmed on save, so the answer must be trimmed too — otherwise the
-  // exact-text match used for the checkbox and exam grading breaks. For MCQs we also
-  // drop any answer that no longer matches a real option. Non-MCQ answers pass through.
-  const normalizeAnswers = (cleanOptions: string[], answers: string[]): string[] => {
-    const trimmed = answers.map(a => a.trim()).filter(Boolean);
-    if (cleanOptions.length === 0) return trimmed;
-    return trimmed.filter(a => cleanOptions.includes(a));
-  };
+  // Keep the stored correct answers in sync with the cleaned options. Options
+  // are trimmed on save, so each answer is re-mapped to the exact option text it
+  // matches (whitespace/markup/case-insensitively). This guarantees the stored
+  // answer is an exact member of options, which the exam grader relies on.
+  const normalizeAnswers = (cleanOptions: string[], answers: string[]): string[] =>
+    alignAnswersToOptions(cleanOptions, answers);
 
   const handleSetBuilderFinish = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1160,7 +1158,7 @@ const Questions = () => {
                     </div>
                     <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                         {formData.options.map((option, index) => {
-                            const isCorrect = formData.answer.some(a => a.trim() === option.trim());
+                            const isCorrect = isAnswerMatch(option, formData.answer);
                             return (
                                 <div key={index} className="flex gap-2 items-center group">
                                     <button

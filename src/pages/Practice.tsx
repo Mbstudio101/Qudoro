@@ -7,6 +7,7 @@ import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import RichText from '../components/ui/RichText';
 import { motion, AnimatePresence } from 'framer-motion';
+import { isAnswerMatch, isSelectionCorrect } from '../utils/answerMatch';
 
 // Fisher-Yates shuffle — returns a new array, leaving the input untouched.
 const shuffleArray = <T,>(arr: T[]): T[] => {
@@ -194,15 +195,11 @@ const Practice = () => {
     setIsChecked(true);
     setUserSelections((prev) => ({ ...prev, [currentQuestion.id]: [...selectedOptions] }));
     
-    // Check correctness (whitespace-insensitive so legacy questions saved with
-    // untrimmed answers still grade correctly against trimmed options)
-    const correctAnswers = (Array.isArray(currentQuestion.answer) ? currentQuestion.answer : [currentQuestion.answer])
-        .map(a => a.trim());
-    const selectedTrimmed = selectedOptions.map(o => o.trim());
-
-    const isCorrect =
-        selectedTrimmed.length === correctAnswers.length &&
-        selectedTrimmed.every(opt => correctAnswers.includes(opt));
+    // Check correctness with normalized matching so questions whose stored
+    // answer differs from the option text only by whitespace, HTML markup,
+    // smart quotes, entities, or case still grade correctly.
+    const correctAnswers = Array.isArray(currentQuestion.answer) ? currentQuestion.answer : [currentQuestion.answer];
+    const isCorrect = isSelectionCorrect(selectedOptions, correctAnswers);
     
     // Update score
     if (isCorrect) {
@@ -654,8 +651,7 @@ const Practice = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {currentQuestion.options?.map((option, idx) => {
                         const isSelected = selectedOptions.includes(option);
-                        const correctAnswers = (Array.isArray(currentQuestion.answer) ? currentQuestion.answer : [currentQuestion.answer]).map(a => a.trim());
-                        const isCorrectAnswer = correctAnswers.includes(option.trim());
+                        const isCorrectAnswer = isAnswerMatch(option, currentQuestion.answer);
                         
                         let extraClasses = "hover:border-primary/50 hover:bg-secondary/30";
                         
