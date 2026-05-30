@@ -183,13 +183,15 @@ const Practice = () => {
     setIsChecked(true);
     setUserSelections((prev) => ({ ...prev, [currentQuestion.id]: [...selectedOptions] }));
     
-    // Check correctness
-    const correctAnswers = Array.isArray(currentQuestion.answer) ? currentQuestion.answer : [currentQuestion.answer];
-    
-    // Exact match required
-    const isCorrect = 
-        selectedOptions.length === correctAnswers.length && 
-        selectedOptions.every(opt => correctAnswers.includes(opt));
+    // Check correctness (whitespace-insensitive so legacy questions saved with
+    // untrimmed answers still grade correctly against trimmed options)
+    const correctAnswers = (Array.isArray(currentQuestion.answer) ? currentQuestion.answer : [currentQuestion.answer])
+        .map(a => a.trim());
+    const selectedTrimmed = selectedOptions.map(o => o.trim());
+
+    const isCorrect =
+        selectedTrimmed.length === correctAnswers.length &&
+        selectedTrimmed.every(opt => correctAnswers.includes(opt));
     
     // Update score
     if (isCorrect) {
@@ -641,8 +643,8 @@ const Practice = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {currentQuestion.options?.map((option, idx) => {
                         const isSelected = selectedOptions.includes(option);
-                        const correctAnswers = Array.isArray(currentQuestion.answer) ? currentQuestion.answer : [currentQuestion.answer];
-                        const isCorrectAnswer = correctAnswers.includes(option);
+                        const correctAnswers = (Array.isArray(currentQuestion.answer) ? currentQuestion.answer : [currentQuestion.answer]).map(a => a.trim());
+                        const isCorrectAnswer = correctAnswers.includes(option.trim());
                         
                         let extraClasses = "hover:border-primary/50 hover:bg-secondary/30";
                         

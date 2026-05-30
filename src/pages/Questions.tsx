@@ -356,6 +356,16 @@ const Questions = () => {
     setIsModalOpen(true);
   };
 
+  // Keep the stored correct answers in sync with the cleaned (trimmed) options.
+  // Options are trimmed on save, so the answer must be trimmed too — otherwise the
+  // exact-text match used for the checkbox and exam grading breaks. For MCQs we also
+  // drop any answer that no longer matches a real option. Non-MCQ answers pass through.
+  const normalizeAnswers = (cleanOptions: string[], answers: string[]): string[] => {
+    const trimmed = answers.map(a => a.trim()).filter(Boolean);
+    if (cleanOptions.length === 0) return trimmed;
+    return trimmed.filter(a => cleanOptions.includes(a));
+  };
+
   const handleSetBuilderFinish = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!setCreationData.title) {
@@ -374,6 +384,7 @@ const Questions = () => {
         finalQuestions.push({
             ...formData,
             options: cleanOptions,
+            answer: normalizeAnswers(cleanOptions, formData.answer),
             tags: tagsArray,
             domain: domain || undefined,
             questionStyle: style || undefined
@@ -419,6 +430,7 @@ const Questions = () => {
       updateQuestion(editingQuestion.id, {
         ...formData,
         options: cleanOptions,
+        answer: normalizeAnswers(cleanOptions, formData.answer),
         tags: tagsArray,
         domain: finalDomain,
         questionStyle: finalStyle
@@ -428,6 +440,7 @@ const Questions = () => {
       const newId = addQuestion({
         ...formData,
         options: cleanOptions,
+        answer: normalizeAnswers(cleanOptions, formData.answer),
         tags: tagsArray,
         domain: finalDomain,
         questionStyle: finalStyle
@@ -459,6 +472,7 @@ const Questions = () => {
         setDraftQuestions(prev => [...prev, {
             ...formData,
             options: cleanOptions,
+            answer: normalizeAnswers(cleanOptions, formData.answer),
             tags: tagsArray,
             domain: finalDomain,
             questionStyle: finalStyle
@@ -482,6 +496,7 @@ const Questions = () => {
     const newId = addQuestion({
         ...formData,
         options: cleanOptions,
+        answer: normalizeAnswers(cleanOptions, formData.answer),
         tags: tagsArray,
         domain: finalDomain,
         questionStyle: finalStyle
@@ -490,7 +505,7 @@ const Questions = () => {
     if (selectedSetId) {
         addQuestionToSet(selectedSetId, newId);
     }
-    
+
     // Reset form
     setFormData({
         content: '',
@@ -1063,14 +1078,6 @@ const Questions = () => {
                             onChange={(e) => setSetCreationData({ ...setCreationData, title: e.target.value })}
                         />
                     </div>
-                    <div className="space-y-2">
-                         <label className="text-sm font-medium leading-none">Description (Optional)</label>
-                         <Input
-                             placeholder="Brief description..."
-                             value={setCreationData.description}
-                             onChange={(e) => setSetCreationData({ ...setCreationData, description: e.target.value })}
-                         />
-                    </div>
                 </div>
                 <div className="h-px bg-border/50 my-2" />
                 <h3 className="font-semibold text-base">Add Question {draftQuestions.length + 1}</h3>
@@ -1153,7 +1160,7 @@ const Questions = () => {
                     </div>
                     <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                         {formData.options.map((option, index) => {
-                            const isCorrect = formData.answer.includes(option);
+                            const isCorrect = formData.answer.some(a => a.trim() === option.trim());
                             return (
                                 <div key={index} className="flex gap-2 items-center group">
                                     <button
