@@ -30,7 +30,7 @@ const Practice = () => {
   const [searchParams] = useSearchParams();
   const mode = searchParams.get('mode');
   const isChallenge = searchParams.get('challenge') === '1';
-  const { sets: allSets, questions, addSession, completeDailyChallenge, userProfile, activeProfileId } = useStore();
+  const { sets: allSets, questions, addSession, completeDailyChallenge, userProfile, activeProfileId, activeExam, saveActiveExam, clearActiveExam } = useStore();
   
   const sets = useMemo(() => allSets.filter(s => !s.profileId || s.profileId === activeProfileId), [allSets, activeProfileId]);
   
@@ -48,6 +48,13 @@ const Practice = () => {
   const timedDurationSeconds = isTimedMode ? ((Number.isFinite(timedMinutesParam) && timedMinutesParam > 0 ? timedMinutesParam : 60) * 60) : null;
   const [timeRemainingSec, setTimeRemainingSec] = useState<number | null>(timedDurationSeconds);
   const sessionSaved = useRef(false);
+  // Guards the initial load effect so it builds/restores the exam exactly once
+  // per mount; once initialized, persistence (not rebuild) takes over.
+  const initializedRef = useRef(false);
+  // Latest countdown value, read by the persistence snapshot without making the
+  // per-second tick re-run the save effect.
+  const timeRemainingRef = useRef<number | null>(timedDurationSeconds);
+  useEffect(() => { timeRemainingRef.current = timeRemainingSec; }, [timeRemainingSec]);
 
   // Engagement state
   const [xpFloat, setXpFloat] = useState<{ id: number; amount: number } | null>(null);
@@ -63,29 +70,69 @@ const Practice = () => {
   const [setQuestions, setSetQuestions] = useState<Question[]>([]);
 
   useEffect(() => {
-    if (currentSet) {
-        const qs = currentSet.questionIds
-            .map((id) => questions.find((q) => q.id === id))
-            .filter((q): q is Question => !!q);
+    if (!currentSet || initializedRef.current) return;
 
-        // Randomize question order and each question's answer choices every
-        // session so studying tests recall, not memorized positions.
-        const prepared = shuffleArray(qs).map(withShuffledOptions);
+    // Resume an in-progress exam if one was saved for this exact set + mode and
+    // hasn't been finished. Rebuild the question list from the saved order +
+    // shuffled options so the user lands back where they left off.
+    const saved = activeExam;
+    const canResume =
+      !!saved &&
+      saved.setId === currentSet.id &&
+      saved.mode === mode &&
+      saved.isChallenge === isChallenge &&
+      saved.timedDurationSeconds === timedDurationSeconds &&
+      Array.isArray(saved.questionOrder) &&
+      saved.questionOrder.length > 0;
 
-        setSetQuestions(prepared);
-        setCurrentQuestionIndex(0);
-        setSelectedOptions([]);
-        setIsChecked(false);
+    if (canResume && saved) {
+      const restored = saved.questionOrder
+        .map((id) => questions.find((q) => q.id === id))
+        .filter((q): q is Question => !!q)
+        .map((q) => ({ ...q, options: saved.optionsByQuestion[q.id] || q.options }));
+
+      if (restored.length > 0) {
+        setSetQuestions(restored);
+        setCurrentQuestionIndex(Math.min(saved.currentQuestionIndex, restored.length - 1));
+        setSelectedOptions(saved.selectedOptions || []);
+        setIsChecked(saved.isChecked);
         setShowResults(false);
-        setScore(0);
-        setIncorrectQuestionIds([]);
-        setUserSelections({});
-        setStartTime(Date.now());
-        setIsDrillMode(false);
-        setTimeRemainingSec(timedDurationSeconds);
+        setScore(saved.score);
+        setIncorrectQuestionIds(saved.incorrectQuestionIds || []);
+        setUserSelections(saved.userSelections || {});
+        setStartTime(saved.startTime);
+        setIsDrillMode(saved.isDrillMode);
+        setFiveMoreActive(saved.fiveMoreActive);
+        setBonusXpEarned(saved.bonusXpEarned || 0);
+        setTimeRemainingSec(saved.timeRemainingSec);
         sessionSaved.current = false;
+        initializedRef.current = true;
+        return;
+      }
     }
-  }, [currentSet, questions, mode, timedDurationSeconds]);
+
+    const qs = currentSet.questionIds
+      .map((id) => questions.find((q) => q.id === id))
+      .filter((q): q is Question => !!q);
+
+    // Randomize question order and each question's answer choices every
+    // session so studying tests recall, not memorized positions.
+    const prepared = shuffleArray(qs).map(withShuffledOptions);
+
+    setSetQuestions(prepared);
+    setCurrentQuestionIndex(0);
+    setSelectedOptions([]);
+    setIsChecked(false);
+    setShowResults(false);
+    setScore(0);
+    setIncorrectQuestionIds([]);
+    setUserSelections({});
+    setStartTime(Date.now());
+    setIsDrillMode(false);
+    setTimeRemainingSec(timedDurationSeconds);
+    sessionSaved.current = false;
+    initializedRef.current = true;
+  }, [currentSet, questions, mode, timedDurationSeconds, isChallenge, activeExam]);
 
   const currentQuestion = setQuestions[currentQuestionIndex];
 
@@ -95,11 +142,9 @@ const Practice = () => {
     }
   }, [currentSet, sets, navigate]);
 
-  // Reset state when question changes
-  useEffect(() => {
-    setSelectedOptions([]);
-    setIsChecked(false);
-  }, [currentQuestionIndex]);
+  // Note: per-question selection is cleared in handleNext (not in an effect on
+  // currentQuestionIndex) so restoring a saved exam doesn't wipe the in-progress
+  // selection on the question the user left off on.
 
   useEffect(() => {
     if (!isTimedMode || showResults || !setQuestions.length) return;
@@ -133,6 +178,8 @@ const Practice = () => {
           duration: duration
         });
         sessionSaved.current = true;
+        // Exam finished — drop the saved progress so it doesn't resume next time.
+        clearActiveExam();
 
         // Check for daily challenge completion
         if (isChallenge && score > 0) {
@@ -144,7 +191,38 @@ const Practice = () => {
         console.error('Failed to save practice session:', err);
       }
     }
-  }, [showResults, currentSet, score, setQuestions.length, incorrectQuestionIds, addSession, startTime, isChallenge, completeDailyChallenge]);
+  }, [showResults, currentSet, score, setQuestions.length, incorrectQuestionIds, addSession, startTime, isChallenge, completeDailyChallenge, clearActiveExam]);
+
+  // Persist in-progress exam state so the user can leave and resume where they
+  // were. Triggered by meaningful state changes (not the per-second timer — the
+  // latest countdown is read from a ref to avoid a write every second).
+  useEffect(() => {
+    if (!initializedRef.current || !currentSet) return;
+    if (showResults || setQuestions.length === 0) return;
+    saveActiveExam({
+      setId: currentSet.id,
+      mode,
+      isChallenge,
+      timedDurationSeconds,
+      questionOrder: setQuestions.map((q) => q.id),
+      optionsByQuestion: Object.fromEntries(setQuestions.map((q) => [q.id, q.options || []] as [string, string[]])),
+      currentQuestionIndex,
+      selectedOptions,
+      isChecked,
+      score,
+      incorrectQuestionIds,
+      userSelections,
+      startTime,
+      timeRemainingSec: timeRemainingRef.current,
+      isDrillMode,
+      fiveMoreActive,
+      bonusXpEarned,
+    });
+  }, [
+    currentSet, showResults, setQuestions, currentQuestionIndex, selectedOptions,
+    isChecked, score, incorrectQuestionIds, userSelections, startTime, isDrillMode,
+    fiveMoreActive, bonusXpEarned, mode, isChallenge, timedDurationSeconds, saveActiveExam,
+  ]);
 
   // Level-up detection — runs after addSession updates the store
   useEffect(() => {
@@ -215,6 +293,8 @@ const Practice = () => {
   const handleNext = () => {
     if (currentQuestionIndex < setQuestions.length - 1) {
       setCurrentQuestionIndex(prev => prev + 1);
+      setSelectedOptions([]);
+      setIsChecked(false);
     } else {
       setShowResults(true);
     }

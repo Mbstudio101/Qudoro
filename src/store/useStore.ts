@@ -90,6 +90,31 @@ export interface StudySession {
   duration?: number; // seconds
 }
 
+// Snapshot of an in-progress practice session so the user can leave and resume
+// exactly where they were. Stored by question id + shuffled option order rather
+// than full question copies, to avoid duplicating image data.
+export interface ActiveExam {
+  profileId?: string;
+  setId: string;
+  mode: string | null;
+  isChallenge: boolean;
+  timedDurationSeconds: number | null;
+  questionOrder: string[];                     // question ids in the (shuffled) order shown
+  optionsByQuestion: Record<string, string[]>; // shuffled answer-choice order per question id
+  currentQuestionIndex: number;
+  selectedOptions: string[];
+  isChecked: boolean;
+  score: number;
+  incorrectQuestionIds: string[];
+  userSelections: Record<string, string[]>;
+  startTime: number;
+  timeRemainingSec: number | null;
+  isDrillMode: boolean;
+  fiveMoreActive: boolean;
+  bonusXpEarned: number;
+  updatedAt: number;
+}
+
 export interface CalendarEvent {
   id: string;
   profileId?: string;
@@ -175,6 +200,7 @@ interface AppState {
   questions: Question[];
   sets: ExamSet[];
   sessions: StudySession[];
+  activeExam: ActiveExam | null; // in-progress practice session, for resume
   calendarEvents: CalendarEvent[];
   notes: Note[];
   userProfile: UserProfile; // The Active Profile
@@ -187,6 +213,8 @@ interface AppState {
   deleteSet: (id: string) => void;
   addQuestionToSet: (setId: string, questionId: string) => void;
   addSession: (session: Omit<StudySession, 'id'>) => void;
+  saveActiveExam: (exam: Omit<ActiveExam, 'profileId' | 'updatedAt'>) => void;
+  clearActiveExam: () => void;
   getDailyChallenge: () => DailyChallenge | null;
   completeDailyChallenge: (bonusXp: number) => void;
   // Calendar Actions
@@ -601,6 +629,7 @@ export const useStore = create<AppState>()(
       questions: [] as Question[],
       sets: [] as ExamSet[],
       sessions: [] as StudySession[],
+      activeExam: null as ActiveExam | null,
       calendarEvents: [] as CalendarEvent[],
       notes: [] as Note[],
       userProfile: { 
@@ -1027,6 +1056,11 @@ export const useStore = create<AppState>()(
         });
         get().checkAchievements();
       },
+      saveActiveExam: (exam) =>
+        set((state) => ({
+          activeExam: { ...exam, profileId: state.activeProfileId || '', updatedAt: Date.now() },
+        })),
+      clearActiveExam: () => set({ activeExam: null }),
       getDailyChallenge: () => {
         const state = get();
         const today = new Date().toISOString().slice(0, 10);
