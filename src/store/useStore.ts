@@ -3,6 +3,7 @@ import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
 import { get, set as idbSet, del } from 'idb-keyval'; // IndexedDB for performance
 import { calculateSM2 } from '../utils/sm2';
+import { alignAnswersToOptions } from '../utils/answerMatch';
 import { BlackboardCourse, BlackboardAssignment, BlackboardGrade, BlackboardToken } from '../types/blackboard';
 import { getSupabaseClient } from '../services/marketplace/supabaseClient';
 
@@ -87,6 +88,31 @@ export interface StudySession {
   totalQuestions: number;
   incorrectQuestionIds: string[];
   duration?: number; // seconds
+}
+
+// Snapshot of an in-progress practice session so the user can leave and resume
+// exactly where they were. Stored by question id + shuffled option order rather
+// than full question copies, to avoid duplicating image data.
+export interface ActiveExam {
+  profileId?: string;
+  setId: string;
+  mode: string | null;
+  isChallenge: boolean;
+  timedDurationSeconds: number | null;
+  questionOrder: string[];                     // question ids in the (shuffled) order shown
+  optionsByQuestion: Record<string, string[]>; // shuffled answer-choice order per question id
+  currentQuestionIndex: number;
+  selectedOptions: string[];
+  isChecked: boolean;
+  score: number;
+  incorrectQuestionIds: string[];
+  userSelections: Record<string, string[]>;
+  startTime: number;
+  timeRemainingSec: number | null;
+  isDrillMode: boolean;
+  fiveMoreActive: boolean;
+  bonusXpEarned: number;
+  updatedAt: number;
 }
 
 export interface CalendarEvent {
@@ -174,6 +200,7 @@ interface AppState {
   questions: Question[];
   sets: ExamSet[];
   sessions: StudySession[];
+  activeExam: ActiveExam | null; // in-progress practice session, for resume
   calendarEvents: CalendarEvent[];
   notes: Note[];
   userProfile: UserProfile; // The Active Profile
@@ -186,6 +213,8 @@ interface AppState {
   deleteSet: (id: string) => void;
   addQuestionToSet: (setId: string, questionId: string) => void;
   addSession: (session: Omit<StudySession, 'id'>) => void;
+  saveActiveExam: (exam: Omit<ActiveExam, 'profileId' | 'updatedAt'>) => void;
+  clearActiveExam: () => void;
   getDailyChallenge: () => DailyChallenge | null;
   completeDailyChallenge: (bonusXp: number) => void;
   // Calendar Actions
@@ -600,6 +629,7 @@ export const useStore = create<AppState>()(
       questions: [] as Question[],
       sets: [] as ExamSet[],
       sessions: [] as StudySession[],
+      activeExam: null as ActiveExam | null,
       calendarEvents: [] as CalendarEvent[],
       notes: [] as Note[],
       userProfile: { 
@@ -1026,6 +1056,11 @@ export const useStore = create<AppState>()(
         });
         get().checkAchievements();
       },
+      saveActiveExam: (exam) =>
+        set((state) => ({
+          activeExam: { ...exam, profileId: state.activeProfileId || '', updatedAt: Date.now() },
+        })),
+      clearActiveExam: () => set({ activeExam: null }),
       getDailyChallenge: () => {
         const state = get();
         const today = new Date().toISOString().slice(0, 10);
@@ -1498,6 +1533,26 @@ export const useStore = create<AppState>()(
     {
       name: 'qudoro-storage',
       storage: createJSONStorage(() => storage),
+      version: 2,
+      // One-time cleanup for questions whose stored answer doesn't exactly match
+      // an option (saved/imported with extra whitespace, HTML markup, smart
+      // quotes, entities, or differing case). Trim options and re-map each answer
+      // onto the exact option text it matches, so grading — which compares option
+      // text to answer text — works everywhere.
+      migrate: (persistedState: unknown, version: number) => {
+        const state = persistedState as { questions?: unknown[] } | null;
+        if (state && version < 2 && Array.isArray(state.questions)) {
+          state.questions = state.questions.map((raw) => {
+            const q = raw as { options?: unknown; answer?: unknown };
+            const options = Array.isArray(q.options)
+              ? q.options.map((o) => (typeof o === 'string' ? o.trim() : o)).filter(Boolean)
+              : q.options;
+            const answer = alignAnswersToOptions(options, q.answer);
+            return { ...q, options, answer };
+          });
+        }
+        return state;
+      },
     }
   )
 );
