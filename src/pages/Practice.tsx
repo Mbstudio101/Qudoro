@@ -8,6 +8,21 @@ import Modal from '../components/ui/Modal';
 import RichText from '../components/ui/RichText';
 import { motion, AnimatePresence } from 'framer-motion';
 
+// Fisher-Yates shuffle — returns a new array, leaving the input untouched.
+const shuffleArray = <T,>(arr: T[]): T[] => {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+
+// Randomize answer-choice order so the position of the correct answer can't be
+// memorized. Grading matches choices by text, so reordering options is safe.
+const withShuffledOptions = (q: Question): Question =>
+  q.options && q.options.length > 1 ? { ...q, options: shuffleArray(q.options) } : q;
+
 const Practice = () => {
   const { setId } = useParams<{ setId: string }>();
   const navigate = useNavigate();
@@ -51,16 +66,12 @@ const Practice = () => {
         const qs = currentSet.questionIds
             .map((id) => questions.find((q) => q.id === id))
             .filter((q): q is Question => !!q);
-        
-        if (mode === 'cram') {
-            // Fisher-Yates shuffle
-            for (let i = qs.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [qs[i], qs[j]] = [qs[j], qs[i]];
-            }
-        }
-        
-        setSetQuestions(qs);
+
+        // Randomize question order and each question's answer choices every
+        // session so studying tests recall, not memorized positions.
+        const prepared = shuffleArray(qs).map(withShuffledOptions);
+
+        setSetQuestions(prepared);
         setCurrentQuestionIndex(0);
         setSelectedOptions([]);
         setIsChecked(false);
@@ -215,7 +226,7 @@ const Practice = () => {
   const handleDrillMissed = () => {
     const missedQuestions = setQuestions.filter((q) => incorrectQuestionIds.includes(q.id));
     if (missedQuestions.length === 0) return;
-    setSetQuestions(missedQuestions);
+    setSetQuestions(shuffleArray(missedQuestions));
     setCurrentQuestionIndex(0);
     setSelectedOptions([]);
     setIsChecked(false);
@@ -236,8 +247,8 @@ const Practice = () => {
     const fullSetQs = (currentSet?.questionIds || [])
       .map(id => questions.find(q => q.id === id))
       .filter((q): q is Question => !!q && !answeredIds.has(q.id));
-    // Shuffle and take up to 5
-    const shuffled = [...fullSetQs].sort(() => Math.random() - 0.5).slice(0, 5);
+    // Shuffle question order, randomize each one's choices, and take up to 5
+    const shuffled = shuffleArray(fullSetQs).slice(0, 5).map(withShuffledOptions);
     if (shuffled.length === 0) return;
     setSetQuestions(shuffled);
     setCurrentQuestionIndex(0);
