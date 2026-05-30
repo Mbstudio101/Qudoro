@@ -1498,6 +1498,32 @@ export const useStore = create<AppState>()(
     {
       name: 'qudoro-storage',
       storage: createJSONStorage(() => storage),
+      version: 1,
+      // One-time cleanup for questions saved before answers were trimmed on save.
+      // Options were trimmed but answers weren't, so the exact-text match used for
+      // grading could miss. Trim both (and normalize answer to an array) so existing
+      // questions grade correctly everywhere.
+      migrate: (persistedState: unknown, version: number) => {
+        const state = persistedState as { questions?: unknown[] } | null;
+        if (state && version < 1 && Array.isArray(state.questions)) {
+          state.questions = state.questions.map((raw) => {
+            const q = raw as { options?: unknown; answer?: unknown };
+            const options = Array.isArray(q.options)
+              ? q.options.map((o) => (typeof o === 'string' ? o.trim() : o)).filter(Boolean)
+              : q.options;
+            const answerArr = Array.isArray(q.answer)
+              ? q.answer
+              : q.answer != null && q.answer !== ''
+                ? [q.answer]
+                : [];
+            const answer = answerArr
+              .map((a) => (typeof a === 'string' ? a.trim() : a))
+              .filter(Boolean);
+            return { ...q, options, answer };
+          });
+        }
+        return state;
+      },
     }
   )
 );
