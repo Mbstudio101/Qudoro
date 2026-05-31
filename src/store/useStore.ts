@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { get, set as idbSet, del } from 'idb-keyval'; // IndexedDB for performance
 import { calculateSM2 } from '../utils/sm2';
 import { alignAnswersToOptions } from '../utils/answerMatch';
+import { questionCountOf, parsePersistMeta, pickBestCandidate, type PersistCandidate, type PersistMeta } from '../utils/persistMerge';
 import { BlackboardCourse, BlackboardAssignment, BlackboardGrade, BlackboardToken } from '../types/blackboard';
 import { getSupabaseClient } from '../services/marketplace/supabaseClient';
 
@@ -528,50 +529,102 @@ const decryptPersistedValue = async (storedValue: string): Promise<string | null
   }
 };
 
+const META_SUFFIX = '::meta';
+
+// Write the snapshot to every backend so dev (origin localhost:5173) and the
+// packaged app (origin file://) converge on one dataset. electron-store is the
+// origin-independent shared source of truth; IndexedDB is a per-origin cache.
+const persistEverywhere = async (
+  name: string,
+  value: string,
+  meta: PersistMeta,
+  opts: { skipSupabase?: boolean } = {},
+): Promise<void> => {
+  const metaKey = name + META_SUFFIX;
+  const metaJson = JSON.stringify(meta);
+  const encryptedValue = await encryptPersistedValue(value);
+
+  // IndexedDB (fast, large capacity, per-origin)
+  try {
+    await idbSet(name, encryptedValue);
+    await idbSet(metaKey, metaJson);
+  } catch (e) {
+    console.error('IDB Write Error — data may not have been saved:', e);
+  }
+
+  // electron-store (single file, shared across dev/prod origins)
+  if (typeof window !== 'undefined' && window.electron) {
+    window.electron.store.set(name, encryptedValue);
+    window.electron.store.set(metaKey, metaJson);
+  }
+
+  if (!opts.skipSupabase) schedulePushToSupabase(value);
+};
+
 const storage: StateStorage = {
   getItem: async (name: string): Promise<string | null> => {
-    // 1. Try IndexedDB first (Fastest, handles large datasets + images)
+    const metaKey = name + META_SUFFIX;
+    const candidates: PersistCandidate[] = [];
+
+    // IndexedDB (current origin)
     try {
-        const value = await get(name);
-        if (typeof value === 'string' && value.length > 0) {
-            const decrypted = await decryptPersistedValue(value);
-            return decrypted;
+      const raw = await get(name);
+      if (typeof raw === 'string' && raw.length > 0) {
+        const decrypted = await decryptPersistedValue(raw);
+        if (decrypted) {
+          const metaRaw = await get(metaKey);
+          candidates.push({ source: 'idb', value: decrypted, meta: parsePersistMeta(metaRaw, decrypted) });
         }
-        if (value !== null && typeof value !== 'undefined') {
-            return JSON.stringify(value);
-        }
+      } else if (raw !== null && typeof raw !== 'undefined') {
+        const asString = JSON.stringify(raw);
+        candidates.push({ source: 'idb', value: asString, meta: parsePersistMeta(undefined, asString) });
+      }
     } catch (e) {
-        console.error('IDB Read Error:', e);
+      console.error('IDB Read Error:', e);
     }
 
-    // 2. Fallback: Migration from Electron Store (Old data)
-    // If IDB is empty, check the old file-based store.
+    // electron-store (origin-independent shared store) — this is what lets the
+    // packaged app's data show up in dev and vice-versa.
     if (typeof window !== 'undefined' && window.electron) {
-        try {
-            const value = await window.electron.store.get(name);
-            if (value) {
-                // Found data in old store! Migrate to IDB immediately.
-                const jsonValue = typeof value === 'string' ? value : JSON.stringify(value);
-                const encryptedValue = await encryptPersistedValue(jsonValue);
-                await idbSet(name, encryptedValue);
-                return jsonValue;
-            }
-        } catch (e) {
-            console.error('Electron Store Read Error:', e);
+      try {
+        const raw = await window.electron.store.get(name);
+        if (raw) {
+          const asString = typeof raw === 'string' ? raw : JSON.stringify(raw);
+          const decrypted = await decryptPersistedValue(asString);
+          if (decrypted) {
+            const metaRaw = await window.electron.store.get(metaKey);
+            candidates.push({ source: 'electron', value: decrypted, meta: parsePersistMeta(metaRaw, decrypted) });
+          }
         }
+      } catch (e) {
+        console.error('Electron Store Read Error:', e);
+      }
     }
 
-    // 3. Last resort: pull from Supabase cloud sync
-    // Covers fresh installs, device switches, and data loss scenarios.
+    const winner = pickBestCandidate(candidates);
+    if (winner) {
+      // Converge both backends on the winner (preserving its recency) so the
+      // other origin sees the same data next launch. Awaited so it can't race a
+      // subsequent setItem.
+      try {
+        await persistEverywhere(name, winner.value, winner.meta, { skipSupabase: true });
+      } catch (e) {
+        console.error('Converge write error:', e);
+      }
+      return winner.value;
+    }
+
+    // Last resort: pull from Supabase cloud sync (fresh installs, device
+    // switches, local data loss).
     try {
       const cloudJson = await pullFromSupabase();
       if (cloudJson) {
-        // Restore locally so next launch is fast
-        const encryptedValue = await encryptPersistedValue(cloudJson);
-        await idbSet(name, encryptedValue);
-        if (typeof window !== 'undefined' && window.electron) {
-          window.electron.store.set(name, cloudJson);
-        }
+        await persistEverywhere(
+          name,
+          cloudJson,
+          { savedAt: Date.now(), qCount: questionCountOf(cloudJson) },
+          { skipSupabase: true },
+        );
         return cloudJson;
       }
     } catch (e) {
@@ -581,26 +634,19 @@ const storage: StateStorage = {
     return null;
   },
   setItem: async (name: string, value: string): Promise<void> => {
-    // Write to IDB (fast, large capacity)
-    try {
-      const encryptedValue = await encryptPersistedValue(value);
-      await idbSet(name, encryptedValue);
-    } catch (e) {
-      console.error('IDB Write Error — data may not have been saved:', e);
-    }
-    // Also write to electron-store so data persists across dev/prod builds
-    // (IDB is origin-partitioned: localhost:5173 ≠ file://, so without this
-    //  switching between dev and packaged app loses all data)
-    if (typeof window !== 'undefined' && window.electron) {
-      window.electron.store.set(name, value);
-    }
-    // Schedule a debounced push to Supabase for cloud sync
-    schedulePushToSupabase(value);
+    await persistEverywhere(name, value, { savedAt: Date.now(), qCount: questionCountOf(value) });
   },
   removeItem: async (name: string): Promise<void> => {
-    await del(name);
+    const metaKey = name + META_SUFFIX;
+    try {
+      await del(name);
+      await del(metaKey);
+    } catch (e) {
+      console.error('IDB Remove Error:', e);
+    }
     if (typeof window !== 'undefined' && window.electron) {
-        window.electron.store.set(name, null);
+      window.electron.store.set(name, null);
+      window.electron.store.set(metaKey, null);
     }
   },
 };
