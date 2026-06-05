@@ -15,6 +15,8 @@ const Settings = () => {
     questions,
     sets,
     importData,
+    exportBackup,
+    restoreBackup,
     resetData,
     addQuestion,
     addSet,
@@ -836,24 +838,10 @@ const Settings = () => {
   };
 
   const handleExport = () => {
-    const exportedQuestions = questions.map((question) => {
-      const options = Array.isArray(question.options) ? question.options : [];
-      const answer = Array.isArray(question.answer) ? question.answer : [];
-      const correctOptionIndices = deriveCorrectOptionIndices(options, answer);
-      const selectionMode = normalizeSelectionMode(
-        question.selectionMode,
-        options.length,
-        correctOptionIndices.length,
-      );
-
-      return {
-        ...question,
-        selectionMode,
-        correctOptionIndices,
-      };
-    });
-
-    const data = JSON.stringify({ questions: exportedQuestions, sets }, null, 2);
+    // Full "save file": account, profile (avatar, theme, XP, streak, level,
+    // achievements, daily challenge, Blackboard), questions, sets, sessions,
+    // calendar and notes — everything needed to restore a user completely.
+    const data = JSON.stringify(exportBackup(), null, 2);
     const blob = new Blob([data], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -877,7 +865,18 @@ const Settings = () => {
     reader.onload = (event) => {
       try {
         const data = JSON.parse(event.target?.result as string);
-        if (Array.isArray(data.questions) && Array.isArray(data.sets)) {
+        if (data && data.qudoroBackup && Array.isArray(data.accounts)) {
+            // Full save file — restores the entire account: profile, avatar,
+            // achievements, XP/streak, settings, and all content.
+            const ok = confirm(
+              'Restore full backup?\n\nThis replaces your current profile, achievements, progress, and all data with the saved backup. This cannot be undone.',
+            );
+            if (ok) {
+              const restored = restoreBackup(data);
+              alert(restored ? 'Full backup restored!' : 'Invalid backup file.');
+            }
+        } else if (Array.isArray(data.questions) && Array.isArray(data.sets)) {
+            // Legacy / shared file — appends question sets to the current profile.
             const normalizedQuestions = normalizeImportedQuestions(data.questions);
             importData({
               questions: normalizedQuestions,

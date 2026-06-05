@@ -1,5 +1,8 @@
-// Strip zero-width and invisible Unicode characters that appear in web-copied content
-const ZERO_WIDTH_RE = /[\u200b\u200c\u200d\u200e\u200f\u2060\ufeff]/g;
+// Strip zero-width and invisible Unicode characters that appear in web-copied content.
+// The class intentionally lists individual zero-width code points (incl. ZWJ \u200d);
+// the rule's "joined sequence" warning is a false positive here.
+// eslint-disable-next-line no-misleading-character-class
+const ZERO_WIDTH_RE = /[\u200b\u200c\u200d\u200e\u200f\u2060\ufeff]/gu;
 
 export const cleanMcqText = (value: string): string =>
   value
@@ -32,7 +35,7 @@ type ParsedMcq = {
 
 // Matches A. A) (A) a. a) — includes lowercase, comma added to boundary set
 const markerRegex =
-  /(^|[\s"'""'')\]\}\.\?!:;,]|(?<=[a-zA-Z0-9]))(?:\(?([A-Za-z])\)|([A-Za-z])[).:-]|([0-9]{1,2})[).:-])\s*/g;
+  /(^|[\s"'""'')\]}.?!:;,]|(?<=[a-zA-Z0-9]))(?:\(?([A-Za-z])\)|([A-Za-z])[).:-]|([0-9]{1,2})[).:-])\s*/g;
 
 // Matches lines that start with an option marker (A. A) (A) a. a) 1. etc.)
 const lineMarkerRegex =

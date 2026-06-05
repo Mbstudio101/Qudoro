@@ -120,7 +120,7 @@ const createWindow = () => {
     if (!app.isPackaged) return;
     const isToggleDevTools =
       (input.meta && input.alt && input.key.toLowerCase() === 'i') ||
-      (input.ctrl && input.shift && input.key.toLowerCase() === 'i') ||
+      (input.control && input.shift && input.key.toLowerCase() === 'i') ||
       input.key === 'F12';
     if (isToggleDevTools) {
       event.preventDefault();
@@ -148,6 +148,10 @@ const createWindow = () => {
   new UpdateService(mainWindow);
 
   const loadMainWindow = async () => {
+    // Capture a non-null reference; the module-level `mainWindow` can be set to
+    // null by the 'closed' handler, but it is always set when this runs.
+    const win = mainWindow;
+    if (!win) return;
     const devServerUrl =
       typeof MAIN_WINDOW_VITE_DEV_SERVER_URL === 'string'
         ? MAIN_WINDOW_VITE_DEV_SERVER_URL
@@ -163,7 +167,7 @@ const createWindow = () => {
 
     if (devServerUrl) {
       try {
-        await mainWindow.loadURL(devServerUrl);
+        await win.loadURL(devServerUrl);
         return;
       } catch (error) {
         console.warn(
@@ -175,12 +179,12 @@ const createWindow = () => {
 
     const fallbackPath = fallbackCandidates.find((candidate) => fs.existsSync(candidate));
     if (fallbackPath) {
-      await mainWindow.loadFile(fallbackPath);
+      await win.loadFile(fallbackPath);
       return;
     }
 
     const errorHtml = `<!doctype html><html><head><meta charset="UTF-8"><title>Qudoro Launch Error</title></head><body style="font-family: -apple-system, sans-serif; background:#0f172a; color:#e2e8f0; padding:24px;"><h2>Qudoro could not load its UI</h2><p>No local renderer file was found.</p><p>Expected one of:</p><pre>${fallbackCandidates.join('\n')}</pre></body></html>`;
-    await mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(errorHtml)}`);
+    await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(errorHtml)}`);
   };
 
   void loadMainWindow().catch((error) => {
@@ -595,7 +599,7 @@ app.on('ready', () => {
     if (process.platform === 'darwin') {
         const iconPath = resolveAppIconPath();
         if (iconPath) {
-          app.dock.setIcon(iconPath);
+          app.dock?.setIcon(iconPath);
         }
     }
     createWindow();

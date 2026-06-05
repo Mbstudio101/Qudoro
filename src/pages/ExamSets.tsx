@@ -117,17 +117,27 @@ const ExamSets = () => {
                 <span className="text-sm font-medium">{set.questionIds.length} Questions</span>
                 {(() => {
                   const setQs = allQuestions.filter(q => set.questionIds.includes(q.id));
+                  const total = setQs.length;
+                  // Fully-mastered count: questions that reached box 5+ (the "X/Y").
                   const mastered = setQs.filter(q => (q.box || 0) >= 5).length;
-                  const pct = setQs.length > 0 ? Math.round((mastered / setQs.length) * 100) : 0;
+                  // Continuous progress toward full mastery: each question contributes
+                  // box/5 (capped at 1), so the bar advances with every correct answer
+                  // instead of only when a question is fully mastered.
+                  const progressPct = total > 0
+                    ? Math.round((setQs.reduce((sum, q) => sum + Math.min(q.box || 0, 5), 0) / (total * 5)) * 100)
+                    : 0;
+                  const complete = total > 0 && mastered === total;
                   return (
                     <div>
                       <div className="flex justify-between text-[11px] text-muted-foreground mb-1">
                         <span>Mastery</span>
-                        <span className={pct === 100 ? 'text-green-500 font-semibold' : ''}>{mastered}/{setQs.length} {pct === 100 ? '✓' : `${pct}%`}</span>
+                        <span className={complete ? 'text-green-500 font-semibold' : ''}>
+                          {mastered}/{total} {complete ? '✓' : `· ${progressPct}%`}
+                        </span>
                       </div>
                       <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
-                        <div className={`h-full rounded-full transition-all duration-500 ${pct === 100 ? 'bg-green-500' : 'bg-primary'}`}
-                             style={{ width: `${pct}%` }} />
+                        <div className={`h-full rounded-full transition-all duration-500 ${complete ? 'bg-green-500' : 'bg-primary'}`}
+                             style={{ width: `${progressPct}%` }} />
                       </div>
                     </div>
                   );

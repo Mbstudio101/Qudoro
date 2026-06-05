@@ -8,7 +8,7 @@ import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
 import Textarea from '../components/ui/Textarea';
-import { useStore } from '../store/useStore';
+import { useStore, type Question } from '../store/useStore';
 import { marketplaceApi, readImportedLinks, saveImportedLink } from '../services/marketplace/marketplaceApi';
 import type {
   DiscoverSort, DiscoverTab, ImportedSetLink, MarketplaceAuthor,
@@ -562,7 +562,7 @@ const Discover = () => {
     const localSet = sets.find(s => s.id === publishData.localSetId);
     if (!localSet) { setPublishError('Choose a local set first.'); return; }
     if (!publishData.subject) { setPublishError('Choose a subject.'); return; }
-    const localQs = localSet.questionIds.map(id => questions.find(q => q.id === id)).filter(Boolean);
+    const localQs = localSet.questionIds.map(id => questions.find(q => q.id === id)).filter((q): q is Question => Boolean(q));
     if (localQs.length === 0) { setPublishError('Selected set has no questions.'); return; }
     const payload: PublishSetInput = {
       title: localSet.title,
@@ -760,7 +760,7 @@ const Discover = () => {
               return (
                 <div className="space-y-6">
                   {/* Popular This Week featured row */}
-                  {popularSets.length >= 2 && activeTab === 'discover' && !activeTag && !activeSubject && (
+                  {popularSets.length >= 2 && activeTab === 'all' && !activeTag && !subject && (
                     <div>
                       <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">🔥 Popular This Week</p>
                       <div className="flex gap-3 overflow-x-auto pb-1">

@@ -136,6 +136,26 @@ export interface Note {
   updatedAt: number;
 }
 
+// A complete "save file" — captures everything needed to fully restore a user's
+// account: profiles (avatar, theme, XP, streak, level, achievements, daily
+// challenge, Blackboard), plus all questions, sets, sessions, calendar and notes.
+export interface QudoroBackup {
+  qudoroBackup: true;
+  version: number;
+  exportedAt: number;
+  accounts: Account[];
+  currentAccountId: string | null;
+  activeProfileId: string | null;
+  isAuthenticated: boolean;
+  userProfile: UserProfile;
+  questions: Question[];
+  sets: ExamSet[];
+  sessions: StudySession[];
+  calendarEvents: CalendarEvent[];
+  notes: Note[];
+  activeExam: ActiveExam | null; // in-progress exam so "where you left off" is preserved
+}
+
 export interface AchievementLevel {
   level: number;
   title: string;
@@ -228,6 +248,8 @@ interface AppState {
   updateNote: (id: string, note: Partial<Note>) => void;
   deleteNote: (id: string) => void;
   importData: (data: { questions: Question[]; sets: ExamSet[] }) => void;
+  exportBackup: () => QudoroBackup;
+  restoreBackup: (backup: QudoroBackup) => boolean;
   resetData: () => void;
   setUserProfile: (profile: Partial<UserProfile>) => void;
   updateLastVisit: () => void;
@@ -412,7 +434,14 @@ const textEncoder = new TextEncoder();
 const ENCRYPTED_STATE_PREFIX = 'enc:v1:';
 
 const bytesToBase64 = (bytes: Uint8Array): string => btoa(String.fromCharCode(...bytes));
-const base64ToBytes = (b64: string): Uint8Array => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+const base64ToBytes = (b64: string): Uint8Array<ArrayBuffer> => {
+  // Build over a concrete ArrayBuffer so the result is a valid BufferSource for
+  // WebCrypto (the bare `Uint8Array` type widens to ArrayBufferLike).
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+};
 
 const hashPassword = async (password: string): Promise<string> => {
   const salt = crypto.getRandomValues(new Uint8Array(16));
@@ -544,6 +573,28 @@ const persistEverywhere = async (
   const metaJson = JSON.stringify(meta);
   const encryptedValue = await encryptPersistedValue(value);
 
+  // Guard against an empty snapshot clobbering a populated SHARED store.
+  //
+  // electron-store is shared across builds (dev `localhost:5173` and the packaged
+  // `file://` app), but each build encrypts with its own safeStorage key. A build
+  // that can't decrypt the other's snapshot would otherwise load an empty state
+  // and overwrite the shared store — silently wiping the other build's library.
+  // The plaintext meta records the real question count, so we can detect this
+  // WITHOUT needing to decrypt, and refuse to overwrite real data with nothing.
+  let skipShared = false;
+  if (meta.qCount === 0 && typeof window !== 'undefined' && window.electron) {
+    try {
+      const existingMetaRaw = await window.electron.store.get(metaKey);
+      const existingMeta = parsePersistMeta(
+        typeof existingMetaRaw === 'string' ? existingMetaRaw : undefined,
+        '',
+      );
+      if (existingMeta.qCount > 0) skipShared = true;
+    } catch {
+      /* if we can't read the existing meta, fall through to normal behavior */
+    }
+  }
+
   // IndexedDB (fast, large capacity, per-origin)
   try {
     await idbSet(name, encryptedValue);
@@ -552,13 +603,22 @@ const persistEverywhere = async (
     console.error('IDB Write Error — data may not have been saved:', e);
   }
 
-  // electron-store (single file, shared across dev/prod origins)
-  if (typeof window !== 'undefined' && window.electron) {
+  // electron-store (single file, shared across dev/prod origins).
+  //
+  // The dev build (`localhost:5173`) encrypts with a different safeStorage key
+  // than the packaged app, so it can't read the packaged snapshot — and if it
+  // wrote here it could later override the packaged app's real account/data by
+  // recency. So the dev build never writes the shared store or the cloud; it
+  // keeps its own per-origin IndexedDB. The packaged app behaves as before.
+  const isDevBuild = import.meta.env.DEV;
+  if (!isDevBuild && !skipShared && typeof window !== 'undefined' && window.electron) {
     window.electron.store.set(name, encryptedValue);
     window.electron.store.set(metaKey, metaJson);
   }
 
-  if (!opts.skipSupabase) schedulePushToSupabase(value);
+  // Never push an empty snapshot to the cloud when real data still exists there,
+  // and never let the dev build push into the user's real cloud sync.
+  if (!opts.skipSupabase && !skipShared && !isDevBuild) schedulePushToSupabase(value);
 };
 
 const storage: StateStorage = {
@@ -1219,6 +1279,45 @@ export const useStore = create<AppState>()(
             accounts: updatedAccounts
           };
         }),
+      exportBackup: () => {
+        const s = get();
+        return {
+          qudoroBackup: true,
+          version: 2,
+          exportedAt: Date.now(),
+          accounts: s.accounts,
+          currentAccountId: s.currentAccountId,
+          activeProfileId: s.activeProfileId,
+          isAuthenticated: s.isAuthenticated,
+          userProfile: s.userProfile,
+          questions: s.questions,
+          sets: s.sets,
+          sessions: s.sessions,
+          calendarEvents: s.calendarEvents,
+          notes: s.notes,
+          activeExam: s.activeExam,
+        };
+      },
+      restoreBackup: (backup) => {
+        // A valid full backup must at least carry the account list and questions.
+        if (!backup || !Array.isArray(backup.accounts) || !Array.isArray(backup.questions)) {
+          return false;
+        }
+        set((state) => ({
+          accounts: backup.accounts,
+          currentAccountId: backup.currentAccountId ?? null,
+          activeProfileId: backup.activeProfileId ?? null,
+          isAuthenticated: backup.isAuthenticated ?? backup.accounts.length > 0,
+          userProfile: backup.userProfile ?? state.userProfile,
+          questions: backup.questions,
+          sets: Array.isArray(backup.sets) ? backup.sets : [],
+          sessions: Array.isArray(backup.sessions) ? backup.sessions : [],
+          calendarEvents: Array.isArray(backup.calendarEvents) ? backup.calendarEvents : [],
+          notes: Array.isArray(backup.notes) ? backup.notes : [],
+          activeExam: backup.activeExam ?? null,
+        }));
+        return true;
+      },
       resetData: () =>
         set({
           questions: [],

@@ -30,7 +30,7 @@ const Practice = () => {
   const [searchParams] = useSearchParams();
   const mode = searchParams.get('mode');
   const isChallenge = searchParams.get('challenge') === '1';
-  const { sets: allSets, questions, addSession, completeDailyChallenge, userProfile, activeProfileId, activeExam, saveActiveExam, clearActiveExam } = useStore();
+  const { sets: allSets, questions, addSession, reviewQuestion, completeDailyChallenge, userProfile, activeProfileId, activeExam, saveActiveExam, clearActiveExam } = useStore();
   
   const sets = useMemo(() => allSets.filter(s => !s.profileId || s.profileId === activeProfileId), [allSets, activeProfileId]);
   
@@ -278,7 +278,12 @@ const Practice = () => {
     // smart quotes, entities, or case still grade correctly.
     const correctAnswers = Array.isArray(currentQuestion.answer) ? currentQuestion.answer : [currentQuestion.answer];
     const isCorrect = isSelectionCorrect(selectedOptions, correctAnswers);
-    
+
+    // Advance the spaced-repetition box so exam answers count toward mastery,
+    // the same way flashcard reviews do. Correct → 'good' (box up), wrong →
+    // 'again' (box reset). XP is still granted once at session end via addSession.
+    reviewQuestion(currentQuestion.id, isCorrect ? 'good' : 'again');
+
     // Update score
     if (isCorrect) {
         setScore(s => s + 1);

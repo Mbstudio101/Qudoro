@@ -20,7 +20,8 @@ const normalizeRawText = (value: string): string =>
   value
     .replace(/\r\n/g, '\n')
     .replace(/\u00a0/g, ' ')
-    .replace(/[\u200b\u200c\u200d\u200e\u200f\u2060\ufeff]/g, '')
+    // eslint-disable-next-line no-misleading-character-class -- intentional list of individual zero-width code points
+    .replace(/[\u200b\u200c\u200d\u200e\u200f\u2060\ufeff]/gu, '')
     .replace(/\t/g, ' ')
     .trim();
 

@@ -175,7 +175,9 @@ const Dashboard = () => {
       const start = new Date(date.setHours(0,  0,  0,   0)).getTime();
       const end   = new Date(date.setHours(23, 59, 59, 999)).getTime();
       let count = questions.filter(q => q.nextReviewDate >= start && q.nextReviewDate <= end).length;
-      if (i === 0) count += questions.filter(q => q.nextReviewDate < start).length;
+      // Today's bar also includes overdue cards AND never-reviewed cards, so it
+      // matches the `cardsDue` stat (which counts !nextReviewDate as due).
+      if (i === 0) count += questions.filter(q => !q.nextReviewDate || q.nextReviewDate < start).length;
       return { day: i === 0 ? 'Today' : days[new Date(start).getDay()], count };
     });
   }, [questions]);
