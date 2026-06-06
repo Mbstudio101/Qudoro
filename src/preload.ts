@@ -54,4 +54,9 @@ contextBridge.exposeInMainWorld('electron', {
     removeBackupDataListener: () =>
       ipcRenderer.removeAllListeners('request-backup-data'),
   },
+  snapshots: {
+    save: (json: string) => ipcRenderer.invoke('save-snapshot', json),
+    list: () => ipcRenderer.invoke('list-snapshots'),
+    read: (file: string) => ipcRenderer.invoke('read-snapshot', file),
+  },
 });

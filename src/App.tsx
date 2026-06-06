@@ -70,7 +70,35 @@ const App = () => {
     });
     return () => window.electron.backup.removeBackupDataListener();
   }, []);
-  
+
+  // Auto-snapshot: whenever the library content changes (a set is built/saved,
+  // questions added/removed), write a versioned local snapshot so the data is
+  // durably captured and recoverable — independent of the per-origin store, the
+  // cloud, or whether a backup folder is configured. Debounced to coalesce bursts.
+  useEffect(() => {
+    if (!window.electron?.snapshots) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    // Signature of the library so we only snapshot on real content changes, not
+    // every unrelated state update (XP, timers, navigation, etc.).
+    const signatureOf = (s: ReturnType<typeof useStore.getState>) =>
+      `${s.questions.length}|${s.sets.map((set) => `${set.id}:${set.questionIds.length}`).join(',')}`;
+    let lastSig = signatureOf(useStore.getState());
+
+    const unsub = useStore.subscribe((state) => {
+      const sig = signatureOf(state);
+      if (sig === lastSig) return;
+      lastSig = sig;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        const backup = useStore.getState().exportBackup();
+        if (backup.questions.length === 0 && backup.sets.length === 0) return; // never snapshot empty
+        window.electron.snapshots.save(JSON.stringify(backup)).catch(() => { /* best-effort */ });
+      }, 2000);
+    });
+
+    return () => { if (timer) clearTimeout(timer); unsub(); };
+  }, []);
+
   // Initialize notification scheduler
   useNotificationScheduler();
 

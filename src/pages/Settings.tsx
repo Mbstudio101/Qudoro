@@ -50,6 +50,12 @@ const Settings = () => {
   const [backupStatus, setBackupStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [backupMsg, setBackupMsg] = useState('');
 
+  // Local snapshot (auto-save) State
+  type SnapshotInfo = { file: string; savedAt: number; qCount: number; sCount: number };
+  const [snapshots, setSnapshots] = useState<SnapshotInfo[]>([]);
+  const [restoreMsg, setRestoreMsg] = useState('');
+  const [restoreStatus, setRestoreStatus] = useState<'idle' | 'restoring' | 'success' | 'error'>('idle');
+
   // Quizlet Import State
   const [quizletUrl, setQuizletUrl] = useState('');
   const [isImporting, setIsImporting] = useState(false);
@@ -694,6 +700,7 @@ const Settings = () => {
     window.electron.backup.getFolder().then(f => { if (f) setBackupFolder(f); });
     window.electron.store.get('lastBackupTime').then((t: number) => { if (t) setLastBackupTime(t); });
     window.electron.store.get('backupIntervalHours').then((h: number) => { if (h) setBackupIntervalHours(h); });
+    window.electron.snapshots?.list().then(setSnapshots).catch(() => { /* ignore */ });
   }, []);
 
   // Scheduled backup interval
@@ -728,6 +735,34 @@ const Settings = () => {
     } else {
       setBackupStatus('error');
       setBackupMsg(result.error ?? 'Backup failed.');
+    }
+  };
+
+  const refreshSnapshots = async () => {
+    if (!window.electron?.snapshots) return;
+    try { setSnapshots(await window.electron.snapshots.list()); } catch { /* ignore */ }
+  };
+
+  const handleRestoreSnapshot = async (snap: SnapshotInfo) => {
+    if (!window.electron?.snapshots) return;
+    const ok = window.confirm(
+      `Restore the snapshot from ${new Date(snap.savedAt).toLocaleString()}?\n\n` +
+      `This will replace your current library with ${snap.qCount} questions and ${snap.sCount} sets.`,
+    );
+    if (!ok) return;
+    setRestoreStatus('restoring');
+    setRestoreMsg('');
+    try {
+      const json = await window.electron.snapshots.read(snap.file);
+      if (!json) throw new Error('Could not read snapshot file.');
+      const parsed = JSON.parse(json);
+      if (!restoreBackup(parsed)) throw new Error('Snapshot is not a valid backup.');
+      setRestoreStatus('success');
+      setRestoreMsg(`Restored ${snap.qCount} questions and ${snap.sCount} sets.`);
+      setTimeout(() => setRestoreStatus('idle'), 4000);
+    } catch (err) {
+      setRestoreStatus('error');
+      setRestoreMsg(err instanceof Error ? err.message : 'Restore failed.');
     }
   };
 
@@ -1233,6 +1268,70 @@ const Settings = () => {
 
               <p className="text-xs text-muted-foreground">
                 Saves as <code className="text-foreground">qudoro-backup-YYYY-MM-DD.json</code> in your chosen folder. A backup is also created automatically when you close the app.
+              </p>
+            </div>
+          </div>
+
+          {/* ── Local Snapshots (auto-save / restore) ── */}
+          <div className="mt-5 rounded-2xl border border-border/40 bg-card/40 overflow-hidden">
+            <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-border/40 bg-linear-to-r from-emerald-500/8 via-teal-500/5 to-transparent">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-emerald-500/15 text-emerald-500">
+                  <Database className="h-4 w-4" />
+                </div>
+                <div>
+                  <h2 className="font-semibold text-sm">Recovery Snapshots</h2>
+                  <p className="text-xs text-muted-foreground">Automatic local saves of your library. Restore any point in time.</p>
+                </div>
+              </div>
+              <button
+                onClick={refreshSnapshots}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border/40 bg-secondary/30 hover:bg-secondary/60 text-xs font-medium transition-all shrink-0"
+              >
+                <RefreshCw className="h-3.5 w-3.5" /> Refresh
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              {snapshots.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  No snapshots yet. One is saved automatically a couple of seconds after you build or change a set, and when you close the app.
+                </p>
+              ) : (
+                <div className="space-y-2 max-h-72 overflow-y-auto">
+                  {snapshots.map((snap) => (
+                    <div
+                      key={snap.file}
+                      className="flex items-center justify-between gap-3 px-3 py-2 rounded-xl border border-border/40 bg-secondary/20"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm text-foreground truncate">{new Date(snap.savedAt).toLocaleString()}</p>
+                        <p className="text-xs text-muted-foreground">{snap.qCount} questions · {snap.sCount} sets</p>
+                      </div>
+                      <button
+                        onClick={() => handleRestoreSnapshot(snap)}
+                        disabled={restoreStatus === 'restoring'}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-emerald-500/25 bg-emerald-500/8 hover:bg-emerald-500/15 text-emerald-500 text-xs font-medium transition-all shrink-0 disabled:opacity-40"
+                      >
+                        <Upload className="h-3.5 w-3.5" /> Restore
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {restoreStatus === 'success' && (
+                <div className="flex items-center gap-2 text-emerald-500 bg-emerald-500/8 border border-emerald-500/20 p-3 rounded-xl text-xs">
+                  <Check className="h-3.5 w-3.5 shrink-0" />{restoreMsg}
+                </div>
+              )}
+              {restoreStatus === 'error' && (
+                <div className="flex items-center gap-2 text-destructive bg-destructive/8 border border-destructive/20 p-3 rounded-xl text-xs">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />{restoreMsg}
+                </div>
+              )}
+
+              <p className="text-xs text-muted-foreground">
+                Snapshots are kept on this device (last 40) and never overwrite each other, so a set you create is recoverable even if it didn't sync.
               </p>
             </div>
           </div>

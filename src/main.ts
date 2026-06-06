@@ -366,6 +366,90 @@ ipcMain.handle('get-backup-folder', () => {
   return docs;
 });
 
+// ── Local auto-snapshots ──────────────────────────────────────────────────────
+// Versioned, timestamped copies of the full library written on every meaningful
+// save. Unlike the user-chosen backup folder these ALWAYS exist (kept inside the
+// app's own data dir, no setup required) and retain a rolling history — so a set
+// is recoverable even if it never reached the shared store, the cloud, or a
+// configured backup folder.
+const SNAPSHOT_LIMIT = 40;
+
+const getSnapshotDir = (): string => {
+  const dir = path.join(app.getPath('userData'), 'snapshots');
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+};
+
+const snapshotCounts = (jsonContent: string): { qCount: number; sCount: number } => {
+  try {
+    const d = JSON.parse(jsonContent);
+    return {
+      qCount: Array.isArray(d?.questions) ? d.questions.length : 0,
+      sCount: Array.isArray(d?.sets) ? d.sets.length : 0,
+    };
+  } catch {
+    return { qCount: 0, sCount: 0 };
+  }
+};
+
+const writeSnapshot = (jsonContent: string): { success: boolean; file?: string; error?: string } => {
+  const { qCount, sCount } = snapshotCounts(jsonContent);
+  // Never persist an empty snapshot — it would only push real ones out of the
+  // rolling window.
+  if (qCount === 0 && sCount === 0) return { success: false, error: 'empty snapshot skipped' };
+  try {
+    const dir = getSnapshotDir();
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const file = `snapshot-${stamp}-q${qCount}-s${sCount}.json`;
+    fs.writeFileSync(path.join(dir, file), jsonContent, 'utf-8');
+    // Prune oldest beyond the limit (filenames sort chronologically by prefix).
+    const files = fs
+      .readdirSync(dir)
+      .filter((f) => f.startsWith('snapshot-') && f.endsWith('.json'))
+      .sort();
+    for (const old of files.slice(0, Math.max(0, files.length - SNAPSHOT_LIMIT))) {
+      try { fs.unlinkSync(path.join(dir, old)); } catch { /* ignore */ }
+    }
+    return { success: true, file };
+  } catch (error: any) {
+    return { success: false, error: error?.message ?? 'snapshot write failed' };
+  }
+};
+
+ipcMain.handle('save-snapshot', (_event, jsonContent: string) => writeSnapshot(jsonContent));
+
+ipcMain.handle('list-snapshots', () => {
+  try {
+    const dir = getSnapshotDir();
+    return fs
+      .readdirSync(dir)
+      .filter((f) => f.startsWith('snapshot-') && f.endsWith('.json'))
+      .map((file) => {
+        const stat = fs.statSync(path.join(dir, file));
+        const m = /q(\d+)-s(\d+)\.json$/.exec(file);
+        return {
+          file,
+          savedAt: stat.mtimeMs,
+          qCount: m ? Number(m[1]) : 0,
+          sCount: m ? Number(m[2]) : 0,
+        };
+      })
+      .sort((a, b) => b.savedAt - a.savedAt);
+  } catch {
+    return [];
+  }
+});
+
+ipcMain.handle('read-snapshot', (_event, file: string) => {
+  // Guard against path traversal — only plain snapshot filenames are allowed.
+  if (typeof file !== 'string' || !/^snapshot-[\w.-]+\.json$/.test(file)) return null;
+  try {
+    return fs.readFileSync(path.join(getSnapshotDir(), file), 'utf-8');
+  } catch {
+    return null;
+  }
+});
+
 let PDFParseCtor: null | (new (data: Uint8Array) => { getText: () => Promise<{ text: string }> }) =
   null;
 
@@ -562,8 +646,8 @@ ipcMain.handle('fetch-url', async (_event, url) => {
 
 // ── On-close backup ──────────────────────────────────────────────────────────
 app.on('before-quit', (event) => {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
   const folderPath = store.get('backupFolder') as string | undefined;
-  if (!folderPath || !mainWindow || mainWindow.isDestroyed()) return;
 
   event.preventDefault();
   mainWindow.webContents.send('request-backup-data');
@@ -573,13 +657,18 @@ app.on('before-quit', (event) => {
   ipcMain.once('backup-data-response', (_evt, jsonContent: string) => {
     clearTimeout(forceQuitTimer);
     try {
-      const dateStr = new Date().toISOString().split('T')[0];
-      fs.writeFileSync(
-        path.join(folderPath, `qudoro-backup-${dateStr}.json`),
-        jsonContent,
-        'utf-8'
-      );
-      store.set('lastBackupTime', Date.now());
+      // Always capture a local rolling snapshot of the final state, even when no
+      // backup folder is configured.
+      writeSnapshot(jsonContent);
+      if (folderPath) {
+        const dateStr = new Date().toISOString().split('T')[0];
+        fs.writeFileSync(
+          path.join(folderPath, `qudoro-backup-${dateStr}.json`),
+          jsonContent,
+          'utf-8'
+        );
+        store.set('lastBackupTime', Date.now());
+      }
     } catch { /* silent */ } finally {
       app.exit(0);
     }
