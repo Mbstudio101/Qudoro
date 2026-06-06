@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { get, set as idbSet, del } from 'idb-keyval'; // IndexedDB for performance
 import { calculateSM2 } from '../utils/sm2';
 import { alignAnswersToOptions } from '../utils/answerMatch';
-import { questionCountOf, parsePersistMeta, pickBestCandidate, type PersistCandidate, type PersistMeta } from '../utils/persistMerge';
+import { questionCountOf, setCountOf, richnessOf, parsePersistMeta, pickBestCandidate, type PersistCandidate, type PersistMeta } from '../utils/persistMerge';
 import { BlackboardCourse, BlackboardAssignment, BlackboardGrade, BlackboardToken } from '../types/blackboard';
 import { getSupabaseClient } from '../services/marketplace/supabaseClient';
 
@@ -582,14 +582,14 @@ const persistEverywhere = async (
   // The plaintext meta records the real question count, so we can detect this
   // WITHOUT needing to decrypt, and refuse to overwrite real data with nothing.
   let skipShared = false;
-  if (meta.qCount === 0 && typeof window !== 'undefined' && window.electron) {
+  if (richnessOf(meta) === 0 && typeof window !== 'undefined' && window.electron) {
     try {
       const existingMetaRaw = await window.electron.store.get(metaKey);
       const existingMeta = parsePersistMeta(
         typeof existingMetaRaw === 'string' ? existingMetaRaw : undefined,
         '',
       );
-      if (existingMeta.qCount > 0) skipShared = true;
+      if (richnessOf(existingMeta) > 0) skipShared = true;
     } catch {
       /* if we can't read the existing meta, fall through to normal behavior */
     }
@@ -682,7 +682,7 @@ const storage: StateStorage = {
         await persistEverywhere(
           name,
           cloudJson,
-          { savedAt: Date.now(), qCount: questionCountOf(cloudJson) },
+          { savedAt: Date.now(), qCount: questionCountOf(cloudJson), sCount: setCountOf(cloudJson) },
           { skipSupabase: true },
         );
         return cloudJson;
@@ -694,7 +694,7 @@ const storage: StateStorage = {
     return null;
   },
   setItem: async (name: string, value: string): Promise<void> => {
-    await persistEverywhere(name, value, { savedAt: Date.now(), qCount: questionCountOf(value) });
+    await persistEverywhere(name, value, { savedAt: Date.now(), qCount: questionCountOf(value), sCount: setCountOf(value) });
   },
   removeItem: async (name: string): Promise<void> => {
     const metaKey = name + META_SUFFIX;
