@@ -81,7 +81,7 @@ const App = () => {
     // Signature of the library so we only snapshot on real content changes, not
     // every unrelated state update (XP, timers, navigation, etc.).
     const signatureOf = (s: ReturnType<typeof useStore.getState>) =>
-      `${s.questions.length}|${s.sets.map((set) => `${set.id}:${set.questionIds.length}`).join(',')}`;
+      `${s.questions.length}|${s.sets.map((set) => `${set.id}:${set.title}:${set.questionIds.length}`).join(',')}`;
     let lastSig = signatureOf(useStore.getState());
 
     const unsub = useStore.subscribe((state) => {

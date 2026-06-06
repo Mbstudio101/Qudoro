@@ -399,6 +399,20 @@ const writeSnapshot = (jsonContent: string): { success: boolean; file?: string; 
   if (qCount === 0 && sCount === 0) return { success: false, error: 'empty snapshot skipped' };
   try {
     const dir = getSnapshotDir();
+    const existing = fs
+      .readdirSync(dir)
+      .filter((f) => f.startsWith('snapshot-') && f.endsWith('.json'))
+      .sort();
+    // Skip if identical to the most recent snapshot, so unchanged app
+    // open/close cycles don't churn real history out of the rolling window.
+    const newest = existing[existing.length - 1];
+    if (newest) {
+      try {
+        if (fs.readFileSync(path.join(dir, newest), 'utf-8') === jsonContent) {
+          return { success: true, file: newest };
+        }
+      } catch { /* fall through and write a fresh snapshot */ }
+    }
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
     const file = `snapshot-${stamp}-q${qCount}-s${sCount}.json`;
     fs.writeFileSync(path.join(dir, file), jsonContent, 'utf-8');
