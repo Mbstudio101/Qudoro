@@ -50,6 +50,9 @@ const Settings = () => {
   const [backupStatus, setBackupStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [backupMsg, setBackupMsg] = useState('');
 
+  // Import/export progress (keeps the UI responsive + shows it isn't frozen)
+  const [ioStatus, setIoStatus] = useState<'idle' | 'exporting' | 'importing'>('idle');
+
   // Local snapshot (auto-save) State
   type SnapshotInfo = { file: string; savedAt: number; qCount: number; sCount: number };
   const [snapshots, setSnapshots] = useState<SnapshotInfo[]>([]);
@@ -872,23 +875,35 @@ const Settings = () => {
       .filter((x): x is Question => x !== null);
   };
 
-  const handleExport = () => {
-    // Full "save file": account, profile (avatar, theme, XP, streak, level,
-    // achievements, daily challenge, Blackboard), questions, sets, sessions,
-    // calendar and notes — everything needed to restore a user completely.
-    const data = JSON.stringify(exportBackup(), null, 2);
-    const blob = new Blob([data], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `qudoro-backup-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  const handleExport = async () => {
+    if (ioStatus !== 'idle') return;
+    setIoStatus('exporting');
+    // Yield once so the "Exporting…" state paints before the synchronous
+    // serialize of a large, image-heavy payload runs.
+    await new Promise((r) => setTimeout(r, 0));
+    try {
+      // Full "save file": account, profile (avatar, theme, XP, streak, level,
+      // achievements, daily challenge, Blackboard), questions, sets, sessions,
+      // calendar and notes — everything needed to restore a user completely.
+      // Compact (no pretty-print): smaller file and noticeably faster to
+      // serialize than indented JSON; restore parses it either way.
+      const data = JSON.stringify(exportBackup());
+      const blob = new Blob([data], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `qudoro-backup-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } finally {
+      setIoStatus('idle');
+    }
   };
 
   const handleImportClick = () => {
+    if (ioStatus !== 'idle') return;
     fileInputRef.current?.click();
   };
 
@@ -896,8 +911,16 @@ const Settings = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setIoStatus('importing');
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onerror = () => {
+      setIoStatus('idle');
+      alert('Failed to read file');
+    };
+    reader.onload = async (event) => {
+      // Yield once so the "Importing…" state paints before the synchronous
+      // parse + restore of a large payload runs.
+      await new Promise((r) => setTimeout(r, 0));
       try {
         const data = JSON.parse(event.target?.result as string);
         if (data && data.qudoroBackup && Array.isArray(data.accounts)) {
@@ -924,6 +947,8 @@ const Settings = () => {
       } catch (err) {
         console.error(err);
         alert('Failed to parse file');
+      } finally {
+        setIoStatus('idle');
       }
     };
     reader.readAsText(file);
@@ -1091,13 +1116,14 @@ const Settings = () => {
                 {/* Export */}
                 <button
                   onClick={handleExport}
-                  className="group flex flex-col items-center gap-3 p-5 rounded-xl border border-blue-500/20 bg-blue-500/5 hover:bg-blue-500/10 hover:border-blue-500/40 transition-all duration-200"
+                  disabled={ioStatus !== 'idle'}
+                  className="group flex flex-col items-center gap-3 p-5 rounded-xl border border-blue-500/20 bg-blue-500/5 hover:bg-blue-500/10 hover:border-blue-500/40 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-500/5"
                 >
                   <div className="p-3 rounded-xl bg-blue-500/15 text-blue-500 group-hover:scale-110 transition-transform">
-                    <Download className="h-5 w-5" />
+                    {ioStatus === 'exporting' ? <RefreshCw className="h-5 w-5 animate-spin" /> : <Download className="h-5 w-5" />}
                   </div>
                   <div className="text-center">
-                    <p className="text-sm font-semibold">Export</p>
+                    <p className="text-sm font-semibold">{ioStatus === 'exporting' ? 'Exporting…' : 'Export'}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">Save backup</p>
                   </div>
                 </button>
@@ -1105,13 +1131,14 @@ const Settings = () => {
                 {/* Import */}
                 <button
                   onClick={handleImportClick}
-                  className="group flex flex-col items-center gap-3 p-5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 hover:border-emerald-500/40 transition-all duration-200"
+                  disabled={ioStatus !== 'idle'}
+                  className="group flex flex-col items-center gap-3 p-5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 hover:border-emerald-500/40 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-emerald-500/5"
                 >
                   <div className="p-3 rounded-xl bg-emerald-500/15 text-emerald-500 group-hover:scale-110 transition-transform">
-                    <Upload className="h-5 w-5" />
+                    {ioStatus === 'importing' ? <RefreshCw className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" />}
                   </div>
                   <div className="text-center">
-                    <p className="text-sm font-semibold">Import</p>
+                    <p className="text-sm font-semibold">{ioStatus === 'importing' ? 'Importing…' : 'Import'}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">Load backup</p>
                   </div>
                 </button>

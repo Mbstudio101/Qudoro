@@ -22,6 +22,8 @@ export default defineConfig({
         '**/out/**',
         '**/.github/**',
         '**/.vscode/**',
+        '**/.claude/**',
+        '**/.vite/**',
         '**/supabase/**',
         '**/extensions/**',
         '**/.git/**',
