@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useStore, Question } from '../store/useStore';
-import { Plus, Trash2, Edit2, Search, Save, Check, ChevronLeft, Folder, List, CheckSquare, Square, Layers, ImagePlus, X } from 'lucide-react';
+import { Plus, Trash2, Edit2, Search, Save, Check, ChevronLeft, Folder, List, CheckSquare, Square, Layers, ImagePlus, X, GripVertical } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
@@ -8,7 +8,7 @@ import Textarea from '../components/ui/Textarea';
 import RichText from '../components/ui/RichText';
 import { motion } from 'framer-motion';
 import { classifyQuestion } from '../utils/nursingConstants';
-import { isAnswerMatch, alignAnswersToOptions } from '../utils/answerMatch';
+import { isAnswerMatch, alignAnswersToOptions, normalizeAnswerText } from '../utils/answerMatch';
 import { CARD_GRADIENT_OPTIONS, getCardGradientClasses } from '../utils/cardGradients';
 import { cleanMcqText, parseLabeledMcq } from '../utils/mcqParser';
 import { draftKey as makeDraftKey } from '../utils/storageKeys';
@@ -18,6 +18,7 @@ const Questions = () => {
     questions: allQuestions,
     sets: allSets,
     addQuestion,
+    findDuplicateQuestion,
     deleteQuestion,
     updateQuestion,
     addQuestionToSet,
@@ -68,6 +69,13 @@ const Questions = () => {
     description: '',
     cardGradient: 'default',
   });
+
+  // Drag-to-reorder state for the answer options list. `dragHandleActive` is a
+  // ref so the mousedown on the grip enables dragging synchronously, before the
+  // browser decides whether the row's dragstart is allowed.
+  const dragHandleActive = React.useRef(false);
+  const [dragOptionIndex, setDragOptionIndex] = useState<number | null>(null);
+  const [dragOverOptionIndex, setDragOverOptionIndex] = useState<number | null>(null);
 
   // ── Draft auto-save ───────────────────────────────────────────────────────
   // Key is profile-scoped so switching profiles never shows the wrong draft.
@@ -364,6 +372,28 @@ const Questions = () => {
   const normalizeAnswers = (cleanOptions: string[], answers: string[]): string[] =>
     alignAnswersToOptions(cleanOptions, answers);
 
+  // Warn when a question with the same text already exists, letting the user add
+  // it anyway or cancel. Returns true if it's safe to proceed. Checks the saved
+  // bank plus any `pendingContents` (e.g. drafts not yet committed). `excludeId`
+  // skips a saved question (used when editing).
+  const confirmIfDuplicate = (
+    content: string,
+    pendingContents: string[] = [],
+    excludeId?: string
+  ): boolean => {
+    const existing = findDuplicateQuestion(content, excludeId);
+    const target = normalizeAnswerText(content);
+    const inPending = target.length > 0 && pendingContents.some((c) => normalizeAnswerText(c) === target);
+    const matchSource = existing ? existing.content : inPending ? content : null;
+    if (!matchSource) return true;
+    const preview = matchSource.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    const shown = preview.length > 140 ? `${preview.slice(0, 140)}…` : preview;
+    const where = existing ? 'already in your Question Bank' : 'already in this set';
+    return window.confirm(
+      `This looks like a duplicate — a question with the same text is ${where}:\n\n"${shown}"\n\nAdd it anyway?`
+    );
+  };
+
   const handleSetBuilderFinish = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!setCreationData.title) {
@@ -392,6 +422,17 @@ const Questions = () => {
     if (finalQuestions.length === 0) {
         alert("Please add at least one question to the set.");
         return;
+    }
+
+    // Warn once if any of these questions already exist in the bank (same text).
+    const dupCount = finalQuestions.filter(q => findDuplicateQuestion(q.content)).length;
+    if (dupCount > 0) {
+        const proceed = window.confirm(
+            `${dupCount} of these question${dupCount > 1 ? 's' : ''} already ` +
+            `${dupCount > 1 ? 'exist' : 'exists'} in your Question Bank (same text). ` +
+            `Create the set anyway?`
+        );
+        if (!proceed) return;
     }
 
     // 1. Create all questions
@@ -435,6 +476,7 @@ const Questions = () => {
       });
       setIsModalOpen(false);
     } else {
+      if (!confirmIfDuplicate(formData.content)) return;
       const newId = addQuestion({
         ...formData,
         options: cleanOptions,
@@ -443,7 +485,7 @@ const Questions = () => {
         domain: finalDomain,
         questionStyle: finalStyle
       });
-      
+
       if (selectedSetId) {
         addQuestionToSet(selectedSetId, newId);
       }
@@ -466,7 +508,9 @@ const Questions = () => {
             alert("Question content is required");
             return;
         }
-        
+
+        if (!confirmIfDuplicate(formData.content, draftQuestions.map(d => d.content))) return;
+
         setDraftQuestions(prev => [...prev, {
             ...formData,
             options: cleanOptions,
@@ -490,6 +534,8 @@ const Questions = () => {
         if (textarea) textarea.focus();
         return;
     }
+
+    if (!confirmIfDuplicate(formData.content)) return;
 
     const newId = addQuestion({
         ...formData,
@@ -594,6 +640,17 @@ const Questions = () => {
     }
     
     setFormData(prev => ({ ...prev, options: newOptions, answer: newAnswers }));
+  };
+
+  const moveOption = (from: number, to: number) => {
+    if (from === to) return;
+    setFormData(prev => {
+      if (from < 0 || from >= prev.options.length || to < 0 || to >= prev.options.length) return prev;
+      const nextOptions = [...prev.options];
+      const [moved] = nextOptions.splice(from, 1);
+      nextOptions.splice(to, 0, moved);
+      return { ...prev, options: nextOptions };
+    });
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -809,15 +866,15 @@ const Questions = () => {
                   </div>
                   <div>
                     <div className="mb-4 pr-6">
-                      <div className="font-semibold line-clamp-3 mb-2">
+                      <div className="font-semibold mb-2 max-h-32 overflow-y-auto custom-scrollbar pr-1">
                         <RichText content={question.content} />
                       </div>
                       {question.imageUrl && (
-                        <div className="mb-2 relative rounded-md overflow-hidden bg-muted/20 h-32 w-full">
+                        <div className="mb-2 relative rounded-md overflow-hidden bg-muted/20 w-full">
                           <img
                             src={question.imageUrl}
                             alt="Question Reference"
-                            className="w-full h-full object-cover"
+                            className="w-full max-h-48 object-contain"
                             loading="lazy"
                           />
                         </div>
@@ -895,15 +952,15 @@ const Questions = () => {
                             </div>
                             <div>
                             <div className="mb-4 pr-6">
-                                <div className="font-semibold line-clamp-3 mb-2">
+                                <div className="font-semibold mb-2 max-h-32 overflow-y-auto custom-scrollbar pr-1">
                                     <RichText content={question.content} />
                                 </div>
                                 {question.imageUrl && (
-                                    <div className="mb-2 relative rounded-md overflow-hidden bg-muted/20 h-32 w-full">
-                                        <img 
-                                            src={question.imageUrl} 
-                                            alt="Question Reference" 
-                                            className="w-full h-full object-cover"
+                                    <div className="mb-2 relative rounded-md overflow-hidden bg-muted/20 w-full">
+                                        <img
+                                            src={question.imageUrl}
+                                            alt="Question Reference"
+                                            className="w-full max-h-48 object-contain"
                                             loading="lazy"
                                         />
                                     </div>
@@ -1159,8 +1216,49 @@ const Questions = () => {
                     <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                         {formData.options.map((option, index) => {
                             const isCorrect = isAnswerMatch(option, formData.answer);
+                            const isDragging = dragOptionIndex === index;
+                            const isDragOver = dragOverOptionIndex === index && dragOptionIndex !== index;
                             return (
-                                <div key={index} className="flex gap-2 items-center group">
+                                <div
+                                    key={index}
+                                    draggable
+                                    onDragStart={(e) => {
+                                        // Only allow drags that began on the grip handle.
+                                        if (!dragHandleActive.current) {
+                                            e.preventDefault();
+                                            return;
+                                        }
+                                        setDragOptionIndex(index);
+                                    }}
+                                    onDragOver={(e) => {
+                                        if (dragOptionIndex === null) return;
+                                        e.preventDefault();
+                                        setDragOverOptionIndex(index);
+                                    }}
+                                    onDrop={(e) => {
+                                        e.preventDefault();
+                                        if (dragOptionIndex !== null) moveOption(dragOptionIndex, index);
+                                        setDragOptionIndex(null);
+                                        setDragOverOptionIndex(null);
+                                        dragHandleActive.current = false;
+                                    }}
+                                    onDragEnd={() => {
+                                        setDragOptionIndex(null);
+                                        setDragOverOptionIndex(null);
+                                        dragHandleActive.current = false;
+                                    }}
+                                    className={`flex gap-2 items-center group rounded-lg transition-all ${isDragging ? 'opacity-50' : ''} ${isDragOver ? 'ring-2 ring-primary/50' : ''}`}
+                                >
+                                    <button
+                                        type="button"
+                                        onMouseDown={() => { dragHandleActive.current = true; }}
+                                        onMouseUp={() => { dragHandleActive.current = false; }}
+                                        className="cursor-grab active:cursor-grabbing p-1 text-muted-foreground/50 hover:text-muted-foreground touch-none"
+                                        title="Drag to reorder"
+                                        aria-label="Drag to reorder option"
+                                    >
+                                        <GripVertical className="h-5 w-5" />
+                                    </button>
                                     <button
                                         type="button"
                                         onClick={() => toggleCorrectAnswer(option)}

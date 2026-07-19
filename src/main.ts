@@ -99,6 +99,13 @@ const createWindow = () => {
     },
   });
 
+  // Exclude the window from screen capture (recordings, screenshots, screen-share).
+  // macOS + Windows only; no-op on Linux. Gated to the packaged app so dev
+  // screenshots/screen-shares still work.
+  if (app.isPackaged) {
+    mainWindow.setContentProtection(true);
+  }
+
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (isSafeExternalUrl(url)) {
       void shell.openExternal(url);
@@ -260,6 +267,12 @@ const openDonationWindow = (parent: BrowserWindow) => {
 };
 
 // IPC Handlers
+// Synchronous flag so the preload can decide whether to enable copy-protection
+// (packaged builds only, so development is unaffected).
+ipcMain.on('get-is-packaged', (event) => {
+  event.returnValue = app.isPackaged;
+});
+
 ipcMain.on('minimize-window', (event) => {
   const win = BrowserWindow.fromWebContents(event.sender);
   win?.minimize();

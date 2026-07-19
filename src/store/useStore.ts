@@ -3,7 +3,7 @@ import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
 import { get, set as idbSet, del } from 'idb-keyval'; // IndexedDB for performance
 import { calculateSM2 } from '../utils/sm2';
-import { alignAnswersToOptions } from '../utils/answerMatch';
+import { alignAnswersToOptions, normalizeAnswerText } from '../utils/answerMatch';
 import { questionCountOf, setCountOf, richnessOf, parsePersistMeta, pickBestCandidate, type PersistCandidate, type PersistMeta } from '../utils/persistMerge';
 import { BlackboardCourse, BlackboardAssignment, BlackboardGrade, BlackboardToken } from '../types/blackboard';
 import { getSupabaseClient } from '../services/marketplace/supabaseClient';
@@ -226,6 +226,13 @@ interface AppState {
   notes: Note[];
   userProfile: UserProfile; // The Active Profile
   addQuestion: (q: Omit<Question, 'id' | 'createdAt' | 'box' | 'nextReviewDate' | 'lastReviewed' | 'easeFactor' | 'repetitions' | 'interval'>) => string;
+  /**
+   * Returns an existing question in the active profile whose content matches
+   * `content` (case/whitespace/HTML-insensitive), or undefined. Used to warn
+   * about duplicates before adding. `excludeId` skips a question (e.g. when
+   * editing).
+   */
+  findDuplicateQuestion: (content: string, excludeId?: string) => Question | undefined;
   updateQuestion: (id: string, q: Partial<Question>) => void;
   deleteQuestion: (id: string) => void;
   reviewQuestion: (id: string, performance: 'again' | 'hard' | 'good' | 'easy') => void;
@@ -932,6 +939,17 @@ export const useStore = create<AppState>()(
         }));
         get().checkAchievements();
         return id;
+      },
+      findDuplicateQuestion: (content, excludeId) => {
+        const target = normalizeAnswerText(content);
+        if (!target) return undefined;
+        const activeProfileId = get().activeProfileId || '';
+        return get().questions.find(
+          (existing) =>
+            existing.id !== excludeId &&
+            (!existing.profileId || existing.profileId === activeProfileId) &&
+            normalizeAnswerText(existing.content) === target
+        );
       },
       updateQuestion: (id, q) =>
         set((state) => ({
