@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Trophy, Flame, Award, User, Clock, Star, Layers, BookOpen, HelpCircle, X, GraduationCap, Palette, Shuffle, Zap, Pen, Shield, Moon, Sun, Calendar, Download, Skull, CheckSquare, Crown, LucideIcon } from 'lucide-react';
 import { GameBadge } from '../components/ui/GameBadge';
 import { getAvatarUrl } from '../utils/avatar';
+import { toDayKey } from '../utils/dateKeys';
 
 // ─── Avatar option data ───────────────────────────────────────────────────────
 const MALE_HAIR   = ['shortFlat', 'shortRound', 'shortCurly', 'shortWaved', 'sides', 'theCaesar', 'theCaesarAndSidePart', 'shavedSides'];
@@ -520,7 +521,7 @@ const StudyHeatmap = ({ history }: { history?: Record<string, number> }) => {
     for (let i = totalDays - 1; i >= 0; i--) {
       const d = new Date(now);
       d.setDate(now.getDate() - i);
-      const key = d.toISOString().slice(0, 10);
+      const key = toDayKey(d);
       result.push({ dateKey: key, count: history?.[key] || 0, weekday: d.getDay() });
     }
     return result;

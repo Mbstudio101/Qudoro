@@ -800,10 +800,10 @@ const Practice = () => {
                             )}
                         </div>
                         <div className="shrink-0 border-t border-border/40 px-8 py-4 flex gap-3 justify-center">
-                            <Button variant="destructive" onClick={() => { setIncorrectQuestionIds(prev => [...prev, currentQuestion.id]); handleNext(); }}>
+                            <Button variant="destructive" onClick={() => { reviewQuestion(currentQuestion.id, 'again'); setIncorrectQuestionIds(prev => [...prev, currentQuestion.id]); handleNext(); }}>
                                 <XCircle className="mr-2 h-4 w-4" /> Got it wrong
                             </Button>
-                            <Button className="bg-green-600 hover:bg-green-700" onClick={() => { setScore(s => s + 1); handleNext(); }}>
+                            <Button className="bg-green-600 hover:bg-green-700" onClick={() => { reviewQuestion(currentQuestion.id, 'good'); setScore(s => s + 1); handleNext(); }}>
                                 <CheckCircle2 className="mr-2 h-4 w-4" /> Got it right
                             </Button>
                         </div>

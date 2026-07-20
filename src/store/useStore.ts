@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { get, set as idbSet, del } from 'idb-keyval'; // IndexedDB for performance
 import { calculateSM2 } from '../utils/sm2';
 import { alignAnswersToOptions, normalizeAnswerText } from '../utils/answerMatch';
+import { toDayKey } from '../utils/dateKeys';
 import { questionCountOf, setCountOf, richnessOf, parsePersistMeta, pickBestCandidate, type PersistCandidate, type PersistMeta } from '../utils/persistMerge';
 import { BlackboardCourse, BlackboardAssignment, BlackboardGrade, BlackboardToken } from '../types/blackboard';
 import { getSupabaseClient } from '../services/marketplace/supabaseClient';
@@ -435,6 +436,13 @@ const calculateLevel = (xp: number) => {
     return Math.floor(Math.sqrt(xp / 100)) + 1;
 };
 // const xpForNextLevel = (level: number) => 100 * Math.pow(level, 2);
+
+// Study-time accounting. reviewQuestion credits a small base per answered
+// question in real time; addSession tops that up with the *actual* wall-clock
+// session time, but capped at MAX so a set left open/idle can't inflate the
+// total. The same cap is used to sanity-clamp legacy inflated totals on load.
+const STUDY_MINUTES_PER_QUESTION_BASE = 0.5;
+const MAX_STUDY_MINUTES_PER_QUESTION = 5;
 
 const PASSWORD_ITERATIONS = 210_000;
 const textEncoder = new TextEncoder();
@@ -1020,15 +1028,21 @@ export const useStore = create<AppState>()(
                newStats.streakDays = 1;
           }
           
-          // Add estimated study time (0.5 mins per question) for real-time tracking
-          // This ensures stats update even if session isn't completed.
-          // Note: addSession will reconcile total time if needed, or we just accumulate here.
-          // To avoid double counting, we will adjust addSession logic.
+          // Add a base amount of study time per answered question for real-time
+          // tracking. addSession later tops this up to the (capped) actual
+          // session length, so stats stay sensible even if a session is abandoned.
           const currentTotalTime = isNaN(newStats.totalStudyTime) ? 0 : (newStats.totalStudyTime || 0);
-          newStats.totalStudyTime = currentTotalTime + 0.5; 
-          
+          newStats.totalStudyTime = currentTotalTime + STUDY_MINUTES_PER_QUESTION_BASE;
+
           // Update last study date
           newStats.lastStudyDate = Date.now();
+
+          // Record today's activity for the Study Activity heat-map here — per
+          // answered question — so the heat-map and the streak (also updated in
+          // this function) always move together, even for abandoned sessions.
+          const todayKey = toDayKey();
+          const history = newStats.studyHistory || {};
+          newStats.studyHistory = { ...history, [todayKey]: (history[todayKey] || 0) + 1 };
 
           const updatedProfile = { ...state.userProfile, stats: newStats };
           const updatedAccounts = state.accounts.map(a => 
@@ -1101,23 +1115,22 @@ export const useStore = create<AppState>()(
             const newStats = { ...state.userProfile.stats };
             newStats.totalSetsCompleted += 1;
             
-            // Calculate duration in minutes (session.duration is in seconds)
-            // Fallback to 1 minute per question if duration is missing
-            const durationInMinutes = session.duration 
-                ? session.duration / 60 
+            // Actual session length in minutes (session.duration is in seconds),
+            // falling back to ~1 min/question when it's missing. Capped so a set
+            // left open/idle can't inflate study time to unrealistic values.
+            const rawDurationMinutes = session.duration
+                ? session.duration / 60
                 : Math.ceil(session.totalQuestions * 1);
-            
-            // Ensure we are adding to a number, handling potential NaN/undefined from legacy data
-            // Note: reviewQuestion now adds 0.5 mins per question incrementally.
-            // We should only add the *extra* time if the session took longer than estimated,
-            // or just use the session time minus the estimated time already added.
-            // Estimated added: session.totalQuestions * 0.5
-            // Actual session time: durationInMinutes
-            // Difference to add: durationInMinutes - (session.totalQuestions * 0.5)
-            // If difference is negative (user was fast), we don't subtract time.
-            
-            const estimatedAdded = session.totalQuestions * 0.5;
-            const extraTime = Math.max(0, durationInMinutes - estimatedAdded);
+            const durationInMinutes = Math.min(
+                rawDurationMinutes,
+                session.totalQuestions * MAX_STUDY_MINUTES_PER_QUESTION
+            );
+
+            // reviewQuestion already credited a base amount per answered question,
+            // so only add the *remaining* actual session time on top (never
+            // negative, so a fast session doesn't subtract time).
+            const alreadyCredited = session.totalQuestions * STUDY_MINUTES_PER_QUESTION_BASE;
+            const extraTime = Math.max(0, durationInMinutes - alreadyCredited);
 
             const currentTotalTime = isNaN(newStats.totalStudyTime) ? 0 : (newStats.totalStudyTime || 0);
             newStats.totalStudyTime = currentTotalTime + extraTime;
@@ -1127,11 +1140,11 @@ export const useStore = create<AppState>()(
             newStats.xp += session.score * 20 + session.totalQuestions * 5;
             newStats.level = calculateLevel(newStats.xp);
             
-            // Note: Streak Logic is now handled in reviewQuestion for real-time updates.
-            // However, Practice Mode (quizzes) calls addSession DIRECTLY without calling reviewQuestion.
-            // So we MUST also handle streak updates here for Practice sessions.
-            // The logic below ensures we don't double-count if reviewQuestion was already called today.
-            
+            // Streak is normally advanced per-question in reviewQuestion (both
+            // Flashcards and Practice call it). This block is a same-day-safe
+            // fallback for any session recorded without per-question reviews:
+            // because reviewQuestion sets lastStudyDate to today, the check below
+            // is a no-op when it already ran, so the streak is never double-counted.
             const now = new Date();
             const lastDate = new Date(newStats.lastStudyDate || 0);
             
@@ -1158,10 +1171,9 @@ export const useStore = create<AppState>()(
             
             newStats.lastStudyDate = Date.now();
 
-            // Track daily study history for heat-map
-            const todayKey = new Date().toISOString().slice(0, 10);
-            const existingHistory = newStats.studyHistory || {};
-            newStats.studyHistory = { ...existingHistory, [todayKey]: (existingHistory[todayKey] || 0) + session.totalQuestions };
+            // Note: daily study history for the heat-map is recorded per answered
+            // question in reviewQuestion, keeping it in sync with the streak. It is
+            // intentionally NOT written here to avoid double-counting.
 
             const profileId = state.activeProfileId || '';
 
@@ -1187,7 +1199,7 @@ export const useStore = create<AppState>()(
       clearActiveExam: () => set({ activeExam: null }),
       getDailyChallenge: () => {
         const state = get();
-        const today = new Date().toISOString().slice(0, 10);
+        const today = toDayKey();
 
         // Return existing challenge if it's already generated for today
         if (state.userProfile.dailyChallenge?.date === today) {
@@ -1374,18 +1386,30 @@ export const useStore = create<AppState>()(
             const now = Date.now();
             const rawStats = state.userProfile.stats;
             
-            // Create a sanitized stats object to prevent NaN issues and ensure all fields exist
+            // Sanity-clamp study time to what the answered-question count can
+            // justify. This corrects legacy inflated totals (e.g. sessions left
+            // open/idle before the per-session duration cap existed).
+            const answered = rawStats?.totalQuestionsAnswered || 0;
+            const rawStudyTime = rawStats?.totalStudyTime || 0;
+            const maxPlausibleStudyTime = answered * MAX_STUDY_MINUTES_PER_QUESTION;
+            const sanitizedStudyTime =
+                answered === 0 ? 0 : Math.min(rawStudyTime, maxPlausibleStudyTime);
+
+            // Create a sanitized stats object to prevent NaN issues and ensure all
+            // fields exist. IMPORTANT: preserve studyHistory (the Study Activity
+            // heat-map) — omitting it here previously wiped it on every visit.
             const currentStats: UserStats = {
-                totalQuestionsAnswered: rawStats?.totalQuestionsAnswered || 0,
+                totalQuestionsAnswered: answered,
                 totalCorrectAnswers: rawStats?.totalCorrectAnswers || 0,
-                totalStudyTime: rawStats?.totalStudyTime || 0,
+                totalStudyTime: sanitizedStudyTime,
                 totalSetsCompleted: rawStats?.totalSetsCompleted || 0,
                 streakDays: rawStats?.streakDays || 0,
                 lastStudyDate: rawStats?.lastStudyDate || 0,
                 xp: rawStats?.xp || 0,
                 level: rawStats?.level || 1,
                 perfectedSetIds: rawStats?.perfectedSetIds || [],
-                importedSetsCount: rawStats?.importedSetsCount || 0
+                importedSetsCount: rawStats?.importedSetsCount || 0,
+                studyHistory: rawStats?.studyHistory || {}
             };
 
             const lastDate = new Date(currentStats.lastStudyDate || 0);
