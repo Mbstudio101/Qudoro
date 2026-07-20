@@ -2,7 +2,7 @@ import { getSupabaseClient } from '../marketplace/supabaseClient';
 
 export type SupabaseAuthResult =
   | { ok: true; email: string; name?: string }
-  | { ok: false; error: string; needsEmailConfirmation?: boolean };
+  | { ok: false; error: string; needsEmailConfirmation?: boolean; networkError?: boolean };
 
 const getWebBaseUrl = (): string => {
   const configured = (import.meta.env.VITE_WEB_BASE_URL as string | undefined)?.trim();
@@ -21,10 +21,16 @@ const normalizeAuthError = (error: unknown, fallback: string): string => {
   return fallback;
 };
 
+/** True when an error is a network/reachability failure rather than a rejected credential. */
+const isNetworkError = (error: unknown): boolean =>
+  error instanceof Error && /failed to fetch|network|fetch failed|ENOTFOUND|ECONNREFUSED|getaddrinfo/i.test(error.message);
+
 export const signInWithSupabase = async (email: string, password: string): Promise<SupabaseAuthResult> => {
   const supabase = getSupabaseClient();
   if (!supabase) {
-    return { ok: false, error: 'Supabase auth is not configured.' };
+    // Not configured counts as "can't reach auth" so callers can fall back to
+    // offline/local sign-in instead of hard-failing.
+    return { ok: false, error: 'Supabase auth is not configured.', networkError: true };
   }
 
   try {
@@ -32,7 +38,10 @@ export const signInWithSupabase = async (email: string, password: string): Promi
     if (error || !data.user?.email) {
       const message = error?.message || 'Invalid login credentials.';
       const needsEmailConfirmation = /email.*confirm/i.test(message);
-      return { ok: false, error: message, needsEmailConfirmation };
+      // supabase-js surfaces network failures as an AuthRetryableFetchError with
+      // a "Failed to fetch" message; treat those as reachability errors.
+      const networkError = isNetworkError(error) || /failed to fetch/i.test(message);
+      return { ok: false, error: message, needsEmailConfirmation, networkError };
     }
 
     const displayName =
@@ -42,7 +51,11 @@ export const signInWithSupabase = async (email: string, password: string): Promi
     return { ok: true, email: data.user.email, name: displayName };
   } catch (error) {
     console.error('Supabase sign-in request failed:', error);
-    return { ok: false, error: normalizeAuthError(error, 'Unable to sign in right now. Please try again.') };
+    return {
+      ok: false,
+      error: normalizeAuthError(error, 'Unable to sign in right now. Please try again.'),
+      networkError: isNetworkError(error),
+    };
   }
 };
 

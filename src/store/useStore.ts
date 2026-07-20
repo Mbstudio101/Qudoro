@@ -213,6 +213,14 @@ interface AppState {
   // Actions
   signup: (data: { name: string; email: string; password: string; field: string; country: string }) => Promise<void>;
   login: (email: string, password: string) => Promise<boolean>;
+  /**
+   * Offline/local sign-in used as a fallback when the auth server is
+   * unreachable. Verifies the password against the locally stored hash when one
+   * exists; for accounts provisioned via the cloud (no local secret) it signs in
+   * to the local data on this machine. Returns why it failed so the UI can
+   * distinguish "no local copy of this account" from "wrong password".
+   */
+  loginOffline: (email: string, password: string) => Promise<{ ok: boolean; reason?: 'no-account' | 'bad-password' }>;
   authenticateWithSupabase: (data: { email: string; name?: string; country?: string; field?: string }) => string;
   restoreSession: (accountId: string) => boolean;
   logout: () => void;
@@ -821,14 +829,40 @@ export const useStore = create<AppState>()(
         }
 
         if (isValid) {
-            set({ 
-                isAuthenticated: true, 
+            set({
+                isAuthenticated: true,
                 currentAccountId: account.id,
                 activeProfileId: null, // Reset active profile to force selection
             });
             return true;
         }
         return false;
+      },
+
+      loginOffline: async (email, password) => {
+        const normalizedEmail = email.trim().toLowerCase();
+        const account = get().accounts.find((a) => a.email.toLowerCase() === normalizedEmail);
+        // The account has to already exist on this device — offline mode can only
+        // reach data that's stored locally.
+        if (!account) return { ok: false, reason: 'no-account' };
+
+        // When a local password hash exists (accounts created via local signup),
+        // require the correct password even offline.
+        if (account.passwordHash) {
+          const valid = await verifyPassword(password, account.passwordHash);
+          if (!valid) return { ok: false, reason: 'bad-password' };
+        } else if (account.password) {
+          if (account.password !== password) return { ok: false, reason: 'bad-password' };
+        }
+        // else: cloud-provisioned account with no local secret to check. The data
+        // is local to this machine, so we allow offline sign-in to it.
+
+        set({
+          isAuthenticated: true,
+          currentAccountId: account.id,
+          activeProfileId: null,
+        });
+        return { ok: true };
       },
 
       authenticateWithSupabase: ({ email, name, country, field }) => {

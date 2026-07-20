@@ -67,7 +67,7 @@ const clearLoginGuard = (email: string) => {
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { restoreSession, authenticateWithSupabase } = useStore();
+  const { restoreSession, authenticateWithSupabase, loginOffline } = useStore();
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -142,6 +142,25 @@ const Login = () => {
       return;
     }
     
+    // Persist the "remember me" token and land on the profile picker. Shared by
+    // the online and offline sign-in paths.
+    const finishSignIn = () => {
+      if (rememberMe) {
+        const accountId = useStore.getState().currentAccountId;
+        if (accountId) {
+          const payload = {
+            email: formData.email,
+            accountId,
+            expiresAt: Date.now() + REMEMBER_ME_DURATION_MS,
+          };
+          localStorage.setItem(REMEMBER_ME_KEY, JSON.stringify(payload));
+        }
+      } else {
+        localStorage.removeItem(REMEMBER_ME_KEY);
+      }
+      navigate('/profiles');
+    };
+
     const supabaseResult = await signInWithSupabase(formData.email, formData.password);
 
     if (supabaseResult.ok) {
@@ -152,42 +171,55 @@ const Login = () => {
         email: supabaseResult.email,
         name: supabaseResult.name,
       });
-      if (rememberMe) {
-        const accountId = useStore.getState().currentAccountId;
-        if (accountId) {
-        const payload = {
-          email: formData.email,
-          accountId,
-          expiresAt: Date.now() + REMEMBER_ME_DURATION_MS,
-        };
-        localStorage.setItem(REMEMBER_ME_KEY, JSON.stringify(payload));
-        }
-      } else {
-        localStorage.removeItem(REMEMBER_ME_KEY);
-      }
-      navigate('/profiles');
-    } else {
-      const nextAttempts = [...guard.attempts, now].filter((ts) => now - ts <= LOGIN_WINDOW_MS);
-      const shouldLock = nextAttempts.length >= MAX_FAILED_LOGIN_ATTEMPTS;
-      const nextState: LoginGuardState = {
-        attempts: shouldLock ? [] : nextAttempts,
-        lockoutUntil: shouldLock ? now + LOGIN_LOCKOUT_MS : 0,
-      };
-      writeLoginGuard(formData.email, nextState);
-      if (nextState.lockoutUntil > now) {
-        setLockoutUntil(nextState.lockoutUntil);
-        setError('Too many failed attempts. Please try again in a few minutes.');
-        return;
-      }
-      if (supabaseResult.needsEmailConfirmation) {
+      finishSignIn();
+      return;
+    }
+
+    // Auth server unreachable → fall back to offline sign-in against local data
+    // so a Supabase outage (or paused project) can't lock the user out of their
+    // own on-device library.
+    if (supabaseResult.networkError) {
+      const offline = await loginOffline(formData.email, formData.password);
+      if (offline.ok) {
+        clearLoginGuard(formData.email);
+        setLockoutUntil(0);
         setToast({
-          message: 'Please confirm your email first. Check your inbox, then sign in again.',
+          message: "Signed in offline — couldn't reach the sign-in server. Your local data is available; cloud sync resumes when it's back.",
           variant: 'info',
         });
-        setError('');
-      } else {
-        setError(supabaseResult.error || 'Invalid email or password');
+        finishSignIn();
+        return;
       }
+      if (offline.reason === 'no-account') {
+        setError("Can't reach the sign-in server, and there's no offline copy of this account on this device.");
+        return;
+      }
+      // reason === 'bad-password' falls through to the failed-attempt handling.
+    }
+
+    const nextAttempts = [...guard.attempts, now].filter((ts) => now - ts <= LOGIN_WINDOW_MS);
+    const shouldLock = nextAttempts.length >= MAX_FAILED_LOGIN_ATTEMPTS;
+    const nextState: LoginGuardState = {
+      attempts: shouldLock ? [] : nextAttempts,
+      lockoutUntil: shouldLock ? now + LOGIN_LOCKOUT_MS : 0,
+    };
+    writeLoginGuard(formData.email, nextState);
+    if (nextState.lockoutUntil > now) {
+      setLockoutUntil(nextState.lockoutUntil);
+      setError('Too many failed attempts. Please try again in a few minutes.');
+      return;
+    }
+    if (supabaseResult.needsEmailConfirmation) {
+      setToast({
+        message: 'Please confirm your email first. Check your inbox, then sign in again.',
+        variant: 'info',
+      });
+      setError('');
+    } else if (supabaseResult.networkError) {
+      // Offline fallback ran and returned bad-password.
+      setError('Invalid email or password.');
+    } else {
+      setError(supabaseResult.error || 'Invalid email or password');
     }
   };
 

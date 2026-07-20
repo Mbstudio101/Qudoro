@@ -6,6 +6,16 @@ import { GameBadge } from '../components/ui/GameBadge';
 import { getAvatarUrl } from '../utils/avatar';
 import { toDayKey } from '../utils/dateKeys';
 
+// Render study time as hours + minutes instead of a large raw minute count
+// (e.g. 2550 → "42h 30m", 45 → "45m").
+const formatStudyTime = (minutes: number): string => {
+  const total = Math.max(0, Math.round(minutes || 0));
+  if (total < 60) return `${total}m`;
+  const hours = Math.floor(total / 60);
+  const mins = total % 60;
+  return mins === 0 ? `${hours}h` : `${hours}h ${mins}m`;
+};
+
 // ─── Avatar option data ───────────────────────────────────────────────────────
 const MALE_HAIR   = ['shortFlat', 'shortRound', 'shortCurly', 'shortWaved', 'sides', 'theCaesar', 'theCaesarAndSidePart', 'shavedSides'];
 const FEMALE_HAIR = ['bigHair', 'bob', 'bun', 'curvy', 'frida', 'longButNotTooLong', 'miaWallace', 'straight01', 'straight02', 'straightAndStrand'];
@@ -665,7 +675,7 @@ const Profile = () => {
     return {
       items: [
         { label: 'Total Questions', value: s.totalQuestionsAnswered, icon: HelpCircle },
-        { label: 'Study Time', value: `${Math.round(s.totalStudyTime)}m`, icon: Clock },
+        { label: 'Study Time', value: formatStudyTime(s.totalStudyTime), icon: Clock },
         { label: 'Study Streak', value: `${s.streakDays} Days`, icon: Flame },
         { label: 'XP Gained', value: s.xp, icon: Star },
       ],
