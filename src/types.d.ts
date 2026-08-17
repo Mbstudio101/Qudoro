@@ -59,6 +59,11 @@ declare global {
         sendBackupData: (json: string) => void;
         removeBackupDataListener: () => void;
       };
+      snapshots: {
+        save: (json: string) => Promise<{ success: boolean; file?: string; error?: string }>;
+        list: () => Promise<Array<{ file: string; savedAt: number; qCount: number; sCount: number }>>;
+        read: (file: string) => Promise<string | null>;
+      };
     };
   }
 }

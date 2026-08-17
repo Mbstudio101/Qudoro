@@ -4,6 +4,17 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Trophy, Flame, Award, User, Clock, Star, Layers, BookOpen, HelpCircle, X, GraduationCap, Palette, Shuffle, Zap, Pen, Shield, Moon, Sun, Calendar, Download, Skull, CheckSquare, Crown, LucideIcon } from 'lucide-react';
 import { GameBadge } from '../components/ui/GameBadge';
 import { getAvatarUrl } from '../utils/avatar';
+import { toDayKey } from '../utils/dateKeys';
+
+// Render study time as hours + minutes instead of a large raw minute count
+// (e.g. 2550 → "42h 30m", 45 → "45m").
+const formatStudyTime = (minutes: number): string => {
+  const total = Math.max(0, Math.round(minutes || 0));
+  if (total < 60) return `${total}m`;
+  const hours = Math.floor(total / 60);
+  const mins = total % 60;
+  return mins === 0 ? `${hours}h` : `${hours}h ${mins}m`;
+};
 
 // ─── Avatar option data ───────────────────────────────────────────────────────
 const MALE_HAIR   = ['shortFlat', 'shortRound', 'shortCurly', 'shortWaved', 'sides', 'theCaesar', 'theCaesarAndSidePart', 'shavedSides'];
@@ -520,7 +531,7 @@ const StudyHeatmap = ({ history }: { history?: Record<string, number> }) => {
     for (let i = totalDays - 1; i >= 0; i--) {
       const d = new Date(now);
       d.setDate(now.getDate() - i);
-      const key = d.toISOString().slice(0, 10);
+      const key = toDayKey(d);
       result.push({ dateKey: key, count: history?.[key] || 0, weekday: d.getDay() });
     }
     return result;
@@ -664,7 +675,7 @@ const Profile = () => {
     return {
       items: [
         { label: 'Total Questions', value: s.totalQuestionsAnswered, icon: HelpCircle },
-        { label: 'Study Time', value: `${Math.round(s.totalStudyTime)}m`, icon: Clock },
+        { label: 'Study Time', value: formatStudyTime(s.totalStudyTime), icon: Clock },
         { label: 'Study Streak', value: `${s.streakDays} Days`, icon: Flame },
         { label: 'XP Gained', value: s.xp, icon: Star },
       ],

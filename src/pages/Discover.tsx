@@ -8,7 +8,7 @@ import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
 import Textarea from '../components/ui/Textarea';
-import { useStore } from '../store/useStore';
+import { useStore, type Question } from '../store/useStore';
 import { marketplaceApi, readImportedLinks, saveImportedLink } from '../services/marketplace/marketplaceApi';
 import type {
   DiscoverSort, DiscoverTab, ImportedSetLink, MarketplaceAuthor,
@@ -16,6 +16,12 @@ import type {
 } from '../types/marketplace';
 import { NURSING_SUBJECTS } from '../types/marketplace';
 import { alignAnswersToOptions } from '../utils/answerMatch';
+import {
+  checkSetForPublish,
+  makeAttestation,
+  CONTENT_ORIGIN_LABELS,
+  type ContentOrigin,
+} from '../utils/publishGuard';
 import { getSupabaseClient } from '../services/marketplace/supabaseClient';
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { getAvatarUrl } from '../utils/avatar';
@@ -365,7 +371,32 @@ const Discover = () => {
   const [publishData,     setPublishData]     = useState({
     localSetId: '', subject: '' as NursingSubject | '',
     tags: '', visibility: 'public' as SharedSetVisibility, descriptionOverride: '',
+    origin: '' as ContentOrigin | '', sourceNote: '', confirmed: false,
   });
+
+  /** Questions in the set currently selected for publishing. */
+  const publishQuestions = useMemo(() => {
+    const localSet = sets.find(s => s.id === publishData.localSetId);
+    if (!localSet) return [];
+    return localSet.questionIds
+      .map(id => questions.find(q => q.id === id))
+      .filter((q): q is Question => Boolean(q));
+  }, [sets, questions, publishData.localSetId]);
+
+  /**
+   * Live intake check. Runs as the form is filled so a publisher sees why the
+   * button is disabled instead of hitting a rejection after submitting.
+   */
+  const publishCheck = useMemo(
+    () =>
+      checkSetForPublish(
+        publishQuestions,
+        publishData.origin
+          ? makeAttestation(publishData.origin, publishData.sourceNote, publishData.confirmed)
+          : null,
+      ),
+    [publishQuestions, publishData.origin, publishData.sourceNote, publishData.confirmed],
+  );
 
   // ── The app profile IS the author profile ─────────────────────────────────
   // No separate author profile setup needed — we use userProfile directly.
@@ -551,7 +582,10 @@ const Discover = () => {
       window.location.hash = '/login';
       return;
     }
-    setPublishData({ localSetId: sets[0]?.id || '', subject: '', tags: '', visibility: 'public', descriptionOverride: '' });
+    setPublishData({
+      localSetId: sets[0]?.id || '', subject: '', tags: '', visibility: 'public', descriptionOverride: '',
+      origin: '', sourceNote: '', confirmed: false,
+    });
     setPublishError('');
     setIsPublishOpen(true);
   };
@@ -562,8 +596,19 @@ const Discover = () => {
     const localSet = sets.find(s => s.id === publishData.localSetId);
     if (!localSet) { setPublishError('Choose a local set first.'); return; }
     if (!publishData.subject) { setPublishError('Choose a subject.'); return; }
-    const localQs = localSet.questionIds.map(id => questions.find(q => q.id === id)).filter(Boolean);
+    const localQs = publishQuestions;
     if (localQs.length === 0) { setPublishError('Selected set has no questions.'); return; }
+    if (!publishData.origin) { setPublishError('State where this content came from.'); return; }
+
+    // Re-run the gate at submit time — the UI disables the button, but the
+    // check must not live only in a disabled attribute.
+    const attestation = makeAttestation(publishData.origin, publishData.sourceNote, publishData.confirmed);
+    const gate = checkSetForPublish(localQs, attestation);
+    if (!gate.canPublish) {
+      setPublishError(gate.findings.find(f => f.severity === 'error')?.message || 'This set cannot be published.');
+      return;
+    }
+
     const payload: PublishSetInput = {
       title: localSet.title,
       description: publishData.descriptionOverride.trim() || localSet.description || '',
@@ -571,6 +616,7 @@ const Discover = () => {
       tags: publishData.tags.split(',').map(t => t.trim()).filter(Boolean),
       visibility: publishData.visibility,
       questions: localQs.map((q, i) => ({ remoteQuestionId: q.id, content: q.content, rationale: q.rationale, options: q.options || [], answers: q.answer, tags: q.tags, orderIndex: i + 1 })),
+      attestation,
     };
     setPublishing(true);
     try { await marketplaceApi.publishSet(payload); setIsPublishOpen(false); await reloadDiscover(); }
@@ -760,7 +806,7 @@ const Discover = () => {
               return (
                 <div className="space-y-6">
                   {/* Popular This Week featured row */}
-                  {popularSets.length >= 2 && activeTab === 'discover' && !activeTag && !activeSubject && (
+                  {popularSets.length >= 2 && activeTab === 'all' && !activeTag && !subject && (
                     <div>
                       <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">🔥 Popular This Week</p>
                       <div className="flex gap-3 overflow-x-auto pb-1">
@@ -960,8 +1006,75 @@ const Discover = () => {
             <label className="text-sm font-medium">Description Override (optional)</label>
             <Input value={publishData.descriptionOverride} onChange={e => setPublishData(p => ({ ...p, descriptionOverride: e.target.value }))} placeholder="Leave blank to use local set description" />
           </div>
+          {/* ── Content origin ──────────────────────────────────────────── */}
+          <div className="space-y-2 rounded-xl border border-border/60 bg-secondary/10 p-4">
+            <label className="text-sm font-medium">Where did this content come from?</label>
+            <p className="text-xs text-muted-foreground">
+              Publishing shares these questions with every Qudoro user, so this has to be accurate.
+            </p>
+            <div className="space-y-1.5 pt-1">
+              {(Object.keys(CONTENT_ORIGIN_LABELS) as ContentOrigin[]).map(o => (
+                <label key={o} className="flex items-start gap-2 text-sm cursor-pointer">
+                  <input
+                    type="radio"
+                    name="content-origin"
+                    className="mt-1"
+                    checked={publishData.origin === o}
+                    onChange={() => setPublishData(p => ({ ...p, origin: o }))}
+                  />
+                  <span>{CONTENT_ORIGIN_LABELS[o]}</span>
+                </label>
+              ))}
+            </div>
+
+            {publishData.origin && publishData.origin !== 'original' && (
+              <div className="space-y-1 pt-2">
+                <label className="text-sm font-medium">Name the source</label>
+                <Input
+                  value={publishData.sourceNote}
+                  onChange={e => setPublishData(p => ({ ...p, sourceNote: e.target.value }))}
+                  placeholder="e.g. StatPearls, Hyperkalemia (CC BY 4.0)"
+                />
+              </div>
+            )}
+
+            <label className="flex items-start gap-2 pt-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={publishData.confirmed}
+                onChange={e => setPublishData(p => ({ ...p, confirmed: e.target.checked }))}
+              />
+              <span>
+                I confirm I have the right to share this, and that it is not copied from a commercial
+                question bank or recalled from a live exam.
+              </span>
+            </label>
+          </div>
+
+          {publishCheck.findings.length > 0 && (
+            <div
+              className={`rounded-xl border p-3 ${
+                publishCheck.canPublish ? 'border-border/60 bg-secondary/20' : 'border-amber-500/30 bg-amber-500/10'
+              }`}
+            >
+              <ul className="space-y-1 text-xs">
+                {publishCheck.findings.map((f, i) => (
+                  <li key={`${f.code}-${i}`} className="flex items-start gap-2">
+                    <span className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${f.severity === 'error' ? 'bg-amber-500' : 'bg-muted-foreground/50'}`} />
+                    <span className="text-muted-foreground">{f.message}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {publishError && <p className="text-sm text-destructive">{publishError}</p>}
-          <div className="flex justify-end"><Button type="submit" disabled={publishing}>{publishing ? 'Publishing…' : 'Publish Set'}</Button></div>
+          <div className="flex justify-end">
+            <Button type="submit" disabled={publishing || !publishCheck.canPublish}>
+              {publishing ? 'Publishing…' : 'Publish Set'}
+            </Button>
+          </div>
         </form>
       </Modal>
     </div>

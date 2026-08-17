@@ -54,4 +54,47 @@ contextBridge.exposeInMainWorld('electron', {
     removeBackupDataListener: () =>
       ipcRenderer.removeAllListeners('request-backup-data'),
   },
+  snapshots: {
+    save: (json: string) => ipcRenderer.invoke('save-snapshot', json),
+    list: () => ipcRenderer.invoke('list-snapshots'),
+    read: (file: string) => ipcRenderer.invoke('read-snapshot', file),
+  },
 });
+
+// --- Copy protection (packaged build only) -------------------------------
+// Deters casual copying of question/answer text. Editable fields are exempt
+// so the user's own inputs, textareas, and contenteditable areas still work.
+const isPackaged: boolean = ipcRenderer.sendSync('get-is-packaged');
+
+if (isPackaged) {
+  const isEditable = (target: EventTarget | null): boolean => {
+    const el = target as HTMLElement | null;
+    if (!el || !el.closest) return false;
+    return !!el.closest('input, textarea, [contenteditable="true"], [contenteditable=""]');
+  };
+
+  const blockIfNotEditable = (e: Event) => {
+    if (!isEditable(e.target)) e.preventDefault();
+  };
+
+  window.addEventListener('copy', blockIfNotEditable, true);
+  window.addEventListener('cut', blockIfNotEditable, true);
+  window.addEventListener('contextmenu', blockIfNotEditable, true);
+  window.addEventListener('selectstart', blockIfNotEditable, true);
+  window.addEventListener('dragstart', blockIfNotEditable, true);
+
+  window.addEventListener('DOMContentLoaded', () => {
+    const style = document.createElement('style');
+    style.textContent = `
+      * {
+        -webkit-user-select: none;
+        user-select: none;
+      }
+      input, textarea, [contenteditable="true"], [contenteditable=""] {
+        -webkit-user-select: text;
+        user-select: text;
+      }
+    `;
+    document.head.appendChild(style);
+  });
+}

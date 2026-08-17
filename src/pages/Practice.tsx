@@ -8,6 +8,10 @@ import Modal from '../components/ui/Modal';
 import RichText from '../components/ui/RichText';
 import { motion, AnimatePresence } from 'framer-motion';
 import { isAnswerMatch, isSelectionCorrect } from '../utils/answerMatch';
+import NgnPlayer from '../components/ngn/NgnPlayer';
+import EhrChartViewer from '../components/ngn/EhrChartViewer';
+import { NgnResponse, createEmptyResponse } from '../types/ngn';
+import { gradeNgn, isNgnAnswered, describeNgnResponse } from '../utils/ngnGrading';
 
 // Fisher-Yates shuffle — returns a new array, leaving the input untouched.
 const shuffleArray = <T,>(arr: T[]): T[] => {
@@ -30,7 +34,7 @@ const Practice = () => {
   const [searchParams] = useSearchParams();
   const mode = searchParams.get('mode');
   const isChallenge = searchParams.get('challenge') === '1';
-  const { sets: allSets, questions, addSession, completeDailyChallenge, userProfile, activeProfileId, activeExam, saveActiveExam, clearActiveExam } = useStore();
+  const { sets: allSets, questions, addSession, reviewQuestion, completeDailyChallenge, userProfile, activeProfileId, activeExam, saveActiveExam, clearActiveExam } = useStore();
   
   const sets = useMemo(() => allSets.filter(s => !s.profileId || s.profileId === activeProfileId), [allSets, activeProfileId]);
   
@@ -41,6 +45,10 @@ const Practice = () => {
   const [score, setScore] = useState(0);
   const [incorrectQuestionIds, setIncorrectQuestionIds] = useState<string[]>([]);
   const [userSelections, setUserSelections] = useState<Record<string, string[]>>({});
+  // NGN answers live alongside `selectedOptions` rather than inside it, so the
+  // classic multiple-choice path is completely untouched.
+  const [ngnResponses, setNgnResponses] = useState<Record<string, NgnResponse>>({});
+  const [ngnPoints, setNgnPoints] = useState<{ earned: number; possible: number }>({ earned: 0, possible: 0 });
   const [startTime, setStartTime] = useState(Date.now());
   const [isDrillMode, setIsDrillMode] = useState(false);
   const timedMinutesParam = Number.parseInt(searchParams.get('minutes') || '', 10);
@@ -100,6 +108,8 @@ const Practice = () => {
         setScore(saved.score);
         setIncorrectQuestionIds(saved.incorrectQuestionIds || []);
         setUserSelections(saved.userSelections || {});
+        setNgnResponses(saved.ngnResponses || {});
+        setNgnPoints(saved.ngnPoints || { earned: 0, possible: 0 });
         setStartTime(saved.startTime);
         setIsDrillMode(saved.isDrillMode);
         setFiveMoreActive(saved.fiveMoreActive);
@@ -127,6 +137,8 @@ const Practice = () => {
     setScore(0);
     setIncorrectQuestionIds([]);
     setUserSelections({});
+    setNgnResponses({});
+    setNgnPoints({ earned: 0, possible: 0 });
     setStartTime(Date.now());
     setIsDrillMode(false);
     setTimeRemainingSec(timedDurationSeconds);
@@ -212,6 +224,8 @@ const Practice = () => {
       score,
       incorrectQuestionIds,
       userSelections,
+      ngnResponses,
+      ngnPoints,
       startTime,
       timeRemainingSec: timeRemainingRef.current,
       isDrillMode,
@@ -220,7 +234,8 @@ const Practice = () => {
     });
   }, [
     currentSet, showResults, setQuestions, currentQuestionIndex, selectedOptions,
-    isChecked, score, incorrectQuestionIds, userSelections, startTime, isDrillMode,
+    isChecked, score, incorrectQuestionIds, userSelections, ngnResponses, ngnPoints,
+    startTime, isDrillMode,
     fiveMoreActive, bonusXpEarned, mode, isChallenge, timedDurationSeconds, saveActiveExam,
   ]);
 
@@ -267,9 +282,52 @@ const Practice = () => {
     }
   };
 
+  // ── NGN answering ─────────────────────────────────────────────────────────
+  const ngnItem = currentQuestion.ngn;
+  const currentNgnResponse: NgnResponse | null = ngnItem
+    ? ngnResponses[currentQuestion.id] || createEmptyResponse(ngnItem)
+    : null;
+  const ngnScore = ngnItem ? gradeNgn(ngnItem, currentNgnResponse) : null;
+
+  const handleNgnChange = (response: NgnResponse) => {
+    if (isChecked) return;
+    setNgnResponses((prev) => ({ ...prev, [currentQuestion.id]: response }));
+  };
+
+  const handleCheckNgn = () => {
+    if (!ngnItem || !ngnScore) return;
+
+    setIsChecked(true);
+    // Store a readable summary so the results review, which only knows about
+    // string answers, still shows what the learner chose.
+    setUserSelections((prev) => ({
+      ...prev,
+      [currentQuestion.id]: describeNgnResponse(ngnItem, currentNgnResponse),
+    }));
+    setNgnPoints((prev) => ({
+      earned: prev.earned + ngnScore.earned,
+      possible: prev.possible + ngnScore.possible,
+    }));
+
+    // Partial credit drives the spaced-repetition grade: a near-miss shouldn't
+    // reset the box the way a blank answer does.
+    const grade = ngnScore.correct ? 'good' : ngnScore.ratio >= 0.5 ? 'hard' : 'again';
+    reviewQuestion(currentQuestion.id, grade);
+
+    // A question only counts toward the session score when it's fully correct,
+    // which keeps XP, streaks, and history charts on their existing scale.
+    if (ngnScore.correct) {
+      setScore((s) => s + 1);
+      setXpFloat({ id: Date.now(), amount: 20 });
+      setTimeout(() => setXpFloat(null), 900);
+    } else {
+      setIncorrectQuestionIds((prev) => [...prev, currentQuestion.id]);
+    }
+  };
+
   const handleCheck = () => {
     if (selectedOptions.length === 0) return;
-    
+
     setIsChecked(true);
     setUserSelections((prev) => ({ ...prev, [currentQuestion.id]: [...selectedOptions] }));
     
@@ -278,7 +336,12 @@ const Practice = () => {
     // smart quotes, entities, or case still grade correctly.
     const correctAnswers = Array.isArray(currentQuestion.answer) ? currentQuestion.answer : [currentQuestion.answer];
     const isCorrect = isSelectionCorrect(selectedOptions, correctAnswers);
-    
+
+    // Advance the spaced-repetition box so exam answers count toward mastery,
+    // the same way flashcard reviews do. Correct → 'good' (box up), wrong →
+    // 'again' (box reset). XP is still granted once at session end via addSession.
+    reviewQuestion(currentQuestion.id, isCorrect ? 'good' : 'again');
+
     // Update score
     if (isCorrect) {
         setScore(s => s + 1);
@@ -311,6 +374,8 @@ const Practice = () => {
     setScore(0);
     setIncorrectQuestionIds([]);
     setUserSelections({});
+    setNgnResponses({});
+    setNgnPoints({ earned: 0, possible: 0 });
     setStartTime(Date.now());
     setIsDrillMode(true);
     setShowFiveMore(false);
@@ -335,6 +400,8 @@ const Practice = () => {
     setScore(0);
     setIncorrectQuestionIds([]);
     setUserSelections({});
+    setNgnResponses({});
+    setNgnPoints({ earned: 0, possible: 0 });
     setStartTime(Date.now());
     setFiveMoreActive(true);
     setShowFiveMore(false);
@@ -407,6 +474,31 @@ const Practice = () => {
           </Modal>
 
             <div className="max-w-4xl mx-auto w-full space-y-8 animate-in fade-in zoom-in duration-300 p-4">
+
+                {/* NGN partial-credit tally — only appears when the session had NGN items */}
+                {ngnPoints.possible > 0 && (
+                  <div className="rounded-2xl border border-border/60 bg-card/50 px-5 py-4">
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <p className="font-semibold text-sm">Clinical judgment partial credit</p>
+                      <p className="text-sm tabular-nums">
+                        <span className="font-bold text-primary">{Math.round(ngnPoints.earned * 10) / 10}</span>
+                        <span className="text-muted-foreground"> / {ngnPoints.possible} points</span>
+                      </p>
+                    </div>
+                    <div className="mt-2 h-2 w-full rounded-full bg-secondary/50 overflow-hidden">
+                      <motion.div
+                        className="h-full bg-primary"
+                        initial={{ width: 0 }}
+                        animate={{ width: `${Math.round((ngnPoints.earned / ngnPoints.possible) * 100)}%` }}
+                        transition={{ duration: 0.6 }}
+                      />
+                    </div>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Scored across the NGN items in this session. The score above still counts a question
+                      only when every part of it is right.
+                    </p>
+                  </div>
+                )}
 
                 {/* Daily challenge completion banner */}
                 {isChallenge && bonusXpEarned > 0 && (
@@ -636,11 +728,12 @@ const Practice = () => {
     );
   }
 
-  // Determine if it's MCQ or Flashcard style (fallback)
-  const isMCQ = currentQuestion.options && currentQuestion.options.length > 0;
+  // Question format: NGN payload wins, then classic MCQ, then flashcard flip.
+  const isNgn = !!ngnItem;
+  const isMCQ = !isNgn && !!currentQuestion.options && currentQuestion.options.length > 0;
 
   return (
-    <div className="flex flex-col h-full max-w-4xl mx-auto pb-10 px-4 overflow-y-auto min-h-0 relative">
+    <div className={`flex flex-col h-full ${isNgn ? 'max-w-6xl' : 'max-w-4xl'} mx-auto pb-10 px-4 overflow-y-auto min-h-0 relative`}>
       {/* XP Float Animation */}
       <AnimatePresence>
         {xpFloat && (
@@ -701,9 +794,16 @@ const Practice = () => {
             exit={{ opacity: 0, x: -20 }}
             className="flex-1 flex flex-col min-h-0"
         >
+            {/* Client record — the 5-tab chart the unfolding case is built on */}
+            {currentQuestion.ehr && (
+                // shrink-0: the card is inside a flex column, and without it the
+                // chart collapses once the feedback panel appears below it.
+                <EhrChartViewer chart={currentQuestion.ehr} compact className="mb-6 shrink-0" />
+            )}
+
             <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-2xl shadow-sm mb-6 flex flex-col overflow-hidden">
                 {/* Scrollable content area */}
-                <div className="overflow-y-auto max-h-[42vh] p-8 flex flex-col items-center justify-center text-center">
+                <div className={`overflow-y-auto max-h-[42vh] p-8 flex flex-col ${isNgn ? 'items-start text-left' : 'items-center justify-center text-center'}`}>
                     {currentQuestion.imageUrl && (
                         <div className="mb-6 w-full max-w-lg rounded-lg overflow-hidden shadow-lg">
                              <img
@@ -718,7 +818,7 @@ const Practice = () => {
                     </div>
                 </div>
                 {/* Sticky footer inside card */}
-                {!isMCQ && (
+                {!isMCQ && !isNgn && (
                     <div className="shrink-0 border-t border-border/40 px-8 py-3 flex items-center justify-center">
                         <span className="text-xs text-muted-foreground tracking-wide select-none">
                             Click below to flip
@@ -727,7 +827,14 @@ const Practice = () => {
                 )}
             </div>
 
-            {isMCQ ? (
+            {isNgn && ngnItem && currentNgnResponse ? (
+                <NgnPlayer
+                    item={ngnItem}
+                    response={currentNgnResponse}
+                    onChange={handleNgnChange}
+                    checked={isChecked}
+                />
+            ) : isMCQ ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {currentQuestion.options?.map((option, idx) => {
                         const isSelected = selectedOptions.includes(option);
@@ -795,10 +902,10 @@ const Practice = () => {
                             )}
                         </div>
                         <div className="shrink-0 border-t border-border/40 px-8 py-4 flex gap-3 justify-center">
-                            <Button variant="destructive" onClick={() => { setIncorrectQuestionIds(prev => [...prev, currentQuestion.id]); handleNext(); }}>
+                            <Button variant="destructive" onClick={() => { reviewQuestion(currentQuestion.id, 'again'); setIncorrectQuestionIds(prev => [...prev, currentQuestion.id]); handleNext(); }}>
                                 <XCircle className="mr-2 h-4 w-4" /> Got it wrong
                             </Button>
-                            <Button className="bg-green-600 hover:bg-green-700" onClick={() => { setScore(s => s + 1); handleNext(); }}>
+                            <Button className="bg-green-600 hover:bg-green-700" onClick={() => { reviewQuestion(currentQuestion.id, 'good'); setScore(s => s + 1); handleNext(); }}>
                                 <CheckCircle2 className="mr-2 h-4 w-4" /> Got it right
                             </Button>
                         </div>
@@ -867,10 +974,77 @@ const Practice = () => {
 
             {!isChecked && isMCQ && (
                 <div className="mt-8 flex justify-end">
-                    <Button 
-                        size="lg" 
-                        onClick={handleCheck} 
+                    <Button
+                        size="lg"
+                        onClick={handleCheck}
                         disabled={selectedOptions.length === 0}
+                        className="w-full md:w-auto min-w-[150px]"
+                    >
+                        Check Answer
+                    </Button>
+                </div>
+            )}
+
+            {/* NGN feedback — reports partial credit alongside the rationale */}
+            {isChecked && isNgn && ngnScore && (
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`mt-6 p-6 rounded-2xl border ${
+                        ngnScore.correct
+                            ? 'bg-green-500/10 border-green-500/20'
+                            : ngnScore.earned > 0
+                                ? 'bg-amber-500/10 border-amber-500/20'
+                                : 'bg-red-500/10 border-red-500/20'
+                    }`}
+                >
+                    <div className="flex items-start gap-3">
+                        {ngnScore.correct ? (
+                            <CheckCircle2 className="h-6 w-6 text-green-500 shrink-0 mt-1" />
+                        ) : (
+                            <AlertCircle className={`h-6 w-6 shrink-0 mt-1 ${ngnScore.earned > 0 ? 'text-amber-500' : 'text-red-500'}`} />
+                        )}
+                        <div className="flex-1">
+                            <div className="flex flex-wrap items-center gap-3 mb-2">
+                                <h3 className={`text-lg font-bold ${
+                                    ngnScore.correct ? 'text-green-500' : ngnScore.earned > 0 ? 'text-amber-500' : 'text-red-500'
+                                }`}>
+                                    {ngnScore.correct ? 'Correct!' : ngnScore.earned > 0 ? 'Partially correct' : 'Incorrect'}
+                                </h3>
+                                <span className="rounded-full bg-background/60 px-3 py-1 text-sm font-semibold tabular-nums">
+                                    {ngnScore.earned} / {ngnScore.possible} points
+                                </span>
+                            </div>
+                            <div className="h-2 w-full rounded-full bg-background/60 overflow-hidden">
+                                <motion.div
+                                    className={`h-full ${ngnScore.correct ? 'bg-green-500' : ngnScore.earned > 0 ? 'bg-amber-500' : 'bg-red-500'}`}
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${Math.round(ngnScore.ratio * 100)}%` }}
+                                    transition={{ duration: 0.5 }}
+                                />
+                            </div>
+                            {currentQuestion.rationale && (
+                                <div className="text-foreground/90 mt-4">
+                                    <span className="font-semibold block mb-1">Rationale:</span>
+                                    <RichText content={currentQuestion.rationale} className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]" />
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    <div className="mt-6 flex justify-end">
+                        <Button onClick={handleNext} size="lg" className={ngnScore.correct ? 'bg-green-600 hover:bg-green-700' : ''}>
+                            {currentQuestionIndex < setQuestions.length - 1 ? 'Next Question' : 'Finish Quiz'}
+                        </Button>
+                    </div>
+                </motion.div>
+            )}
+
+            {!isChecked && isNgn && ngnItem && (
+                <div className="mt-8 flex justify-end">
+                    <Button
+                        size="lg"
+                        onClick={handleCheckNgn}
+                        disabled={!isNgnAnswered(ngnItem, currentNgnResponse)}
                         className="w-full md:w-auto min-w-[150px]"
                     >
                         Check Answer

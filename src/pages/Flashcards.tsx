@@ -276,7 +276,7 @@ const Flashcards = () => {
 
   return (
     <div className="flex flex-col h-full max-w-3xl mx-auto pb-10">
-	      <div className="mb-6 space-y-4">
+      <div className="mb-6 space-y-4">
         <div className="flex items-center justify-between">
            <Button variant="ghost" size="sm" onClick={() => setSelectedSetId(null)} className="-ml-2 text-muted-foreground hover:text-foreground">
              <ArrowLeft size={16} className="mr-1" /> Back
@@ -297,10 +297,10 @@ const Flashcards = () => {
                 transition={{ duration: 0.5 }}
             />
         </div>
-	        <div className="flex justify-between text-xs text-muted-foreground px-1">
-	            <span>{currentIndex} reviewed</span>
-	            <span>{dueQuestions.length - currentIndex} remaining</span>
-	        </div>
+        <div className="flex justify-between text-xs text-muted-foreground px-1">
+            <span>{currentIndex} reviewed</span>
+            <span>{dueQuestions.length - currentIndex} remaining</span>
+        </div>
           <div className="text-[11px] text-muted-foreground text-center">
             Space: flip card, 1-4: Again/Hard/Good/Easy
           </div>
@@ -309,7 +309,7 @@ const Flashcards = () => {
               Drill Missed Cards
             </div>
           )}
-	      </div>
+      </div>
 
       <div className="flex-1 flex flex-col items-center justify-center perspective-1000 min-h-[400px]">
         <div className="relative w-full max-w-xl aspect-3/2 group">

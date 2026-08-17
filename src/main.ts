@@ -99,6 +99,13 @@ const createWindow = () => {
     },
   });
 
+  // Exclude the window from screen capture (recordings, screenshots, screen-share).
+  // macOS + Windows only; no-op on Linux. Gated to the packaged app so dev
+  // screenshots/screen-shares still work.
+  if (app.isPackaged) {
+    mainWindow.setContentProtection(true);
+  }
+
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (isSafeExternalUrl(url)) {
       void shell.openExternal(url);
@@ -120,7 +127,7 @@ const createWindow = () => {
     if (!app.isPackaged) return;
     const isToggleDevTools =
       (input.meta && input.alt && input.key.toLowerCase() === 'i') ||
-      (input.ctrl && input.shift && input.key.toLowerCase() === 'i') ||
+      (input.control && input.shift && input.key.toLowerCase() === 'i') ||
       input.key === 'F12';
     if (isToggleDevTools) {
       event.preventDefault();
@@ -148,6 +155,10 @@ const createWindow = () => {
   new UpdateService(mainWindow);
 
   const loadMainWindow = async () => {
+    // Capture a non-null reference; the module-level `mainWindow` can be set to
+    // null by the 'closed' handler, but it is always set when this runs.
+    const win = mainWindow;
+    if (!win) return;
     const devServerUrl =
       typeof MAIN_WINDOW_VITE_DEV_SERVER_URL === 'string'
         ? MAIN_WINDOW_VITE_DEV_SERVER_URL
@@ -163,7 +174,7 @@ const createWindow = () => {
 
     if (devServerUrl) {
       try {
-        await mainWindow.loadURL(devServerUrl);
+        await win.loadURL(devServerUrl);
         return;
       } catch (error) {
         console.warn(
@@ -175,12 +186,12 @@ const createWindow = () => {
 
     const fallbackPath = fallbackCandidates.find((candidate) => fs.existsSync(candidate));
     if (fallbackPath) {
-      await mainWindow.loadFile(fallbackPath);
+      await win.loadFile(fallbackPath);
       return;
     }
 
     const errorHtml = `<!doctype html><html><head><meta charset="UTF-8"><title>Qudoro Launch Error</title></head><body style="font-family: -apple-system, sans-serif; background:#0f172a; color:#e2e8f0; padding:24px;"><h2>Qudoro could not load its UI</h2><p>No local renderer file was found.</p><p>Expected one of:</p><pre>${fallbackCandidates.join('\n')}</pre></body></html>`;
-    await mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(errorHtml)}`);
+    await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(errorHtml)}`);
   };
 
   void loadMainWindow().catch((error) => {
@@ -256,6 +267,12 @@ const openDonationWindow = (parent: BrowserWindow) => {
 };
 
 // IPC Handlers
+// Synchronous flag so the preload can decide whether to enable copy-protection
+// (packaged builds only, so development is unaffected).
+ipcMain.on('get-is-packaged', (event) => {
+  event.returnValue = app.isPackaged;
+});
+
 ipcMain.on('minimize-window', (event) => {
   const win = BrowserWindow.fromWebContents(event.sender);
   win?.minimize();
@@ -360,6 +377,104 @@ ipcMain.handle('get-backup-folder', () => {
   // Default to Documents folder on first use
   const docs = app.getPath('documents');
   return docs;
+});
+
+// ── Local auto-snapshots ──────────────────────────────────────────────────────
+// Versioned, timestamped copies of the full library written on every meaningful
+// save. Unlike the user-chosen backup folder these ALWAYS exist (kept inside the
+// app's own data dir, no setup required) and retain a rolling history — so a set
+// is recoverable even if it never reached the shared store, the cloud, or a
+// configured backup folder.
+const SNAPSHOT_LIMIT = 40;
+
+const getSnapshotDir = (): string => {
+  const dir = path.join(app.getPath('userData'), 'snapshots');
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+};
+
+const snapshotCounts = (jsonContent: string): { qCount: number; sCount: number } => {
+  try {
+    const d = JSON.parse(jsonContent);
+    return {
+      qCount: Array.isArray(d?.questions) ? d.questions.length : 0,
+      sCount: Array.isArray(d?.sets) ? d.sets.length : 0,
+    };
+  } catch {
+    return { qCount: 0, sCount: 0 };
+  }
+};
+
+const writeSnapshot = (jsonContent: string): { success: boolean; file?: string; error?: string } => {
+  const { qCount, sCount } = snapshotCounts(jsonContent);
+  // Never persist an empty snapshot — it would only push real ones out of the
+  // rolling window.
+  if (qCount === 0 && sCount === 0) return { success: false, error: 'empty snapshot skipped' };
+  try {
+    const dir = getSnapshotDir();
+    const existing = fs
+      .readdirSync(dir)
+      .filter((f) => f.startsWith('snapshot-') && f.endsWith('.json'))
+      .sort();
+    // Skip if identical to the most recent snapshot, so unchanged app
+    // open/close cycles don't churn real history out of the rolling window.
+    const newest = existing[existing.length - 1];
+    if (newest) {
+      try {
+        if (fs.readFileSync(path.join(dir, newest), 'utf-8') === jsonContent) {
+          return { success: true, file: newest };
+        }
+      } catch { /* fall through and write a fresh snapshot */ }
+    }
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const file = `snapshot-${stamp}-q${qCount}-s${sCount}.json`;
+    fs.writeFileSync(path.join(dir, file), jsonContent, 'utf-8');
+    // Prune oldest beyond the limit (filenames sort chronologically by prefix).
+    const files = fs
+      .readdirSync(dir)
+      .filter((f) => f.startsWith('snapshot-') && f.endsWith('.json'))
+      .sort();
+    for (const old of files.slice(0, Math.max(0, files.length - SNAPSHOT_LIMIT))) {
+      try { fs.unlinkSync(path.join(dir, old)); } catch { /* ignore */ }
+    }
+    return { success: true, file };
+  } catch (error: any) {
+    return { success: false, error: error?.message ?? 'snapshot write failed' };
+  }
+};
+
+ipcMain.handle('save-snapshot', (_event, jsonContent: string) => writeSnapshot(jsonContent));
+
+ipcMain.handle('list-snapshots', () => {
+  try {
+    const dir = getSnapshotDir();
+    return fs
+      .readdirSync(dir)
+      .filter((f) => f.startsWith('snapshot-') && f.endsWith('.json'))
+      .map((file) => {
+        const stat = fs.statSync(path.join(dir, file));
+        const m = /q(\d+)-s(\d+)\.json$/.exec(file);
+        return {
+          file,
+          savedAt: stat.mtimeMs,
+          qCount: m ? Number(m[1]) : 0,
+          sCount: m ? Number(m[2]) : 0,
+        };
+      })
+      .sort((a, b) => b.savedAt - a.savedAt);
+  } catch {
+    return [];
+  }
+});
+
+ipcMain.handle('read-snapshot', (_event, file: string) => {
+  // Guard against path traversal — only plain snapshot filenames are allowed.
+  if (typeof file !== 'string' || !/^snapshot-[\w.-]+\.json$/.test(file)) return null;
+  try {
+    return fs.readFileSync(path.join(getSnapshotDir(), file), 'utf-8');
+  } catch {
+    return null;
+  }
 });
 
 let PDFParseCtor: null | (new (data: Uint8Array) => { getText: () => Promise<{ text: string }> }) =
@@ -558,8 +673,8 @@ ipcMain.handle('fetch-url', async (_event, url) => {
 
 // ── On-close backup ──────────────────────────────────────────────────────────
 app.on('before-quit', (event) => {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
   const folderPath = store.get('backupFolder') as string | undefined;
-  if (!folderPath || !mainWindow || mainWindow.isDestroyed()) return;
 
   event.preventDefault();
   mainWindow.webContents.send('request-backup-data');
@@ -569,13 +684,18 @@ app.on('before-quit', (event) => {
   ipcMain.once('backup-data-response', (_evt, jsonContent: string) => {
     clearTimeout(forceQuitTimer);
     try {
-      const dateStr = new Date().toISOString().split('T')[0];
-      fs.writeFileSync(
-        path.join(folderPath, `qudoro-backup-${dateStr}.json`),
-        jsonContent,
-        'utf-8'
-      );
-      store.set('lastBackupTime', Date.now());
+      // Always capture a local rolling snapshot of the final state, even when no
+      // backup folder is configured.
+      writeSnapshot(jsonContent);
+      if (folderPath) {
+        const dateStr = new Date().toISOString().split('T')[0];
+        fs.writeFileSync(
+          path.join(folderPath, `qudoro-backup-${dateStr}.json`),
+          jsonContent,
+          'utf-8'
+        );
+        store.set('lastBackupTime', Date.now());
+      }
     } catch { /* silent */ } finally {
       app.exit(0);
     }
@@ -595,7 +715,7 @@ app.on('ready', () => {
     if (process.platform === 'darwin') {
         const iconPath = resolveAppIconPath();
         if (iconPath) {
-          app.dock.setIcon(iconPath);
+          app.dock?.setIcon(iconPath);
         }
     }
     createWindow();

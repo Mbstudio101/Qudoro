@@ -1,4 +1,5 @@
 import type {
+  ContentAttestation,
   DiscoverQuery,
   DiscoverResponse,
   ImportedSetLink,
@@ -42,6 +43,7 @@ const toSummary = (detail: SharedSetDetail): SharedSetSummary => ({
   createdAt: detail.createdAt,
   updatedAt: detail.updatedAt,
   author: detail.author,
+  attestation: detail.attestation,
 });
 
 class MockMarketplaceApi implements MarketplaceApi {
@@ -109,6 +111,7 @@ class MockMarketplaceApi implements MarketplaceApi {
       createdAt: now,
       updatedAt: now,
       author: { id: 'mock_author', displayName: 'You' },
+      attestation: input.attestation,
       questions: input.questions.map((q, idx) => ({
         id: `mock_q_${idx + 1}_${Date.now()}`,
         remoteQuestionId: q.remoteQuestionId,
@@ -143,7 +146,7 @@ class SupabaseMarketplaceApi implements MarketplaceApi {
     let query = supabase
       .from('shared_sets')
       .select(
-        'id, slug, title, description, subject, tags, visibility, version, downloads_count, rating_avg, rating_count, author_id, created_at, updated_at',
+        'id, slug, title, description, subject, tags, visibility, version, downloads_count, rating_avg, rating_count, author_id, created_at, updated_at, attestation',
         { count: 'exact' },
       )
       .eq('visibility', 'public');
@@ -206,6 +209,7 @@ class SupabaseMarketplaceApi implements MarketplaceApi {
         id: row.author_id as string,
         displayName: `Nurse ${String(row.author_id).slice(0, 6)}`,
       },
+      attestation: (row.attestation as ContentAttestation | null) ?? undefined,
     }));
 
     return {
@@ -223,7 +227,7 @@ class SupabaseMarketplaceApi implements MarketplaceApi {
     const { data: setData, error: setError } = await supabase
       .from('shared_sets')
       .select(
-        'id, slug, title, description, subject, tags, visibility, version, downloads_count, rating_avg, rating_count, author_id, created_at, updated_at',
+        'id, slug, title, description, subject, tags, visibility, version, downloads_count, rating_avg, rating_count, author_id, created_at, updated_at, attestation',
       )
       .eq('id', setId)
       .eq('visibility', 'public')
@@ -277,6 +281,7 @@ class SupabaseMarketplaceApi implements MarketplaceApi {
         id: setData.author_id as string,
         displayName: `Nurse ${String(setData.author_id).slice(0, 6)}`,
       },
+      attestation: (setData.attestation as ContentAttestation | null) ?? undefined,
       questions,
     };
   }
@@ -309,8 +314,12 @@ class SupabaseMarketplaceApi implements MarketplaceApi {
         tags: input.tags,
         visibility: input.visibility,
         version: 1,
+        // Stored as jsonb. Needs a matching `attestation` column on
+        // `shared_sets`; without it Supabase rejects the insert, which is the
+        // safe failure — a set should not publish with its origin dropped.
+        attestation: input.attestation,
       })
-      .select('id, slug, title, description, subject, tags, visibility, version, downloads_count, rating_avg, rating_count, author_id, created_at, updated_at')
+      .select('id, slug, title, description, subject, tags, visibility, version, downloads_count, rating_avg, rating_count, author_id, created_at, updated_at, attestation')
       .single();
 
     if (setError || !insertedSet) {
@@ -354,6 +363,7 @@ class SupabaseMarketplaceApi implements MarketplaceApi {
         id: insertedSet.author_id as string,
         displayName: `Nurse ${String(insertedSet.author_id).slice(0, 6)}`,
       },
+      attestation: (insertedSet.attestation as ContentAttestation | null) ?? undefined,
     };
   }
 }

@@ -28,6 +28,7 @@ import {
 import Input from '../components/ui/Input';
 import { getHolidayForToday } from '../utils/holidays';
 import { getQuotesByField } from '../utils/quotes';
+import { toDayKey } from '../utils/dateKeys';
 
 // Animated count-up hook (ease-out cubic)
 const useCountUp = (target: number, duration = 900) => {
@@ -124,15 +125,15 @@ const Dashboard = () => {
   // ── Streak / week view ────────────────────────────────────────────────────
   const streakDays    = userProfile.stats.streakDays   || 0;
   const lastStudyDate = userProfile.stats.lastStudyDate || 0;
-  const todayKey      = new Date().toISOString().slice(0, 10);
-  const studiedToday  = new Date(lastStudyDate).toISOString().slice(0, 10) === todayKey;
+  const todayKey      = toDayKey();
+  const studiedToday  = toDayKey(new Date(lastStudyDate)) === todayKey;
 
   const weekHistory = useMemo(() => {
     const history = userProfile.stats.studyHistory || {};
     return Array.from({ length: 7 }, (_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - (6 - i));
-      const key = d.toISOString().slice(0, 10);
+      const key = toDayKey(d);
       return {
         key,
         label: d.toLocaleDateString('en', { weekday: 'short' }).slice(0, 1),
@@ -175,7 +176,9 @@ const Dashboard = () => {
       const start = new Date(date.setHours(0,  0,  0,   0)).getTime();
       const end   = new Date(date.setHours(23, 59, 59, 999)).getTime();
       let count = questions.filter(q => q.nextReviewDate >= start && q.nextReviewDate <= end).length;
-      if (i === 0) count += questions.filter(q => q.nextReviewDate < start).length;
+      // Today's bar also includes overdue cards AND never-reviewed cards, so it
+      // matches the `cardsDue` stat (which counts !nextReviewDate as due).
+      if (i === 0) count += questions.filter(q => !q.nextReviewDate || q.nextReviewDate < start).length;
       return { day: i === 0 ? 'Today' : days[new Date(start).getDay()], count };
     });
   }, [questions]);

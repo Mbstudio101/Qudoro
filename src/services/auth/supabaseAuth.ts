@@ -2,7 +2,7 @@ import { getSupabaseClient } from '../marketplace/supabaseClient';
 
 export type SupabaseAuthResult =
   | { ok: true; email: string; name?: string }
-  | { ok: false; error: string; needsEmailConfirmation?: boolean };
+  | { ok: false; error: string; needsEmailConfirmation?: boolean; networkError?: boolean };
 
 const getWebBaseUrl = (): string => {
   const configured = (import.meta.env.VITE_WEB_BASE_URL as string | undefined)?.trim();
@@ -10,21 +10,37 @@ const getWebBaseUrl = (): string => {
   return 'https://qudoro.com';
 };
 
+/** Shown whenever the auth server can't be reached, in place of raw fetch errors. */
+const UNREACHABLE_MESSAGE =
+  "Can't reach the sign-in server. Check your internet connection, or try again later.";
+
+const NETWORK_ERROR_PATTERN =
+  /failed to fetch|network|fetch failed|ENOTFOUND|ECONNREFUSED|ERR_NAME_NOT_RESOLVED|getaddrinfo|load failed/i;
+
 const normalizeAuthError = (error: unknown, fallback: string): string => {
   if (error instanceof Error) {
     const message = error.message || fallback;
-    if (/failed to fetch/i.test(message)) {
-      return 'Network error while contacting auth server. Check internet and Supabase URL/key configuration.';
+    if (NETWORK_ERROR_PATTERN.test(message)) {
+      return UNREACHABLE_MESSAGE;
     }
     return message;
   }
   return fallback;
 };
 
+/** True when an error is a network/reachability failure rather than a rejected credential. */
+const isNetworkError = (error: unknown): boolean =>
+  error instanceof Error && NETWORK_ERROR_PATTERN.test(error.message);
+
+/** Same check for the plain-message form supabase-js returns on its result objects. */
+const isNetworkMessage = (message: string): boolean => NETWORK_ERROR_PATTERN.test(message);
+
 export const signInWithSupabase = async (email: string, password: string): Promise<SupabaseAuthResult> => {
   const supabase = getSupabaseClient();
   if (!supabase) {
-    return { ok: false, error: 'Supabase auth is not configured.' };
+    // Not configured counts as "can't reach auth" so callers can fall back to
+    // offline/local sign-in instead of hard-failing.
+    return { ok: false, error: 'Supabase auth is not configured.', networkError: true };
   }
 
   try {
@@ -32,7 +48,15 @@ export const signInWithSupabase = async (email: string, password: string): Promi
     if (error || !data.user?.email) {
       const message = error?.message || 'Invalid login credentials.';
       const needsEmailConfirmation = /email.*confirm/i.test(message);
-      return { ok: false, error: message, needsEmailConfirmation };
+      // supabase-js surfaces network failures as an AuthRetryableFetchError with
+      // a "Failed to fetch" message; treat those as reachability errors.
+      const networkError = isNetworkError(error) || isNetworkMessage(message);
+      return {
+        ok: false,
+        error: networkError ? UNREACHABLE_MESSAGE : message,
+        needsEmailConfirmation,
+        networkError,
+      };
     }
 
     const displayName =
@@ -42,7 +66,11 @@ export const signInWithSupabase = async (email: string, password: string): Promi
     return { ok: true, email: data.user.email, name: displayName };
   } catch (error) {
     console.error('Supabase sign-in request failed:', error);
-    return { ok: false, error: normalizeAuthError(error, 'Unable to sign in right now. Please try again.') };
+    return {
+      ok: false,
+      error: normalizeAuthError(error, 'Unable to sign in right now. Please try again.'),
+      networkError: isNetworkError(error),
+    };
   }
 };
 
@@ -55,7 +83,7 @@ export const signUpWithSupabase = async (input: {
 }): Promise<SupabaseAuthResult> => {
   const supabase = getSupabaseClient();
   if (!supabase) {
-    return { ok: false, error: 'Supabase auth is not configured.' };
+    return { ok: false, error: UNREACHABLE_MESSAGE, networkError: true };
   }
 
   try {
@@ -73,7 +101,16 @@ export const signUpWithSupabase = async (input: {
     });
 
     if (error) {
-      return { ok: false, error: error.message || 'Failed to create account.' };
+      const message = error.message || 'Failed to create account.';
+      // Sign-up has no offline fallback (there is nothing local to sign in to
+      // yet), so a reachability failure must at least say so plainly rather
+      // than surfacing a raw "Failed to fetch".
+      const networkError = isNetworkError(error) || isNetworkMessage(message);
+      return {
+        ok: false,
+        error: networkError ? `${UNREACHABLE_MESSAGE} You need a connection to create a new account.` : message,
+        networkError,
+      };
     }
 
     // If email confirmation is enabled, session can be null right after sign-up.
@@ -93,7 +130,11 @@ export const signUpWithSupabase = async (input: {
     return { ok: true, email: data.user.email, name: displayName };
   } catch (error) {
     console.error('Supabase sign-up request failed:', error);
-    return { ok: false, error: normalizeAuthError(error, 'Unable to create account right now. Please try again.') };
+    return {
+      ok: false,
+      error: normalizeAuthError(error, 'Unable to create account right now. Please try again.'),
+      networkError: isNetworkError(error),
+    };
   }
 };
 
@@ -107,10 +148,12 @@ export const signOutSupabase = async (): Promise<void> => {
   }
 };
 
-export const requestPasswordReset = async (email: string): Promise<{ ok: true } | { ok: false; error: string }> => {
+export const requestPasswordReset = async (
+  email: string,
+): Promise<{ ok: true } | { ok: false; error: string; networkError?: boolean }> => {
   const supabase = getSupabaseClient();
   if (!supabase) {
-    return { ok: false, error: 'Supabase auth is not configured.' };
+    return { ok: false, error: UNREACHABLE_MESSAGE, networkError: true };
   }
 
   try {
@@ -119,12 +162,22 @@ export const requestPasswordReset = async (email: string): Promise<{ ok: true } 
     });
 
     if (error) {
-      return { ok: false, error: error.message || 'Unable to send reset email.' };
+      const message = error.message || 'Unable to send reset email.';
+      const networkError = isNetworkError(error) || isNetworkMessage(message);
+      return {
+        ok: false,
+        error: networkError ? UNREACHABLE_MESSAGE : message,
+        networkError,
+      };
     }
 
     return { ok: true };
   } catch (error) {
     console.error('Supabase password reset request failed:', error);
-    return { ok: false, error: normalizeAuthError(error, 'Unable to send reset email right now.') };
+    return {
+      ok: false,
+      error: normalizeAuthError(error, 'Unable to send reset email right now.'),
+      networkError: isNetworkError(error),
+    };
   }
 };

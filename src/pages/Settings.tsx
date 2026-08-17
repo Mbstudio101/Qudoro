@@ -15,6 +15,8 @@ const Settings = () => {
     questions,
     sets,
     importData,
+    exportBackup,
+    restoreBackup,
     resetData,
     addQuestion,
     addSet,
@@ -47,6 +49,15 @@ const Settings = () => {
   const [lastBackupTime, setLastBackupTime] = useState<number | null>(null);
   const [backupStatus, setBackupStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [backupMsg, setBackupMsg] = useState('');
+
+  // Import/export progress (keeps the UI responsive + shows it isn't frozen)
+  const [ioStatus, setIoStatus] = useState<'idle' | 'exporting' | 'importing'>('idle');
+
+  // Local snapshot (auto-save) State
+  type SnapshotInfo = { file: string; savedAt: number; qCount: number; sCount: number };
+  const [snapshots, setSnapshots] = useState<SnapshotInfo[]>([]);
+  const [restoreMsg, setRestoreMsg] = useState('');
+  const [restoreStatus, setRestoreStatus] = useState<'idle' | 'restoring' | 'success' | 'error'>('idle');
 
   // Quizlet Import State
   const [quizletUrl, setQuizletUrl] = useState('');
@@ -692,6 +703,7 @@ const Settings = () => {
     window.electron.backup.getFolder().then(f => { if (f) setBackupFolder(f); });
     window.electron.store.get('lastBackupTime').then((t: number) => { if (t) setLastBackupTime(t); });
     window.electron.store.get('backupIntervalHours').then((h: number) => { if (h) setBackupIntervalHours(h); });
+    window.electron.snapshots?.list().then(setSnapshots).catch(() => { /* ignore */ });
   }, []);
 
   // Scheduled backup interval
@@ -726,6 +738,34 @@ const Settings = () => {
     } else {
       setBackupStatus('error');
       setBackupMsg(result.error ?? 'Backup failed.');
+    }
+  };
+
+  const refreshSnapshots = async () => {
+    if (!window.electron?.snapshots) return;
+    try { setSnapshots(await window.electron.snapshots.list()); } catch { /* ignore */ }
+  };
+
+  const handleRestoreSnapshot = async (snap: SnapshotInfo) => {
+    if (!window.electron?.snapshots) return;
+    const ok = window.confirm(
+      `Restore the snapshot from ${new Date(snap.savedAt).toLocaleString()}?\n\n` +
+      `This will replace your current library with ${snap.qCount} questions and ${snap.sCount} sets.`,
+    );
+    if (!ok) return;
+    setRestoreStatus('restoring');
+    setRestoreMsg('');
+    try {
+      const json = await window.electron.snapshots.read(snap.file);
+      if (!json) throw new Error('Could not read snapshot file.');
+      const parsed = JSON.parse(json);
+      if (!restoreBackup(parsed)) throw new Error('Snapshot is not a valid backup.');
+      setRestoreStatus('success');
+      setRestoreMsg(`Restored ${snap.qCount} questions and ${snap.sCount} sets.`);
+      setTimeout(() => setRestoreStatus('idle'), 4000);
+    } catch (err) {
+      setRestoreStatus('error');
+      setRestoreMsg(err instanceof Error ? err.message : 'Restore failed.');
     }
   };
 
@@ -835,37 +875,35 @@ const Settings = () => {
       .filter((x): x is Question => x !== null);
   };
 
-  const handleExport = () => {
-    const exportedQuestions = questions.map((question) => {
-      const options = Array.isArray(question.options) ? question.options : [];
-      const answer = Array.isArray(question.answer) ? question.answer : [];
-      const correctOptionIndices = deriveCorrectOptionIndices(options, answer);
-      const selectionMode = normalizeSelectionMode(
-        question.selectionMode,
-        options.length,
-        correctOptionIndices.length,
-      );
-
-      return {
-        ...question,
-        selectionMode,
-        correctOptionIndices,
-      };
-    });
-
-    const data = JSON.stringify({ questions: exportedQuestions, sets }, null, 2);
-    const blob = new Blob([data], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `qudoro-backup-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  const handleExport = async () => {
+    if (ioStatus !== 'idle') return;
+    setIoStatus('exporting');
+    // Yield once so the "Exporting…" state paints before the synchronous
+    // serialize of a large, image-heavy payload runs.
+    await new Promise((r) => setTimeout(r, 0));
+    try {
+      // Full "save file": account, profile (avatar, theme, XP, streak, level,
+      // achievements, daily challenge, Blackboard), questions, sets, sessions,
+      // calendar and notes — everything needed to restore a user completely.
+      // Compact (no pretty-print): smaller file and noticeably faster to
+      // serialize than indented JSON; restore parses it either way.
+      const data = JSON.stringify(exportBackup());
+      const blob = new Blob([data], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `qudoro-backup-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } finally {
+      setIoStatus('idle');
+    }
   };
 
   const handleImportClick = () => {
+    if (ioStatus !== 'idle') return;
     fileInputRef.current?.click();
   };
 
@@ -873,11 +911,30 @@ const Settings = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setIoStatus('importing');
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onerror = () => {
+      setIoStatus('idle');
+      alert('Failed to read file');
+    };
+    reader.onload = async (event) => {
+      // Yield once so the "Importing…" state paints before the synchronous
+      // parse + restore of a large payload runs.
+      await new Promise((r) => setTimeout(r, 0));
       try {
         const data = JSON.parse(event.target?.result as string);
-        if (Array.isArray(data.questions) && Array.isArray(data.sets)) {
+        if (data && data.qudoroBackup && Array.isArray(data.accounts)) {
+            // Full save file — restores the entire account: profile, avatar,
+            // achievements, XP/streak, settings, and all content.
+            const ok = confirm(
+              'Restore full backup?\n\nThis replaces your current profile, achievements, progress, and all data with the saved backup. This cannot be undone.',
+            );
+            if (ok) {
+              const restored = restoreBackup(data);
+              alert(restored ? 'Full backup restored!' : 'Invalid backup file.');
+            }
+        } else if (Array.isArray(data.questions) && Array.isArray(data.sets)) {
+            // Legacy / shared file — appends question sets to the current profile.
             const normalizedQuestions = normalizeImportedQuestions(data.questions);
             importData({
               questions: normalizedQuestions,
@@ -890,6 +947,8 @@ const Settings = () => {
       } catch (err) {
         console.error(err);
         alert('Failed to parse file');
+      } finally {
+        setIoStatus('idle');
       }
     };
     reader.readAsText(file);
@@ -1057,13 +1116,14 @@ const Settings = () => {
                 {/* Export */}
                 <button
                   onClick={handleExport}
-                  className="group flex flex-col items-center gap-3 p-5 rounded-xl border border-blue-500/20 bg-blue-500/5 hover:bg-blue-500/10 hover:border-blue-500/40 transition-all duration-200"
+                  disabled={ioStatus !== 'idle'}
+                  className="group flex flex-col items-center gap-3 p-5 rounded-xl border border-blue-500/20 bg-blue-500/5 hover:bg-blue-500/10 hover:border-blue-500/40 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-500/5"
                 >
                   <div className="p-3 rounded-xl bg-blue-500/15 text-blue-500 group-hover:scale-110 transition-transform">
-                    <Download className="h-5 w-5" />
+                    {ioStatus === 'exporting' ? <RefreshCw className="h-5 w-5 animate-spin" /> : <Download className="h-5 w-5" />}
                   </div>
                   <div className="text-center">
-                    <p className="text-sm font-semibold">Export</p>
+                    <p className="text-sm font-semibold">{ioStatus === 'exporting' ? 'Exporting…' : 'Export'}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">Save backup</p>
                   </div>
                 </button>
@@ -1071,13 +1131,14 @@ const Settings = () => {
                 {/* Import */}
                 <button
                   onClick={handleImportClick}
-                  className="group flex flex-col items-center gap-3 p-5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 hover:border-emerald-500/40 transition-all duration-200"
+                  disabled={ioStatus !== 'idle'}
+                  className="group flex flex-col items-center gap-3 p-5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 hover:border-emerald-500/40 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-emerald-500/5"
                 >
                   <div className="p-3 rounded-xl bg-emerald-500/15 text-emerald-500 group-hover:scale-110 transition-transform">
-                    <Upload className="h-5 w-5" />
+                    {ioStatus === 'importing' ? <RefreshCw className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" />}
                   </div>
                   <div className="text-center">
-                    <p className="text-sm font-semibold">Import</p>
+                    <p className="text-sm font-semibold">{ioStatus === 'importing' ? 'Importing…' : 'Import'}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">Load backup</p>
                   </div>
                 </button>
@@ -1234,6 +1295,70 @@ const Settings = () => {
 
               <p className="text-xs text-muted-foreground">
                 Saves as <code className="text-foreground">qudoro-backup-YYYY-MM-DD.json</code> in your chosen folder. A backup is also created automatically when you close the app.
+              </p>
+            </div>
+          </div>
+
+          {/* ── Local Snapshots (auto-save / restore) ── */}
+          <div className="mt-5 rounded-2xl border border-border/40 bg-card/40 overflow-hidden">
+            <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-border/40 bg-linear-to-r from-emerald-500/8 via-teal-500/5 to-transparent">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-emerald-500/15 text-emerald-500">
+                  <Database className="h-4 w-4" />
+                </div>
+                <div>
+                  <h2 className="font-semibold text-sm">Recovery Snapshots</h2>
+                  <p className="text-xs text-muted-foreground">Automatic local saves of your library. Restore any point in time.</p>
+                </div>
+              </div>
+              <button
+                onClick={refreshSnapshots}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border/40 bg-secondary/30 hover:bg-secondary/60 text-xs font-medium transition-all shrink-0"
+              >
+                <RefreshCw className="h-3.5 w-3.5" /> Refresh
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              {snapshots.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  No snapshots yet. One is saved automatically a couple of seconds after you build or change a set, and when you close the app.
+                </p>
+              ) : (
+                <div className="space-y-2 max-h-72 overflow-y-auto">
+                  {snapshots.map((snap) => (
+                    <div
+                      key={snap.file}
+                      className="flex items-center justify-between gap-3 px-3 py-2 rounded-xl border border-border/40 bg-secondary/20"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm text-foreground truncate">{new Date(snap.savedAt).toLocaleString()}</p>
+                        <p className="text-xs text-muted-foreground">{snap.qCount} questions · {snap.sCount} sets</p>
+                      </div>
+                      <button
+                        onClick={() => handleRestoreSnapshot(snap)}
+                        disabled={restoreStatus === 'restoring'}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-emerald-500/25 bg-emerald-500/8 hover:bg-emerald-500/15 text-emerald-500 text-xs font-medium transition-all shrink-0 disabled:opacity-40"
+                      >
+                        <Upload className="h-3.5 w-3.5" /> Restore
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {restoreStatus === 'success' && (
+                <div className="flex items-center gap-2 text-emerald-500 bg-emerald-500/8 border border-emerald-500/20 p-3 rounded-xl text-xs">
+                  <Check className="h-3.5 w-3.5 shrink-0" />{restoreMsg}
+                </div>
+              )}
+              {restoreStatus === 'error' && (
+                <div className="flex items-center gap-2 text-destructive bg-destructive/8 border border-destructive/20 p-3 rounded-xl text-xs">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />{restoreMsg}
+                </div>
+              )}
+
+              <p className="text-xs text-muted-foreground">
+                Snapshots are kept on this device (last 40) and never overwrite each other, so a set you create is recoverable even if it didn't sync.
               </p>
             </div>
           </div>

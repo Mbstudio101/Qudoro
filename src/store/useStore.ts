@@ -3,10 +3,47 @@ import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
 import { get, set as idbSet, del } from 'idb-keyval'; // IndexedDB for performance
 import { calculateSM2 } from '../utils/sm2';
-import { alignAnswersToOptions } from '../utils/answerMatch';
+import { alignAnswersToOptions, normalizeAnswerText } from '../utils/answerMatch';
+import { toDayKey } from '../utils/dateKeys';
+import { questionCountOf, setCountOf, richnessOf, parsePersistMeta, pickBestCandidate, type PersistCandidate, type PersistMeta } from '../utils/persistMerge';
 import { BlackboardCourse, BlackboardAssignment, BlackboardGrade, BlackboardToken } from '../types/blackboard';
+import { NgnItem, NgnResponse, EhrChart } from '../types/ngn';
 import { getSupabaseClient } from '../services/marketplace/supabaseClient';
 
+
+/** How an item's content came to exist. Drives what can be safely published. */
+export type QuestionOrigin =
+  | 'authored'   // written by hand in the editor
+  | 'imported'   // brought in from an external set — provenance is the importer's problem
+  | 'generated'; // produced from a cited source passage
+
+export interface SourceCitation {
+  /** Human-readable attribution, e.g. "StatPearls: Hyperkalemia (CC BY 4.0)". */
+  citation: string;
+  url?: string;
+  /** The passage the claim was drawn from, kept so a reviewer can check it. */
+  excerpt?: string;
+  retrievedAt?: number;
+  /** Reuse terms of the source — the field that decides if this can ship. */
+  license?: string;
+}
+
+export interface QuestionProvenance {
+  origin: QuestionOrigin;
+  /** Sources backing the stem and rationale. Empty for hand-authored items. */
+  sources: SourceCitation[];
+  /** Set when a qualified human has checked the clinical content. */
+  reviewedBy?: string;
+  reviewedAt?: number;
+  /** Free-text note from the reviewer — why it passed, or what they changed. */
+  reviewNote?: string;
+  /** Model + prompt version, when `origin` is 'generated'. For recalls. */
+  generator?: { model: string; promptVersion: string; generatedAt: number };
+}
+
+/** An item is publishable only once a human has actually signed off on it. */
+export const isVerified = (q: Pick<Question, 'provenance'>): boolean =>
+  Boolean(q.provenance?.reviewedBy && q.provenance?.reviewedAt);
 
 export interface Question {
   id: string;
@@ -21,6 +58,23 @@ export interface Question {
   tags: string[];
   domain?: string;
   questionStyle?: string;
+  /**
+   * Next Generation NCLEX item payload. Absent on classic flashcard/MCQ
+   * questions, which keep behaving exactly as before. When present, Practice
+   * renders the NGN player and grades with partial credit; `answer` still holds
+   * a readable answer key so exports and review screens keep working.
+   */
+  ngn?: NgnItem;
+  /** Optional 5-tab EHR chart shown alongside the question. */
+  ehr?: EhrChart;
+  /**
+   * Where this item's clinical claims come from, and who signed off on them.
+   * Absent on hand-authored and imported questions, which keep behaving exactly
+   * as before — but an item with no `provenance` cannot be reported as verified,
+   * and that is the point: it makes unsourced content visible instead of
+   * indistinguishable from reviewed content.
+   */
+  provenance?: QuestionProvenance;
   createdAt: number;
   box: number;
   nextReviewDate: number;
@@ -107,6 +161,10 @@ export interface ActiveExam {
   score: number;
   incorrectQuestionIds: string[];
   userSelections: Record<string, string[]>;
+  /** In-progress answers for NGN questions, keyed by question id. */
+  ngnResponses?: Record<string, NgnResponse>;
+  /** Running partial-credit tally across NGN questions in this session. */
+  ngnPoints?: { earned: number; possible: number };
   startTime: number;
   timeRemainingSec: number | null;
   isDrillMode: boolean;
@@ -133,6 +191,26 @@ export interface Note {
   content: string;
   createdAt: number;
   updatedAt: number;
+}
+
+// A complete "save file" — captures everything needed to fully restore a user's
+// account: profiles (avatar, theme, XP, streak, level, achievements, daily
+// challenge, Blackboard), plus all questions, sets, sessions, calendar and notes.
+export interface QudoroBackup {
+  qudoroBackup: true;
+  version: number;
+  exportedAt: number;
+  accounts: Account[];
+  currentAccountId: string | null;
+  activeProfileId: string | null;
+  isAuthenticated: boolean;
+  userProfile: UserProfile;
+  questions: Question[];
+  sets: ExamSet[];
+  sessions: StudySession[];
+  calendarEvents: CalendarEvent[];
+  notes: Note[];
+  activeExam: ActiveExam | null; // in-progress exam so "where you left off" is preserved
 }
 
 export interface AchievementLevel {
@@ -191,6 +269,14 @@ interface AppState {
   // Actions
   signup: (data: { name: string; email: string; password: string; field: string; country: string }) => Promise<void>;
   login: (email: string, password: string) => Promise<boolean>;
+  /**
+   * Offline/local sign-in used as a fallback when the auth server is
+   * unreachable. Verifies the password against the locally stored hash when one
+   * exists; for accounts provisioned via the cloud (no local secret) it signs in
+   * to the local data on this machine. Returns why it failed so the UI can
+   * distinguish "no local copy of this account" from "wrong password".
+   */
+  loginOffline: (email: string, password: string) => Promise<{ ok: boolean; reason?: 'no-account' | 'bad-password' }>;
   authenticateWithSupabase: (data: { email: string; name?: string; country?: string; field?: string }) => string;
   restoreSession: (accountId: string) => boolean;
   logout: () => void;
@@ -205,6 +291,13 @@ interface AppState {
   notes: Note[];
   userProfile: UserProfile; // The Active Profile
   addQuestion: (q: Omit<Question, 'id' | 'createdAt' | 'box' | 'nextReviewDate' | 'lastReviewed' | 'easeFactor' | 'repetitions' | 'interval'>) => string;
+  /**
+   * Returns an existing question in the active profile whose content matches
+   * `content` (case/whitespace/HTML-insensitive), or undefined. Used to warn
+   * about duplicates before adding. `excludeId` skips a question (e.g. when
+   * editing).
+   */
+  findDuplicateQuestion: (content: string, excludeId?: string) => Question | undefined;
   updateQuestion: (id: string, q: Partial<Question>) => void;
   deleteQuestion: (id: string) => void;
   reviewQuestion: (id: string, performance: 'again' | 'hard' | 'good' | 'easy') => void;
@@ -227,6 +320,8 @@ interface AppState {
   updateNote: (id: string, note: Partial<Note>) => void;
   deleteNote: (id: string) => void;
   importData: (data: { questions: Question[]; sets: ExamSet[] }) => void;
+  exportBackup: () => QudoroBackup;
+  restoreBackup: (backup: QudoroBackup) => boolean;
   resetData: () => void;
   setUserProfile: (profile: Partial<UserProfile>) => void;
   updateLastVisit: () => void;
@@ -406,12 +501,26 @@ const calculateLevel = (xp: number) => {
 };
 // const xpForNextLevel = (level: number) => 100 * Math.pow(level, 2);
 
+// Study-time accounting. reviewQuestion credits a small base per answered
+// question in real time; addSession tops that up with the *actual* wall-clock
+// session time, but capped at MAX so a set left open/idle can't inflate the
+// total. The same cap is used to sanity-clamp legacy inflated totals on load.
+const STUDY_MINUTES_PER_QUESTION_BASE = 0.5;
+const MAX_STUDY_MINUTES_PER_QUESTION = 5;
+
 const PASSWORD_ITERATIONS = 210_000;
 const textEncoder = new TextEncoder();
 const ENCRYPTED_STATE_PREFIX = 'enc:v1:';
 
 const bytesToBase64 = (bytes: Uint8Array): string => btoa(String.fromCharCode(...bytes));
-const base64ToBytes = (b64: string): Uint8Array => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+const base64ToBytes = (b64: string): Uint8Array<ArrayBuffer> => {
+  // Build over a concrete ArrayBuffer so the result is a valid BufferSource for
+  // WebCrypto (the bare `Uint8Array` type widens to ArrayBufferLike).
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+};
 
 const hashPassword = async (password: string): Promise<string> => {
   const salt = crypto.getRandomValues(new Uint8Array(16));
@@ -528,50 +637,133 @@ const decryptPersistedValue = async (storedValue: string): Promise<string | null
   }
 };
 
+const META_SUFFIX = '::meta';
+
+// Write the snapshot to every backend so dev (origin localhost:5173) and the
+// packaged app (origin file://) converge on one dataset. electron-store is the
+// origin-independent shared source of truth; IndexedDB is a per-origin cache.
+const persistEverywhere = async (
+  name: string,
+  value: string,
+  meta: PersistMeta,
+  opts: { skipSupabase?: boolean } = {},
+): Promise<void> => {
+  const metaKey = name + META_SUFFIX;
+  const metaJson = JSON.stringify(meta);
+  const encryptedValue = await encryptPersistedValue(value);
+
+  // Guard against an empty snapshot clobbering a populated SHARED store.
+  //
+  // electron-store is shared across builds (dev `localhost:5173` and the packaged
+  // `file://` app), but each build encrypts with its own safeStorage key. A build
+  // that can't decrypt the other's snapshot would otherwise load an empty state
+  // and overwrite the shared store — silently wiping the other build's library.
+  // The plaintext meta records the real question count, so we can detect this
+  // WITHOUT needing to decrypt, and refuse to overwrite real data with nothing.
+  let skipShared = false;
+  if (richnessOf(meta) === 0 && typeof window !== 'undefined' && window.electron) {
+    try {
+      const existingMetaRaw = await window.electron.store.get(metaKey);
+      const existingMeta = parsePersistMeta(
+        typeof existingMetaRaw === 'string' ? existingMetaRaw : undefined,
+        '',
+      );
+      if (richnessOf(existingMeta) > 0) skipShared = true;
+    } catch {
+      /* if we can't read the existing meta, fall through to normal behavior */
+    }
+  }
+
+  // IndexedDB (fast, large capacity, per-origin)
+  try {
+    await idbSet(name, encryptedValue);
+    await idbSet(metaKey, metaJson);
+  } catch (e) {
+    console.error('IDB Write Error — data may not have been saved:', e);
+  }
+
+  // electron-store (single file, shared across dev/prod origins).
+  //
+  // The dev build (`localhost:5173`) encrypts with a different safeStorage key
+  // than the packaged app, so it can't read the packaged snapshot — and if it
+  // wrote here it could later override the packaged app's real account/data by
+  // recency. So the dev build never writes the shared store or the cloud; it
+  // keeps its own per-origin IndexedDB. The packaged app behaves as before.
+  const isDevBuild = import.meta.env.DEV;
+  if (!isDevBuild && !skipShared && typeof window !== 'undefined' && window.electron) {
+    window.electron.store.set(name, encryptedValue);
+    window.electron.store.set(metaKey, metaJson);
+  }
+
+  // Never push an empty snapshot to the cloud when real data still exists there,
+  // and never let the dev build push into the user's real cloud sync.
+  if (!opts.skipSupabase && !skipShared && !isDevBuild) schedulePushToSupabase(value);
+};
+
 const storage: StateStorage = {
   getItem: async (name: string): Promise<string | null> => {
-    // 1. Try IndexedDB first (Fastest, handles large datasets + images)
+    const metaKey = name + META_SUFFIX;
+    const candidates: PersistCandidate[] = [];
+
+    // IndexedDB (current origin)
     try {
-        const value = await get(name);
-        if (typeof value === 'string' && value.length > 0) {
-            const decrypted = await decryptPersistedValue(value);
-            return decrypted;
+      const raw = await get(name);
+      if (typeof raw === 'string' && raw.length > 0) {
+        const decrypted = await decryptPersistedValue(raw);
+        if (decrypted) {
+          const metaRaw = await get(metaKey);
+          candidates.push({ source: 'idb', value: decrypted, meta: parsePersistMeta(metaRaw, decrypted) });
         }
-        if (value !== null && typeof value !== 'undefined') {
-            return JSON.stringify(value);
-        }
+      } else if (raw !== null && typeof raw !== 'undefined') {
+        const asString = JSON.stringify(raw);
+        candidates.push({ source: 'idb', value: asString, meta: parsePersistMeta(undefined, asString) });
+      }
     } catch (e) {
-        console.error('IDB Read Error:', e);
+      console.error('IDB Read Error:', e);
     }
 
-    // 2. Fallback: Migration from Electron Store (Old data)
-    // If IDB is empty, check the old file-based store.
+    // electron-store (origin-independent shared store) — this is what lets the
+    // packaged app's data show up in dev and vice-versa.
     if (typeof window !== 'undefined' && window.electron) {
-        try {
-            const value = await window.electron.store.get(name);
-            if (value) {
-                // Found data in old store! Migrate to IDB immediately.
-                const jsonValue = typeof value === 'string' ? value : JSON.stringify(value);
-                const encryptedValue = await encryptPersistedValue(jsonValue);
-                await idbSet(name, encryptedValue);
-                return jsonValue;
-            }
-        } catch (e) {
-            console.error('Electron Store Read Error:', e);
+      try {
+        const raw = await window.electron.store.get(name);
+        if (raw) {
+          const asString = typeof raw === 'string' ? raw : JSON.stringify(raw);
+          const decrypted = await decryptPersistedValue(asString);
+          if (decrypted) {
+            const metaRaw = await window.electron.store.get(metaKey);
+            candidates.push({ source: 'electron', value: decrypted, meta: parsePersistMeta(metaRaw, decrypted) });
+          }
         }
+      } catch (e) {
+        console.error('Electron Store Read Error:', e);
+      }
     }
 
-    // 3. Last resort: pull from Supabase cloud sync
-    // Covers fresh installs, device switches, and data loss scenarios.
+    const winner = pickBestCandidate(candidates);
+    if (winner) {
+      // Converge both backends on the winner (preserving its recency) so the
+      // other origin sees the same data next launch. Awaited so it can't race a
+      // subsequent setItem.
+      try {
+        await persistEverywhere(name, winner.value, winner.meta, { skipSupabase: true });
+      } catch (e) {
+        console.error('Converge write error:', e);
+      }
+      return winner.value;
+    }
+
+    // Last resort: pull from Supabase cloud sync (fresh installs, device
+    // switches, local data loss).
     try {
       const cloudJson = await pullFromSupabase();
       if (cloudJson) {
-        // Restore locally so next launch is fast
-        const encryptedValue = await encryptPersistedValue(cloudJson);
-        await idbSet(name, encryptedValue);
-        if (typeof window !== 'undefined' && window.electron) {
-          window.electron.store.set(name, cloudJson);
-        }
+        await persistEverywhere(
+          name,
+          cloudJson,
+          { savedAt: Date.now(), qCount: questionCountOf(cloudJson), sCount: setCountOf(cloudJson) },
+          { skipSupabase: true },
+        );
         return cloudJson;
       }
     } catch (e) {
@@ -581,26 +773,19 @@ const storage: StateStorage = {
     return null;
   },
   setItem: async (name: string, value: string): Promise<void> => {
-    // Write to IDB (fast, large capacity)
-    try {
-      const encryptedValue = await encryptPersistedValue(value);
-      await idbSet(name, encryptedValue);
-    } catch (e) {
-      console.error('IDB Write Error — data may not have been saved:', e);
-    }
-    // Also write to electron-store so data persists across dev/prod builds
-    // (IDB is origin-partitioned: localhost:5173 ≠ file://, so without this
-    //  switching between dev and packaged app loses all data)
-    if (typeof window !== 'undefined' && window.electron) {
-      window.electron.store.set(name, value);
-    }
-    // Schedule a debounced push to Supabase for cloud sync
-    schedulePushToSupabase(value);
+    await persistEverywhere(name, value, { savedAt: Date.now(), qCount: questionCountOf(value), sCount: setCountOf(value) });
   },
   removeItem: async (name: string): Promise<void> => {
-    await del(name);
+    const metaKey = name + META_SUFFIX;
+    try {
+      await del(name);
+      await del(metaKey);
+    } catch (e) {
+      console.error('IDB Remove Error:', e);
+    }
     if (typeof window !== 'undefined' && window.electron) {
-        window.electron.store.set(name, null);
+      window.electron.store.set(name, null);
+      window.electron.store.set(metaKey, null);
     }
   },
 };
@@ -700,14 +885,40 @@ export const useStore = create<AppState>()(
         }
 
         if (isValid) {
-            set({ 
-                isAuthenticated: true, 
+            set({
+                isAuthenticated: true,
                 currentAccountId: account.id,
                 activeProfileId: null, // Reset active profile to force selection
             });
             return true;
         }
         return false;
+      },
+
+      loginOffline: async (email, password) => {
+        const normalizedEmail = email.trim().toLowerCase();
+        const account = get().accounts.find((a) => a.email.toLowerCase() === normalizedEmail);
+        // The account has to already exist on this device — offline mode can only
+        // reach data that's stored locally.
+        if (!account) return { ok: false, reason: 'no-account' };
+
+        // When a local password hash exists (accounts created via local signup),
+        // require the correct password even offline.
+        if (account.passwordHash) {
+          const valid = await verifyPassword(password, account.passwordHash);
+          if (!valid) return { ok: false, reason: 'bad-password' };
+        } else if (account.password) {
+          if (account.password !== password) return { ok: false, reason: 'bad-password' };
+        }
+        // else: cloud-provisioned account with no local secret to check. The data
+        // is local to this machine, so we allow offline sign-in to it.
+
+        set({
+          isAuthenticated: true,
+          currentAccountId: account.id,
+          activeProfileId: null,
+        });
+        return { ok: true };
       },
 
       authenticateWithSupabase: ({ email, name, country, field }) => {
@@ -827,6 +1038,17 @@ export const useStore = create<AppState>()(
         get().checkAchievements();
         return id;
       },
+      findDuplicateQuestion: (content, excludeId) => {
+        const target = normalizeAnswerText(content);
+        if (!target) return undefined;
+        const activeProfileId = get().activeProfileId || '';
+        return get().questions.find(
+          (existing) =>
+            existing.id !== excludeId &&
+            (!existing.profileId || existing.profileId === activeProfileId) &&
+            normalizeAnswerText(existing.content) === target
+        );
+      },
       updateQuestion: (id, q) =>
         set((state) => ({
           questions: state.questions.map((item) =>
@@ -896,15 +1118,21 @@ export const useStore = create<AppState>()(
                newStats.streakDays = 1;
           }
           
-          // Add estimated study time (0.5 mins per question) for real-time tracking
-          // This ensures stats update even if session isn't completed.
-          // Note: addSession will reconcile total time if needed, or we just accumulate here.
-          // To avoid double counting, we will adjust addSession logic.
+          // Add a base amount of study time per answered question for real-time
+          // tracking. addSession later tops this up to the (capped) actual
+          // session length, so stats stay sensible even if a session is abandoned.
           const currentTotalTime = isNaN(newStats.totalStudyTime) ? 0 : (newStats.totalStudyTime || 0);
-          newStats.totalStudyTime = currentTotalTime + 0.5; 
-          
+          newStats.totalStudyTime = currentTotalTime + STUDY_MINUTES_PER_QUESTION_BASE;
+
           // Update last study date
           newStats.lastStudyDate = Date.now();
+
+          // Record today's activity for the Study Activity heat-map here — per
+          // answered question — so the heat-map and the streak (also updated in
+          // this function) always move together, even for abandoned sessions.
+          const todayKey = toDayKey();
+          const history = newStats.studyHistory || {};
+          newStats.studyHistory = { ...history, [todayKey]: (history[todayKey] || 0) + 1 };
 
           const updatedProfile = { ...state.userProfile, stats: newStats };
           const updatedAccounts = state.accounts.map(a => 
@@ -977,23 +1205,22 @@ export const useStore = create<AppState>()(
             const newStats = { ...state.userProfile.stats };
             newStats.totalSetsCompleted += 1;
             
-            // Calculate duration in minutes (session.duration is in seconds)
-            // Fallback to 1 minute per question if duration is missing
-            const durationInMinutes = session.duration 
-                ? session.duration / 60 
+            // Actual session length in minutes (session.duration is in seconds),
+            // falling back to ~1 min/question when it's missing. Capped so a set
+            // left open/idle can't inflate study time to unrealistic values.
+            const rawDurationMinutes = session.duration
+                ? session.duration / 60
                 : Math.ceil(session.totalQuestions * 1);
-            
-            // Ensure we are adding to a number, handling potential NaN/undefined from legacy data
-            // Note: reviewQuestion now adds 0.5 mins per question incrementally.
-            // We should only add the *extra* time if the session took longer than estimated,
-            // or just use the session time minus the estimated time already added.
-            // Estimated added: session.totalQuestions * 0.5
-            // Actual session time: durationInMinutes
-            // Difference to add: durationInMinutes - (session.totalQuestions * 0.5)
-            // If difference is negative (user was fast), we don't subtract time.
-            
-            const estimatedAdded = session.totalQuestions * 0.5;
-            const extraTime = Math.max(0, durationInMinutes - estimatedAdded);
+            const durationInMinutes = Math.min(
+                rawDurationMinutes,
+                session.totalQuestions * MAX_STUDY_MINUTES_PER_QUESTION
+            );
+
+            // reviewQuestion already credited a base amount per answered question,
+            // so only add the *remaining* actual session time on top (never
+            // negative, so a fast session doesn't subtract time).
+            const alreadyCredited = session.totalQuestions * STUDY_MINUTES_PER_QUESTION_BASE;
+            const extraTime = Math.max(0, durationInMinutes - alreadyCredited);
 
             const currentTotalTime = isNaN(newStats.totalStudyTime) ? 0 : (newStats.totalStudyTime || 0);
             newStats.totalStudyTime = currentTotalTime + extraTime;
@@ -1003,11 +1230,11 @@ export const useStore = create<AppState>()(
             newStats.xp += session.score * 20 + session.totalQuestions * 5;
             newStats.level = calculateLevel(newStats.xp);
             
-            // Note: Streak Logic is now handled in reviewQuestion for real-time updates.
-            // However, Practice Mode (quizzes) calls addSession DIRECTLY without calling reviewQuestion.
-            // So we MUST also handle streak updates here for Practice sessions.
-            // The logic below ensures we don't double-count if reviewQuestion was already called today.
-            
+            // Streak is normally advanced per-question in reviewQuestion (both
+            // Flashcards and Practice call it). This block is a same-day-safe
+            // fallback for any session recorded without per-question reviews:
+            // because reviewQuestion sets lastStudyDate to today, the check below
+            // is a no-op when it already ran, so the streak is never double-counted.
             const now = new Date();
             const lastDate = new Date(newStats.lastStudyDate || 0);
             
@@ -1034,10 +1261,9 @@ export const useStore = create<AppState>()(
             
             newStats.lastStudyDate = Date.now();
 
-            // Track daily study history for heat-map
-            const todayKey = new Date().toISOString().slice(0, 10);
-            const existingHistory = newStats.studyHistory || {};
-            newStats.studyHistory = { ...existingHistory, [todayKey]: (existingHistory[todayKey] || 0) + session.totalQuestions };
+            // Note: daily study history for the heat-map is recorded per answered
+            // question in reviewQuestion, keeping it in sync with the streak. It is
+            // intentionally NOT written here to avoid double-counting.
 
             const profileId = state.activeProfileId || '';
 
@@ -1063,7 +1289,7 @@ export const useStore = create<AppState>()(
       clearActiveExam: () => set({ activeExam: null }),
       getDailyChallenge: () => {
         const state = get();
-        const today = new Date().toISOString().slice(0, 10);
+        const today = toDayKey();
 
         // Return existing challenge if it's already generated for today
         if (state.userProfile.dailyChallenge?.date === today) {
@@ -1173,6 +1399,45 @@ export const useStore = create<AppState>()(
             accounts: updatedAccounts
           };
         }),
+      exportBackup: () => {
+        const s = get();
+        return {
+          qudoroBackup: true,
+          version: 2,
+          exportedAt: Date.now(),
+          accounts: s.accounts,
+          currentAccountId: s.currentAccountId,
+          activeProfileId: s.activeProfileId,
+          isAuthenticated: s.isAuthenticated,
+          userProfile: s.userProfile,
+          questions: s.questions,
+          sets: s.sets,
+          sessions: s.sessions,
+          calendarEvents: s.calendarEvents,
+          notes: s.notes,
+          activeExam: s.activeExam,
+        };
+      },
+      restoreBackup: (backup) => {
+        // A valid full backup must at least carry the account list and questions.
+        if (!backup || !Array.isArray(backup.accounts) || !Array.isArray(backup.questions)) {
+          return false;
+        }
+        set((state) => ({
+          accounts: backup.accounts,
+          currentAccountId: backup.currentAccountId ?? null,
+          activeProfileId: backup.activeProfileId ?? null,
+          isAuthenticated: backup.isAuthenticated ?? backup.accounts.length > 0,
+          userProfile: backup.userProfile ?? state.userProfile,
+          questions: backup.questions,
+          sets: Array.isArray(backup.sets) ? backup.sets : [],
+          sessions: Array.isArray(backup.sessions) ? backup.sessions : [],
+          calendarEvents: Array.isArray(backup.calendarEvents) ? backup.calendarEvents : [],
+          notes: Array.isArray(backup.notes) ? backup.notes : [],
+          activeExam: backup.activeExam ?? null,
+        }));
+        return true;
+      },
       resetData: () =>
         set({
           questions: [],
@@ -1211,18 +1476,30 @@ export const useStore = create<AppState>()(
             const now = Date.now();
             const rawStats = state.userProfile.stats;
             
-            // Create a sanitized stats object to prevent NaN issues and ensure all fields exist
+            // Sanity-clamp study time to what the answered-question count can
+            // justify. This corrects legacy inflated totals (e.g. sessions left
+            // open/idle before the per-session duration cap existed).
+            const answered = rawStats?.totalQuestionsAnswered || 0;
+            const rawStudyTime = rawStats?.totalStudyTime || 0;
+            const maxPlausibleStudyTime = answered * MAX_STUDY_MINUTES_PER_QUESTION;
+            const sanitizedStudyTime =
+                answered === 0 ? 0 : Math.min(rawStudyTime, maxPlausibleStudyTime);
+
+            // Create a sanitized stats object to prevent NaN issues and ensure all
+            // fields exist. IMPORTANT: preserve studyHistory (the Study Activity
+            // heat-map) — omitting it here previously wiped it on every visit.
             const currentStats: UserStats = {
-                totalQuestionsAnswered: rawStats?.totalQuestionsAnswered || 0,
+                totalQuestionsAnswered: answered,
                 totalCorrectAnswers: rawStats?.totalCorrectAnswers || 0,
-                totalStudyTime: rawStats?.totalStudyTime || 0,
+                totalStudyTime: sanitizedStudyTime,
                 totalSetsCompleted: rawStats?.totalSetsCompleted || 0,
                 streakDays: rawStats?.streakDays || 0,
                 lastStudyDate: rawStats?.lastStudyDate || 0,
                 xp: rawStats?.xp || 0,
                 level: rawStats?.level || 1,
                 perfectedSetIds: rawStats?.perfectedSetIds || [],
-                importedSetsCount: rawStats?.importedSetsCount || 0
+                importedSetsCount: rawStats?.importedSetsCount || 0,
+                studyHistory: rawStats?.studyHistory || {}
             };
 
             const lastDate = new Date(currentStats.lastStudyDate || 0);

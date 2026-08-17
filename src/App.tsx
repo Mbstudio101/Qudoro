@@ -63,13 +63,42 @@ const App = () => {
   useEffect(() => {
     if (!window.electron?.backup) return;
     window.electron.backup.onRequestBackupData(() => {
-      const { questions, sets } = useStore.getState();
-      const json = JSON.stringify({ questions, sets }, null, 2);
+      // Full "save file" — profile, avatar, achievements, XP/streak, settings,
+      // plus all questions, sets, sessions, calendar and notes.
+      const json = JSON.stringify(useStore.getState().exportBackup(), null, 2);
       window.electron.backup.sendBackupData(json);
     });
     return () => window.electron.backup.removeBackupDataListener();
   }, []);
-  
+
+  // Auto-snapshot: whenever the library content changes (a set is built/saved,
+  // questions added/removed), write a versioned local snapshot so the data is
+  // durably captured and recoverable — independent of the per-origin store, the
+  // cloud, or whether a backup folder is configured. Debounced to coalesce bursts.
+  useEffect(() => {
+    if (!window.electron?.snapshots) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    // Signature of the library so we only snapshot on real content changes, not
+    // every unrelated state update (XP, timers, navigation, etc.).
+    const signatureOf = (s: ReturnType<typeof useStore.getState>) =>
+      `${s.questions.length}|${s.sets.map((set) => `${set.id}:${set.title}:${set.questionIds.length}`).join(',')}`;
+    let lastSig = signatureOf(useStore.getState());
+
+    const unsub = useStore.subscribe((state) => {
+      const sig = signatureOf(state);
+      if (sig === lastSig) return;
+      lastSig = sig;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        const backup = useStore.getState().exportBackup();
+        if (backup.questions.length === 0 && backup.sets.length === 0) return; // never snapshot empty
+        window.electron.snapshots.save(JSON.stringify(backup)).catch(() => { /* best-effort */ });
+      }, 2000);
+    });
+
+    return () => { if (timer) clearTimeout(timer); unsub(); };
+  }, []);
+
   // Initialize notification scheduler
   useNotificationScheduler();
 
@@ -93,6 +122,34 @@ const App = () => {
       });
     });
   }, [authenticateWithSupabase, isAuthenticated]);
+
+  // DEV-ONLY: auto-load a seed question bank into the dev build.
+  //
+  // The dev build can't decrypt the packaged app's encrypted store, so it starts
+  // empty. This pulls public/dev-seed.json (a profileId-stripped copy of the
+  // user's backup) once, after login, so the dev build mirrors real data without
+  // any manual import. Gated to import.meta.env.DEV — never runs in the packaged
+  // app — and never re-imports once the bank has questions.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    if (!isAuthenticated) return;
+    const { activeProfileId, questions, importData } = useStore.getState();
+    if (!activeProfileId) return;
+    const visible = questions.some((q) => !q.profileId || q.profileId === activeProfileId);
+    if (visible) return; // already has data for this profile — don't duplicate
+    const flag = `dev-seeded:${activeProfileId}`;
+    if (localStorage.getItem(flag)) return;
+    void fetch('/dev-seed.json')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((seed) => {
+        if (seed && Array.isArray(seed.questions) && Array.isArray(seed.sets)) {
+          importData({ questions: seed.questions, sets: seed.sets });
+          localStorage.setItem(flag, '1');
+          console.info(`[dev-seed] imported ${seed.questions.length} questions`);
+        }
+      })
+      .catch(() => { /* best-effort dev convenience */ });
+  }, [isAuthenticated]);
 
   useEffect(() => {
     // Global Keyboard Shortcuts

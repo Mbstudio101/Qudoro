@@ -93,3 +93,8 @@ out/
 
 # Local env
 .env.local
+
+# Dev-only seed + local recovery snapshots (contain a copy of personal study data)
+public/dev-seed.json
+qudoro-RECOVERED-*.json
+qudoro-electronstore-snapshot-*.json

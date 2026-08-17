@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useStore, Question } from '../store/useStore';
-import { Plus, Trash2, Edit2, Search, Save, Check, ChevronLeft, Folder, List, CheckSquare, Square, Layers, ImagePlus, X } from 'lucide-react';
+import { Plus, Trash2, Edit2, Search, Save, Check, ChevronLeft, Folder, List, CheckSquare, Square, Layers, ImagePlus, X, GripVertical, Eye, Stethoscope } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
@@ -8,16 +8,55 @@ import Textarea from '../components/ui/Textarea';
 import RichText from '../components/ui/RichText';
 import { motion } from 'framer-motion';
 import { classifyQuestion } from '../utils/nursingConstants';
-import { isAnswerMatch, alignAnswersToOptions } from '../utils/answerMatch';
+import { validateItem } from '../utils/itemValidation';
+import { isAnswerMatch, alignAnswersToOptions, normalizeAnswerText } from '../utils/answerMatch';
 import { CARD_GRADIENT_OPTIONS, getCardGradientClasses } from '../utils/cardGradients';
 import { cleanMcqText, parseLabeledMcq } from '../utils/mcqParser';
 import { draftKey as makeDraftKey } from '../utils/storageKeys';
+import NgnStylePicker, { StyleChoice } from '../components/ngn/NgnStylePicker';
+import NgnEditor from '../components/ngn/NgnEditor';
+import NgnPlayer from '../components/ngn/NgnPlayer';
+import EhrChartEditor from '../components/ngn/EhrChartEditor';
+import EhrChartViewer from '../components/ngn/EhrChartViewer';
+import {
+  NgnItem,
+  NgnResponse,
+  EhrChart,
+  createNgnItem,
+  createEhrChart,
+  createEmptyResponse,
+  ngnKindMeta,
+} from '../types/ngn';
+import { validateNgnItem, summarizeNgnAnswer } from '../utils/ngnGrading';
+
+/** Small format tag shown on a question card for NGN items / attached charts. */
+const QuestionFormatBadge = ({ question }: { question: Question }) => {
+  if (!question.ngn && !question.ehr) return null;
+  const meta = question.ngn ? ngnKindMeta(question.ngn.kind) : null;
+  return (
+    <div className="mb-2 flex flex-wrap gap-1.5">
+      {meta && (
+        <span
+          className={`inline-flex items-center rounded-full bg-linear-to-r ${meta.gradient} px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white`}
+        >
+          {meta.name}
+        </span>
+      )}
+      {question.ehr && (
+        <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+          <Stethoscope className="h-3 w-3" /> EHR
+        </span>
+      )}
+    </div>
+  );
+};
 
 const Questions = () => {
   const {
     questions: allQuestions,
     sets: allSets,
     addQuestion,
+    findDuplicateQuestion,
     deleteQuestion,
     updateQuestion,
     addQuestionToSet,
@@ -45,8 +84,10 @@ const Questions = () => {
       tags: string[];
       domain?: string;
       questionStyle?: string;
+      ngn?: NgnItem;
+      ehr?: EhrChart;
   };
-  
+
   const [draftQuestions, setDraftQuestions] = useState<DraftQuestion[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
@@ -69,6 +110,61 @@ const Questions = () => {
     cardGradient: 'default',
   });
 
+  // ── NGN authoring state ───────────────────────────────────────────────────
+  // `ngnItem === null` means the question is a classic flashcard/MCQ, which is
+  // the default and leaves every existing code path untouched.
+  const [ngnItem, setNgnItem] = useState<NgnItem | null>(null);
+  const [ehrChart, setEhrChart] = useState<EhrChart>(() => createEhrChart());
+  const [showNgnPreview, setShowNgnPreview] = useState(false);
+  const [previewResponse, setPreviewResponse] = useState<NgnResponse | null>(null);
+
+  const resetNgnState = () => {
+    setNgnItem(null);
+    setEhrChart(createEhrChart());
+    setShowNgnPreview(false);
+    setPreviewResponse(null);
+  };
+
+  const handleStyleChange = (choice: StyleChoice) => {
+    setShowNgnPreview(false);
+    setPreviewResponse(null);
+    if (choice === null) {
+      setNgnItem(null);
+      return;
+    }
+    if (ngnItem?.kind === choice) return;
+    setNgnItem(createNgnItem(choice));
+  };
+
+  const togglePreview = () => {
+    if (!ngnItem) return;
+    if (showNgnPreview) {
+      setShowNgnPreview(false);
+      return;
+    }
+    setPreviewResponse(createEmptyResponse(ngnItem));
+    setShowNgnPreview(true);
+  };
+
+  /**
+   * Blocks saving an NGN item that isn't answerable yet. Classic questions skip
+   * this entirely, so nothing about the old flow changes.
+   */
+  const ngnBlocksSave = (): boolean => {
+    if (!ngnItem) return false;
+    const problems = validateNgnItem(ngnItem);
+    if (problems.length === 0) return false;
+    alert(`This ${ngnKindMeta(ngnItem.kind).name} question isn't ready yet:\n\n• ${problems.join('\n• ')}`);
+    return true;
+  };
+
+  // Drag-to-reorder state for the answer options list. `dragHandleActive` is a
+  // ref so the mousedown on the grip enables dragging synchronously, before the
+  // browser decides whether the row's dragstart is allowed.
+  const dragHandleActive = React.useRef(false);
+  const [dragOptionIndex, setDragOptionIndex] = useState<number | null>(null);
+  const [dragOverOptionIndex, setDragOverOptionIndex] = useState<number | null>(null);
+
   // ── Draft auto-save ───────────────────────────────────────────────────────
   // Key is profile-scoped so switching profiles never shows the wrong draft.
   const draftKey = makeDraftKey(activeProfileId || 'default');
@@ -77,6 +173,8 @@ const Questions = () => {
     draftQuestions: DraftQuestion[];
     formData: { content: string; rationale: string; answer: string[]; options: string[]; tags: string; imageUrl: string };
     setCreationData: { title: string; description: string; cardGradient: string };
+    ngnItem?: NgnItem | null;
+    ehrChart?: EhrChart;
     savedAt: number;
   };
 
@@ -109,12 +207,12 @@ const Questions = () => {
     try {
       localStorage.setItem(
         draftKey,
-        JSON.stringify({ draftQuestions, formData, setCreationData, savedAt: Date.now() }),
+        JSON.stringify({ draftQuestions, formData, setCreationData, ngnItem, ehrChart, savedAt: Date.now() }),
       );
     } catch {
       // Storage quota — silent fail
     }
-  }, [draftQuestions, formData, setCreationData, isSetBuilderMode, isModalOpen, draftKey]);
+  }, [draftQuestions, formData, setCreationData, ngnItem, ehrChart, isSetBuilderMode, isModalOpen, draftKey]);
   const [setEditData, setSetEditData] = useState({
     title: '',
     description: '',
@@ -314,6 +412,10 @@ const Questions = () => {
     setDraftQuestions(savedDraft.draftQuestions);
     setFormData(savedDraft.formData);
     setSetCreationData(savedDraft.setCreationData);
+    setNgnItem(savedDraft.ngnItem || null);
+    setEhrChart(savedDraft.ehrChart || createEhrChart());
+    setShowNgnPreview(false);
+    setPreviewResponse(null);
     setIsModalOpen(true);
     setSavedDraft(null); // hide banner — draft is now active in the form
   };
@@ -330,13 +432,18 @@ const Questions = () => {
     setFormData({ content: '', rationale: '', answer: [], options: [], tags: '', imageUrl: '' });
     setSetCreationData({ title: '', description: '', cardGradient: 'default' });
     setDraftQuestions([]);
+    resetNgnState();
     setIsModalOpen(true);
   };
 
   const handleOpenModal = (question?: Question) => {
     setIsSetBuilderMode(false);
+    setShowNgnPreview(false);
+    setPreviewResponse(null);
     if (question) {
-      const parsed = (!question.options || question.options.length === 0)
+      // NGN questions store their choices in the payload, so the auto-parse
+      // that rescues legacy pasted MCQs must not run for them.
+      const parsed = (!question.ngn && (!question.options || question.options.length === 0))
         ? parseQuestionAndOptions(question.content)
         : null;
       setEditingQuestion(question);
@@ -348,10 +455,13 @@ const Questions = () => {
         tags: question.tags.join(', '),
         imageUrl: question.imageUrl || '',
       });
+      setNgnItem(question.ngn || null);
+      setEhrChart(question.ehr || createEhrChart());
       setSelectedSetId('');
     } else {
       setEditingQuestion(null);
       setFormData({ content: '', rationale: '', answer: [], options: [], tags: '', imageUrl: '' });
+      resetNgnState();
       // Keep selectedSetId if it was set previously
     }
     setIsModalOpen(true);
@@ -364,6 +474,75 @@ const Questions = () => {
   const normalizeAnswers = (cleanOptions: string[], answers: string[]): string[] =>
     alignAnswersToOptions(cleanOptions, answers);
 
+  // Warn when a question with the same text already exists, letting the user add
+  // it anyway or cancel. Returns true if it's safe to proceed. Checks the saved
+  // bank plus any `pendingContents` (e.g. drafts not yet committed). `excludeId`
+  // skips a saved question (used when editing).
+  const confirmIfDuplicate = (
+    content: string,
+    pendingContents: string[] = [],
+    excludeId?: string
+  ): boolean => {
+    const existing = findDuplicateQuestion(content, excludeId);
+    const target = normalizeAnswerText(content);
+    const inPending = target.length > 0 && pendingContents.some((c) => normalizeAnswerText(c) === target);
+    const matchSource = existing ? existing.content : inPending ? content : null;
+    if (!matchSource) return true;
+    const preview = matchSource.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    const shown = preview.length > 140 ? `${preview.slice(0, 140)}…` : preview;
+    const where = existing ? 'already in your Question Bank' : 'already in this set';
+    return window.confirm(
+      `This looks like a duplicate — a question with the same text is ${where}:\n\n"${shown}"\n\nAdd it anyway?`
+    );
+  };
+
+  /**
+   * Single source of truth for turning the form into a saveable question.
+   *
+   * NGN items carry their payload in `ngn` but still write a readable answer
+   * key into `answer`, so flashcard views, session reviews, search, and exports
+   * keep working without knowing anything about NGN. `ngn`/`ehr` are always
+   * present as keys (possibly `undefined`) so switching a question back to
+   * Classic clears the old payload on update.
+   */
+  /**
+   * Whole-question checks for the panel above the save buttons.
+   *
+   * `ngn` is deliberately left out — NgnEditor already renders those findings
+   * inline, and repeating them here would double-report the same problem. What
+   * this adds is everything outside the NGN payload: the stem, the rationale,
+   * and the EHR chart (whose lab flags nothing else validates).
+   */
+  const itemFindings = useMemo(
+    () =>
+      validateItem({
+        content: formData.content,
+        rationale: formData.rationale,
+        answer: formData.answer,
+        ehr: ehrChart.enabled ? ehrChart : undefined,
+      }),
+    [formData.content, formData.rationale, formData.answer, ehrChart],
+  );
+
+  const composeQuestionData = () => {
+    const tagsArray = formData.tags.split(',').map((t) => t.trim()).filter(Boolean);
+    const cleanOptions = ngnItem ? [] : formData.options.map((o) => o.trim()).filter(Boolean);
+    const { domain, style } = classifyQuestion(formData.content, cleanOptions);
+
+    return {
+      content: formData.content,
+      rationale: formData.rationale,
+      imageUrl: formData.imageUrl,
+      options: cleanOptions,
+      answer: ngnItem ? summarizeNgnAnswer(ngnItem) : normalizeAnswers(cleanOptions, formData.answer),
+      tags: tagsArray,
+      domain: domain || undefined,
+      questionStyle: style || undefined,
+      ngn: ngnItem || undefined,
+      ehr: ehrChart.enabled ? ehrChart : undefined,
+    };
+  };
+
   const handleSetBuilderFinish = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!setCreationData.title) {
@@ -371,27 +550,28 @@ const Questions = () => {
         return;
     }
 
-    const tagsArray = formData.tags.split(',').map((t) => t.trim()).filter(Boolean);
-    const cleanOptions = formData.options.map(o => o.trim()).filter(Boolean);
-    
     // Prepare the final list of questions
     // Include the one currently in the form if it has content
     const finalQuestions = [...draftQuestions];
     if (formData.content) {
-        const { domain, style } = classifyQuestion(formData.content, cleanOptions);
-        finalQuestions.push({
-            ...formData,
-            options: cleanOptions,
-            answer: normalizeAnswers(cleanOptions, formData.answer),
-            tags: tagsArray,
-            domain: domain || undefined,
-            questionStyle: style || undefined
-        });
+        if (ngnBlocksSave()) return;
+        finalQuestions.push(composeQuestionData());
     }
 
     if (finalQuestions.length === 0) {
         alert("Please add at least one question to the set.");
         return;
+    }
+
+    // Warn once if any of these questions already exist in the bank (same text).
+    const dupCount = finalQuestions.filter(q => findDuplicateQuestion(q.content)).length;
+    if (dupCount > 0) {
+        const proceed = window.confirm(
+            `${dupCount} of these question${dupCount > 1 ? 's' : ''} already ` +
+            `${dupCount > 1 ? 'exist' : 'exists'} in your Question Bank (same text). ` +
+            `Create the set anyway?`
+        );
+        if (!proceed) return;
     }
 
     // 1. Create all questions
@@ -409,6 +589,7 @@ const Questions = () => {
     setIsModalOpen(false);
     setIsSetBuilderMode(false);
     setDraftQuestions([]);
+    resetNgnState();
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -417,104 +598,74 @@ const Questions = () => {
         return;
     }
     e.preventDefault();
-    const tagsArray = formData.tags.split(',').map((t) => t.trim()).filter(Boolean);
-    const cleanOptions = formData.options.map(o => o.trim()).filter(Boolean);
-
-    const { domain, style } = classifyQuestion(formData.content, cleanOptions);
-    const finalDomain = domain || undefined;
-    const finalStyle = style || undefined;
+    if (ngnBlocksSave()) return;
+    const payload = composeQuestionData();
 
     if (editingQuestion) {
-      updateQuestion(editingQuestion.id, {
-        ...formData,
-        options: cleanOptions,
-        answer: normalizeAnswers(cleanOptions, formData.answer),
-        tags: tagsArray,
-        domain: finalDomain,
-        questionStyle: finalStyle
-      });
+      updateQuestion(editingQuestion.id, payload);
       setIsModalOpen(false);
+      resetNgnState();
     } else {
-      const newId = addQuestion({
-        ...formData,
-        options: cleanOptions,
-        answer: normalizeAnswers(cleanOptions, formData.answer),
-        tags: tagsArray,
-        domain: finalDomain,
-        questionStyle: finalStyle
-      });
-      
+      if (!confirmIfDuplicate(formData.content)) return;
+      const newId = addQuestion(payload);
+
       if (selectedSetId) {
         addQuestionToSet(selectedSetId, newId);
       }
 
       setIsModalOpen(false);
+      resetNgnState();
     }
   };
 
   const handleSaveAndAddAnother = (e: React.MouseEvent) => {
     e.preventDefault();
-    const tagsArray = formData.tags.split(',').map((t) => t.trim()).filter(Boolean);
-    const cleanOptions = formData.options.map(o => o.trim()).filter(Boolean);
-
-    const { domain, style } = classifyQuestion(formData.content, cleanOptions);
-    const finalDomain = domain || undefined;
-    const finalStyle = style || undefined;
+    if (ngnBlocksSave()) return;
+    const payload = composeQuestionData();
 
     if (isSetBuilderMode) {
         if (!formData.content) {
             alert("Question content is required");
             return;
         }
-        
-        setDraftQuestions(prev => [...prev, {
-            ...formData,
-            options: cleanOptions,
-            answer: normalizeAnswers(cleanOptions, formData.answer),
-            tags: tagsArray,
-            domain: finalDomain,
-            questionStyle: finalStyle
-        }]);
 
-        // Reset form
-        setFormData({
-            content: '',
-            rationale: '',
-            answer: [],
-            options: [],
-            tags: formData.tags,
-            imageUrl: '',
-        });
-        
-        const textarea = document.querySelector('textarea');
-        if (textarea) textarea.focus();
+        if (!confirmIfDuplicate(formData.content, draftQuestions.map(d => d.content))) return;
+
+        setDraftQuestions(prev => [...prev, payload]);
+        resetFormForNextQuestion();
         return;
     }
 
-    const newId = addQuestion({
-        ...formData,
-        options: cleanOptions,
-        answer: normalizeAnswers(cleanOptions, formData.answer),
-        tags: tagsArray,
-        domain: finalDomain,
-        questionStyle: finalStyle
-    });
+    if (!confirmIfDuplicate(formData.content)) return;
+
+    const newId = addQuestion(payload);
 
     if (selectedSetId) {
         addQuestionToSet(selectedSetId, newId);
     }
 
-    // Reset form
+    // Keep selectedSetId for the next question
+    resetFormForNextQuestion();
+  };
+
+  /**
+   * Clears the stem/answers but deliberately keeps the tags, the chosen NGN
+   * format, and the EHR chart — an unfolding case study is several questions
+   * hanging off the same client record.
+   */
+  const resetFormForNextQuestion = () => {
     setFormData({
         content: '',
         rationale: '',
         answer: [],
         options: [],
-        tags: formData.tags, // Keep tags for convenience
+        tags: formData.tags,
         imageUrl: '',
     });
-    // Keep selectedSetId for the next question
-    
+    if (ngnItem) setNgnItem(createNgnItem(ngnItem.kind));
+    setShowNgnPreview(false);
+    setPreviewResponse(null);
+
     const textarea = document.querySelector('textarea');
     if (textarea) textarea.focus();
   };
@@ -523,7 +674,9 @@ const Questions = () => {
     e.preventDefault();
     const text = e.clipboardData.getData('text');
 
-    const parsed = parseQuestionAndOptions(text);
+    // NGN items keep their choices in the payload — never split a pasted stem
+    // into the (unused) classic options list.
+    const parsed = ngnItem ? null : parseQuestionAndOptions(text);
     if (!parsed || parsed.options.length === 0) {
         // Fallback: Check if the last few lines are short, might be options without prefixes?
         // For now, just paste as content
@@ -594,6 +747,17 @@ const Questions = () => {
     }
     
     setFormData(prev => ({ ...prev, options: newOptions, answer: newAnswers }));
+  };
+
+  const moveOption = (from: number, to: number) => {
+    if (from === to) return;
+    setFormData(prev => {
+      if (from < 0 || from >= prev.options.length || to < 0 || to >= prev.options.length) return prev;
+      const nextOptions = [...prev.options];
+      const [moved] = nextOptions.splice(from, 1);
+      nextOptions.splice(to, 0, moved);
+      return { ...prev, options: nextOptions };
+    });
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -809,15 +973,16 @@ const Questions = () => {
                   </div>
                   <div>
                     <div className="mb-4 pr-6">
-                      <div className="font-semibold line-clamp-3 mb-2">
+                      <QuestionFormatBadge question={question} />
+                      <div className="font-semibold mb-2 max-h-32 overflow-y-auto custom-scrollbar pr-1">
                         <RichText content={question.content} />
                       </div>
                       {question.imageUrl && (
-                        <div className="mb-2 relative rounded-md overflow-hidden bg-muted/20 h-32 w-full">
+                        <div className="mb-2 relative rounded-md overflow-hidden bg-muted/20 w-full">
                           <img
                             src={question.imageUrl}
                             alt="Question Reference"
-                            className="w-full h-full object-cover"
+                            className="w-full max-h-48 object-contain"
                             loading="lazy"
                           />
                         </div>
@@ -895,15 +1060,16 @@ const Questions = () => {
                             </div>
                             <div>
                             <div className="mb-4 pr-6">
-                                <div className="font-semibold line-clamp-3 mb-2">
+                                <QuestionFormatBadge question={question} />
+                                <div className="font-semibold mb-2 max-h-32 overflow-y-auto custom-scrollbar pr-1">
                                     <RichText content={question.content} />
                                 </div>
                                 {question.imageUrl && (
-                                    <div className="mb-2 relative rounded-md overflow-hidden bg-muted/20 h-32 w-full">
-                                        <img 
-                                            src={question.imageUrl} 
-                                            alt="Question Reference" 
-                                            className="w-full h-full object-cover"
+                                    <div className="mb-2 relative rounded-md overflow-hidden bg-muted/20 w-full">
+                                        <img
+                                            src={question.imageUrl}
+                                            alt="Question Reference"
+                                            className="w-full max-h-48 object-contain"
                                             loading="lazy"
                                         />
                                     </div>
@@ -1055,7 +1221,10 @@ const Questions = () => {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         title={isSetBuilderMode ? 'Create New Exam Set' : (editingQuestion ? 'Edit Question' : 'New Question')}
-        maxWidth="max-w-5xl"
+        maxWidth={ngnItem ? 'max-w-6xl' : 'max-w-5xl'}
+        // NGN editors make this form much taller than a classic question —
+        // cap it to the viewport so the action buttons stay reachable.
+        className="max-h-[92vh] overflow-y-auto"
       >
         <form onSubmit={handleSubmit} className="space-y-6">
           {isSetBuilderMode && (
@@ -1081,6 +1250,8 @@ const Questions = () => {
                 <h3 className="font-semibold text-base">Add Question {draftQuestions.length + 1}</h3>
             </div>
           )}
+
+          <NgnStylePicker value={ngnItem ? ngnItem.kind : null} onChange={handleStyleChange} />
 
           <div className="grid lg:grid-cols-2 gap-8">
             {/* Left Column: Content & Image */}
@@ -1149,6 +1320,7 @@ const Questions = () => {
 
             {/* Right Column: Options & Metadata */}
             <div className="space-y-6">
+                {!ngnItem && (
                 <div className="space-y-2">
                     <div className="flex items-center justify-between">
                         <label className="text-sm font-medium leading-none">
@@ -1159,8 +1331,49 @@ const Questions = () => {
                     <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                         {formData.options.map((option, index) => {
                             const isCorrect = isAnswerMatch(option, formData.answer);
+                            const isDragging = dragOptionIndex === index;
+                            const isDragOver = dragOverOptionIndex === index && dragOptionIndex !== index;
                             return (
-                                <div key={index} className="flex gap-2 items-center group">
+                                <div
+                                    key={index}
+                                    draggable
+                                    onDragStart={(e) => {
+                                        // Only allow drags that began on the grip handle.
+                                        if (!dragHandleActive.current) {
+                                            e.preventDefault();
+                                            return;
+                                        }
+                                        setDragOptionIndex(index);
+                                    }}
+                                    onDragOver={(e) => {
+                                        if (dragOptionIndex === null) return;
+                                        e.preventDefault();
+                                        setDragOverOptionIndex(index);
+                                    }}
+                                    onDrop={(e) => {
+                                        e.preventDefault();
+                                        if (dragOptionIndex !== null) moveOption(dragOptionIndex, index);
+                                        setDragOptionIndex(null);
+                                        setDragOverOptionIndex(null);
+                                        dragHandleActive.current = false;
+                                    }}
+                                    onDragEnd={() => {
+                                        setDragOptionIndex(null);
+                                        setDragOverOptionIndex(null);
+                                        dragHandleActive.current = false;
+                                    }}
+                                    className={`flex gap-2 items-center group rounded-lg transition-all ${isDragging ? 'opacity-50' : ''} ${isDragOver ? 'ring-2 ring-primary/50' : ''}`}
+                                >
+                                    <button
+                                        type="button"
+                                        onMouseDown={() => { dragHandleActive.current = true; }}
+                                        onMouseUp={() => { dragHandleActive.current = false; }}
+                                        className="cursor-grab active:cursor-grabbing p-1 text-muted-foreground/50 hover:text-muted-foreground touch-none"
+                                        title="Drag to reorder"
+                                        aria-label="Drag to reorder option"
+                                    >
+                                        <GripVertical className="h-5 w-5" />
+                                    </button>
                                     <button
                                         type="button"
                                         onClick={() => toggleCorrectAnswer(option)}
@@ -1187,6 +1400,7 @@ const Questions = () => {
                         </Button>
                     </div>
                 </div>
+                )}
 
                 <div className="space-y-2">
                     <label className="text-sm font-medium leading-none">
@@ -1196,11 +1410,79 @@ const Questions = () => {
                     placeholder="Explain why the correct answer is right..."
                     value={formData.rationale}
                     onChange={(e) => setFormData({ ...formData, rationale: e.target.value })}
-                    className="min-h-[100px]"
+                    className={ngnItem ? 'min-h-[220px]' : 'min-h-[100px]'}
                     />
                 </div>
 
             </div>
+          </div>
+
+          {/* NGN item builder — replaces the classic options list */}
+          {ngnItem && (
+            showNgnPreview && previewResponse ? (
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-primary/30 bg-primary/5 px-4 py-3">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Eye className="h-4 w-4 text-primary" />
+                    <span className="font-semibold">Student preview</span>
+                    <span className="text-xs text-muted-foreground">
+                      Exactly how this appears during practice
+                    </span>
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={togglePreview}>
+                    Back to editing
+                  </Button>
+                </div>
+
+                {ehrChart.enabled && <EhrChartViewer chart={ehrChart} compact />}
+
+                {formData.content && (
+                  <div className="rounded-2xl border border-border/60 bg-card/50 p-5 text-lg font-medium leading-relaxed">
+                    <RichText content={formData.content} className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]" />
+                  </div>
+                )}
+
+                <NgnPlayer item={ngnItem} response={previewResponse} onChange={setPreviewResponse} />
+              </div>
+            ) : (
+              <NgnEditor
+                item={ngnItem}
+                onChange={setNgnItem}
+                onPreview={togglePreview}
+                previewing={showNgnPreview}
+              />
+            )
+          )}
+
+          {/* Optional 5-tab EHR chart */}
+          <div className="rounded-2xl border border-border/60 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setEhrChart({ ...ehrChart, enabled: !ehrChart.enabled })}
+              className="flex w-full items-center justify-between gap-3 bg-secondary/20 px-4 py-3 text-left transition-colors hover:bg-secondary/30"
+            >
+              <div className="flex items-center gap-3">
+                <Stethoscope className={`h-5 w-5 ${ehrChart.enabled ? 'text-primary' : 'text-muted-foreground'}`} />
+                <div>
+                  <span className="text-sm font-medium">Attach a client record (EHR)</span>
+                  <p className="text-xs text-muted-foreground">
+                    Five tabs — H&amp;P, Orders, Notes, Flowsheets, Labs — shown beside the question.
+                  </p>
+                </div>
+              </div>
+              <span
+                className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${ehrChart.enabled ? 'bg-primary' : 'bg-muted'}`}
+              >
+                <span
+                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-background shadow transition-all ${ehrChart.enabled ? 'left-[22px]' : 'left-0.5'}`}
+                />
+              </span>
+            </button>
+            {ehrChart.enabled && (
+              <div className="border-t border-border/60 p-4">
+                <EhrChartEditor chart={ehrChart} onChange={setEhrChart} />
+              </div>
+            )}
           </div>
 
           {!isSetBuilderMode && (
@@ -1226,6 +1508,30 @@ const Questions = () => {
                 </div>
             </div>
           </div>
+          )}
+
+          {itemFindings.length > 0 && (
+            <div
+              className={`rounded-xl border p-4 ${
+                itemFindings.some((f) => f.severity === 'error')
+                  ? 'border-amber-500/30 bg-amber-500/10'
+                  : 'border-border/60 bg-secondary/20'
+              }`}
+            >
+              <p className="text-sm font-medium mb-2">Review before saving</p>
+              <ul className="space-y-1 text-xs">
+                {itemFindings.map((f, i) => (
+                  <li key={`${f.code}-${i}`} className="flex items-start gap-2">
+                    <span
+                      className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${
+                        f.severity === 'error' ? 'bg-amber-500' : 'bg-muted-foreground/50'
+                      }`}
+                    />
+                    <span className="text-muted-foreground">{f.message}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
 
           <div className="flex justify-end pt-6 gap-3 border-t border-border/50">
