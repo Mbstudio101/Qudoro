@@ -7,8 +7,43 @@ import { alignAnswersToOptions, normalizeAnswerText } from '../utils/answerMatch
 import { toDayKey } from '../utils/dateKeys';
 import { questionCountOf, setCountOf, richnessOf, parsePersistMeta, pickBestCandidate, type PersistCandidate, type PersistMeta } from '../utils/persistMerge';
 import { BlackboardCourse, BlackboardAssignment, BlackboardGrade, BlackboardToken } from '../types/blackboard';
+import { NgnItem, NgnResponse, EhrChart } from '../types/ngn';
 import { getSupabaseClient } from '../services/marketplace/supabaseClient';
 
+
+/** How an item's content came to exist. Drives what can be safely published. */
+export type QuestionOrigin =
+  | 'authored'   // written by hand in the editor
+  | 'imported'   // brought in from an external set — provenance is the importer's problem
+  | 'generated'; // produced from a cited source passage
+
+export interface SourceCitation {
+  /** Human-readable attribution, e.g. "StatPearls: Hyperkalemia (CC BY 4.0)". */
+  citation: string;
+  url?: string;
+  /** The passage the claim was drawn from, kept so a reviewer can check it. */
+  excerpt?: string;
+  retrievedAt?: number;
+  /** Reuse terms of the source — the field that decides if this can ship. */
+  license?: string;
+}
+
+export interface QuestionProvenance {
+  origin: QuestionOrigin;
+  /** Sources backing the stem and rationale. Empty for hand-authored items. */
+  sources: SourceCitation[];
+  /** Set when a qualified human has checked the clinical content. */
+  reviewedBy?: string;
+  reviewedAt?: number;
+  /** Free-text note from the reviewer — why it passed, or what they changed. */
+  reviewNote?: string;
+  /** Model + prompt version, when `origin` is 'generated'. For recalls. */
+  generator?: { model: string; promptVersion: string; generatedAt: number };
+}
+
+/** An item is publishable only once a human has actually signed off on it. */
+export const isVerified = (q: Pick<Question, 'provenance'>): boolean =>
+  Boolean(q.provenance?.reviewedBy && q.provenance?.reviewedAt);
 
 export interface Question {
   id: string;
@@ -23,6 +58,23 @@ export interface Question {
   tags: string[];
   domain?: string;
   questionStyle?: string;
+  /**
+   * Next Generation NCLEX item payload. Absent on classic flashcard/MCQ
+   * questions, which keep behaving exactly as before. When present, Practice
+   * renders the NGN player and grades with partial credit; `answer` still holds
+   * a readable answer key so exports and review screens keep working.
+   */
+  ngn?: NgnItem;
+  /** Optional 5-tab EHR chart shown alongside the question. */
+  ehr?: EhrChart;
+  /**
+   * Where this item's clinical claims come from, and who signed off on them.
+   * Absent on hand-authored and imported questions, which keep behaving exactly
+   * as before — but an item with no `provenance` cannot be reported as verified,
+   * and that is the point: it makes unsourced content visible instead of
+   * indistinguishable from reviewed content.
+   */
+  provenance?: QuestionProvenance;
   createdAt: number;
   box: number;
   nextReviewDate: number;
@@ -109,6 +161,10 @@ export interface ActiveExam {
   score: number;
   incorrectQuestionIds: string[];
   userSelections: Record<string, string[]>;
+  /** In-progress answers for NGN questions, keyed by question id. */
+  ngnResponses?: Record<string, NgnResponse>;
+  /** Running partial-credit tally across NGN questions in this session. */
+  ngnPoints?: { earned: number; possible: number };
   startTime: number;
   timeRemainingSec: number | null;
   isDrillMode: boolean;

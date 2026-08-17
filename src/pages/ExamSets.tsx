@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useStore, ExamSet } from '../store/useStore';
-import { Trash2, Edit2, Play, Layers, Zap, Brain, Clock3 } from 'lucide-react';
+import { Trash2, Edit2, Play, Layers, Zap, Brain, Clock3, TrendingUp, TrendingDown, Minus, LineChart } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
@@ -8,19 +8,31 @@ import Textarea from '../components/ui/Textarea';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { CARD_GRADIENT_OPTIONS, getCardGradientClasses } from '../utils/cardGradients';
+import { getExamHistory } from '../utils/examHistory';
+import ExamHistoryModal from '../components/ExamHistoryModal';
 
 const ExamSets = () => {
   const navigate = useNavigate();
-  const { sets: allSets, questions: allQuestions, deleteSet, updateSet, activeProfileId } = useStore();
-  
+  const { sets: allSets, questions: allQuestions, sessions, deleteSet, updateSet, activeProfileId } = useStore();
+
   const sets = useMemo(() => allSets.filter(s => !s.profileId || s.profileId === activeProfileId), [allSets, activeProfileId]);
+
+  // Per-set attempt history, keyed by set id, recomputed when sessions change.
+  const historyBySet = useMemo(() => {
+    const map: Record<string, ReturnType<typeof getExamHistory>> = {};
+    for (const s of sets) map[s.id] = getExamHistory(sessions, s.id, activeProfileId);
+    return map;
+  }, [sets, sessions, activeProfileId]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSet, setEditingSet] = useState<ExamSet | null>(null);
-  
+
   // Study Mode Selection State
   const [selectedSetForExam, setSelectedSetForExam] = useState<ExamSet | null>(null);
   const [isStudyModeModalOpen, setIsStudyModeModalOpen] = useState(false);
+
+  // Score-history modal state
+  const [historySet, setHistorySet] = useState<ExamSet | null>(null);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -143,6 +155,45 @@ const ExamSets = () => {
                   );
                 })()}
               </div>
+              {(() => {
+                const hist = historyBySet[set.id];
+                if (!hist || !hist.latest) return null;
+                const { latest, delta } = hist;
+                return (
+                  <button
+                    type="button"
+                    onClick={() => setHistorySet(set)}
+                    className="mt-3 flex w-full items-center justify-between rounded-lg border border-border/70 bg-background/50 px-3 py-2 text-left transition-colors hover:bg-background/80"
+                  >
+                    <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <LineChart className="h-3.5 w-3.5" /> Last score
+                    </span>
+                    <span className="flex items-center gap-2 text-sm font-semibold">
+                      {latest.pct}%
+                      {delta !== null && (
+                        <span
+                          className={`flex items-center gap-0.5 text-[11px] font-medium ${
+                            delta > 0
+                              ? 'text-green-500'
+                              : delta < 0
+                              ? 'text-red-500'
+                              : 'text-muted-foreground'
+                          }`}
+                        >
+                          {delta > 0 ? (
+                            <TrendingUp className="h-3 w-3" />
+                          ) : delta < 0 ? (
+                            <TrendingDown className="h-3 w-3" />
+                          ) : (
+                            <Minus className="h-3 w-3" />
+                          )}
+                          {delta > 0 ? '+' : ''}{delta}%
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                );
+              })()}
               <div className="mt-3 space-y-1">
                 <label className="text-[11px] font-medium text-muted-foreground">Card Color</label>
                 <select
@@ -189,6 +240,15 @@ const ExamSets = () => {
           </div>
         )}
       </div>
+
+      {historySet && (
+        <ExamHistoryModal
+          isOpen={!!historySet}
+          onClose={() => setHistorySet(null)}
+          title={historySet.title}
+          history={historyBySet[historySet.id] ?? getExamHistory(sessions, historySet.id, activeProfileId)}
+        />
+      )}
 
       <Modal
         isOpen={isModalOpen}

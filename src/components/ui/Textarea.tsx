@@ -1,7 +1,13 @@
 import React from 'react';
 import { twMerge } from 'tailwind-merge';
 
-const Textarea = ({ className, ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => {
+// `ref` is accepted as a plain prop (React 19) so callers can drive the caret,
+// e.g. inserting a cloze placeholder at the cursor.
+type TextareaProps = React.TextareaHTMLAttributes<HTMLTextAreaElement> & {
+  ref?: React.Ref<HTMLTextAreaElement>;
+};
+
+const Textarea = ({ className, ...props }: TextareaProps) => {
   return (
     <textarea
       className={twMerge(

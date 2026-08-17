@@ -1,3 +1,7 @@
+import type { ContentAttestation } from '../utils/publishGuard';
+
+export type { ContentAttestation };
+
 export type SharedSetVisibility = 'public' | 'private';
 export type DiscoverTab = 'all' | 'trending' | 'new' | 'saved' | 'following';
 
@@ -55,6 +59,13 @@ export interface SharedSetSummary {
   createdAt: string;
   updatedAt: string;
   author: MarketplaceAuthor;
+  /**
+   * The publisher's declared origin for this content. Optional so sets shared
+   * before attestation existed keep loading — but the UI must render a missing
+   * attestation as "unverified" rather than hiding it, since that is exactly
+   * the population most likely to be someone else's content.
+   */
+  attestation?: ContentAttestation;
 }
 
 export interface SharedSetDetail extends SharedSetSummary {
@@ -115,4 +126,6 @@ export interface PublishSetInput {
   tags: string[];
   visibility: SharedSetVisibility;
   questions: PublishQuestionInput[];
+  /** Required — `checkSetForPublish` blocks publishing without one. */
+  attestation: ContentAttestation;
 }
